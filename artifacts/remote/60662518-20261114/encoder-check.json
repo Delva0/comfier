@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "seconds": 7.383859913003107,
+  "clip_call_id": "0957832d380c4409b9cc2e0305f34169",
+  "conditioning_call_id": "33f84555a7fd4356a3a534758560549e",
+  "conditioning_shape": [
+    1,
+    84,
+    5120
+  ],
+  "conditioning_finite": true,
+  "latent_shape": [
+    1,
+    24,
+    1,
+    128,
+    128
+  ]
+}

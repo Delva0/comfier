@@ -1,0 +1,63 @@
+# SDK 调用与 graph 语义
+
+实现：[client.py](../../src/comani/client.py)、[refs.py](../../src/comani/refs.py)、[graph.py](../../src/comani/graph.py)。
+
+## Eager 调用
+
+```python
+async with Client(url, token=token) as remote:
+    a = remote.node("OriginalClassName", **{"input name": value})
+    b = remote.node("Consumer", value=a.output(0))
+    result, = await b
+```
+
+节点名称直接使用 registry 的原始字符串；常规输入可写 kwargs，任意字符串键使用 `**dict`。不根据节点名生成 Python 属性或函数。
+
+调用时创建 Call、完成 future 和发送项。后台 sender 完成握手/必要 artifact 上传后发送；等待提交 ACK 不等于等待计算完成。未 await 的调用也会执行，但事件循环必须有调度机会。Client 应通过 `async with` 或显式 `await close()` 管理。
+
+| 对象/操作 | 含义 |
+|---|---|
+| `Call` | 一次 invocation；可持有该调用的全部输出槽 |
+| `call.output(i)` | 该输出槽的 `OutputFuture`，可以尚未就绪 |
+| `await call` | 按实际输出顺序返回 `tuple[RemoteRef, ...]` |
+| `await call.output(i)` | 等同一 producer token，返回一个 `RemoteRef` |
+| `RemoteRef` | 已取得的远端引用，不可 await；仍可能因 session/缓存失效 |
+| `await ref.fetch()` | 显式反序列化到本地，不重新执行 producer |
+
+`.python()` 仍是一个输出槽：函数返回 tuple/list/dict 时，整个返回值放在此槽中，不自动解包。零输出调用的整体结果是空 tuple，副作用仍需执行完成。
+
+取消某个本地 waiter 不取消底层远端调用。`close(wait=False)` 关闭会话并令待处理 SDK 等待失败；原生正在执行的同步工作不保证立即停止，见 [Runtime](runtime.md)。
+
+## Graph receiver
+
+```python
+with remote.graph() as workflow:
+    image = workflow.input("image", type="IMAGE")
+    middle, = await remote.node("ImageInvert", image=image)
+    last = remote.node("ImageInvert", image=middle)
+    workflow.output("image", last.output(0))
+
+run = remote.submit(workflow, inputs={"image": source.output(0)})
+early = await run[middle]
+final = await run.output("image")
+```
+
+`with` 通过 ContextVar 切换当前任务的 receiver；嵌套退出和异常退出会恢复先前 receiver。scope 内调用只记录节点，`await call` 不挂起，立即返回符号 GraphRefs。普通 Python 此时仍在本地执行；符号值不能用于本地 bool 判断、迭代运行时数据或 fetch。
+
+退出 scope 只封图，不提交。GraphRef 不冒充 RemoteRef，且本身不可 await；图外通过 `run[GraphRef]` 将它绑定到某一次运行。一个 sealed graph 可以重复提交，每个 run 有独立调用 ID，端口不会隐式绑定到“最后一次运行”。
+
+`run.output(name)` 的名称是声明输出的 slot 别名，整体 await 仍按声明顺序返回 tuple。它和 `await run` 等整个 workflow invocation，包括原生收尾；`run[GraphRef]` 等该节点 producer，可在整体结束前就绪。声明输出已经产出不代表 workflow 已完成。
+
+## 目标、组合与控制流
+
+声明的输出 demand 其 producer；原生 OUTPUT_NODE 可作为默认执行根，显式副作用用 `workflow.target(call)`。查询 `run[port]` 不添加执行目标，所以未被原生 lazy 分支请求的中间量会得到 `Skipped`，不会自动补算。
+
+在外层 capture 中调用 `remote.submit(inner, inputs=...)` 会结构性嵌入子图：绑定输入、隔离节点 ID、重映射连接与输出，不发送独立 RPC。它不做全程序捕获、跨实例分配或全局优化。
+
+相邻的两个 graph 内 await 不增加 A→B 顺序边；只有输出传入输入才形成数据边。数据相关条件、循环和动态展开使用原生节点表达；本地已知参数可用普通 Python if/for 决定构图结构。
+
+输出 metadata 未知时，graph 内自动 tuple 解包报 `UnknownOutputLayout`；可显式使用 `call.output(slot)`。真实执行返回实际布局，显式 pending slot 不被旧 metadata 快照提前限制。
+
+## 原生 API prompt
+
+`remote.submit(api_prompt, outputs={"image": ["decode", 0]}, targets=["decode"])` 接受后端 `node_id -> {class_type, inputs}` 格式。它保留原生 `[node_id, slot]` 链接，不是前端 canvas JSON。外部 Python 内存对象和远端引用通过 capture 的 input/bindings 传入，不直接塞进标准 JSON。

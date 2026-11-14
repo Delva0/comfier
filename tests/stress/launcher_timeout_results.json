@@ -1,0 +1,9 @@
+{
+  "passed": true,
+  "start_returncode": 1,
+  "recorded_pid": 712530,
+  "ready": false,
+  "startup_error": "Daemon was not ready within 0.001s: <urlopen error [Errno 111] Connection refused>; inspect /home/delva/projects/comani/next/.local/daemon.log",
+  "recorded_child_alive": false,
+  "port_listening": false
+}

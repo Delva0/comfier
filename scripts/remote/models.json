@@ -1,0 +1,24 @@
+{
+  "diffusion": {
+    "filename": "diffusion_models/minimax_H3_image_pruned_INT8.safetensors",
+    "url": "https://civitai.com/api/download/models/3462708?fileId=3365259",
+    "bytes": 20979337386,
+    "sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+    "source": "https://civitai.com/api/v1/model-versions/3462708",
+    "model_id": 3045867,
+    "version_id": 3462708,
+    "file_id": 3365259
+  },
+  "encoder": {
+    "filename": "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/0bb149f51e3156ed4b90dd45d5620346bfe1df8f/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+    "bytes": 15687142551,
+    "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6"
+  },
+  "vae": {
+    "filename": "vae/minimax_h3_image_vae_fp16.safetensors",
+    "url": "https://huggingface.co/Comfy-Org/MiniMax-H3-Image/resolve/0bb149f51e3156ed4b90dd45d5620346bfe1df8f/vae/minimax_h3_image_vae_fp16.safetensors",
+    "bytes": 1168505312,
+    "sha256": "d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af"
+  }
+}

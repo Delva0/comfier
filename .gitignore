@@ -1,0 +1,17 @@
+.venv*/
+.local/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.env
+.env.*
+!.env.example
+*.log
+
+# Keep generated assets and private run files local. Only selected, reviewed
+# acceptance reports are force-added to the repository.
+/artifacts/

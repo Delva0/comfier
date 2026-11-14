@@ -1,0 +1,11 @@
+{
+  "expected_connection_error": "ClientConnectorError",
+  "http_session_closed": {
+    "_session": true,
+    "_wait_session": true,
+    "_data_session": true
+  },
+  "client_closed": true,
+  "sender_stopped": true,
+  "passed": true
+}

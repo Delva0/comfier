@@ -1,0 +1,235 @@
+{
+  "definition": "Physical lines include blanks/comments; nonblank_noncomment excludes blank and # comment-only lines but includes docstrings. Third-party environments, artifacts and generated files excluded. JSON result/environment manifests are not counted as code or prose.",
+  "groups": {
+    "sdk": {
+      "file_count": 8,
+      "physical_lines": 1201,
+      "nonblank_noncomment_lines": 998,
+      "files": {
+        "src/comani/__init__.py": {
+          "physical_lines": 27,
+          "nonblank_noncomment_lines": 25,
+          "sha256": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e"
+        },
+        "src/comani/client.py": {
+          "physical_lines": 365,
+          "nonblank_noncomment_lines": 327,
+          "sha256": "957df6e3ae386bbb8e147671f92ab947b791f5f9e7c6be47697814a0413f8fe5"
+        },
+        "src/comani/code.py": {
+          "physical_lines": 123,
+          "nonblank_noncomment_lines": 107,
+          "sha256": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153"
+        },
+        "src/comani/errors.py": {
+          "physical_lines": 72,
+          "nonblank_noncomment_lines": 41,
+          "sha256": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3"
+        },
+        "src/comani/graph.py": {
+          "physical_lines": 214,
+          "nonblank_noncomment_lines": 181,
+          "sha256": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550"
+        },
+        "src/comani/protocol.py": {
+          "physical_lines": 85,
+          "nonblank_noncomment_lines": 67,
+          "sha256": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb"
+        },
+        "src/comani/refs.py": {
+          "physical_lines": 244,
+          "nonblank_noncomment_lines": 196,
+          "sha256": "dcf753ba5e56cbd3078d38a579dd95e8a00f65c7649f58e399488fa3658d1e58"
+        },
+        "src/comani/transport.py": {
+          "physical_lines": 71,
+          "nonblank_noncomment_lines": 54,
+          "sha256": "63413d7ad7b421162eb14b7e064c335c643b0aef1d49eda2312ee11247d93447"
+        }
+      }
+    },
+    "runtime": {
+      "file_count": 7,
+      "physical_lines": 1240,
+      "nonblank_noncomment_lines": 1071,
+      "files": {
+        "src/comani/_runtime/__init__.py": {
+          "physical_lines": 5,
+          "nonblank_noncomment_lines": 3,
+          "sha256": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2"
+        },
+        "src/comani/_runtime/__main__.py": {
+          "physical_lines": 32,
+          "nonblank_noncomment_lines": 26,
+          "sha256": "e822a7bc4023c3d496c79d27bfdb8c629dbe0685337da9f73dacf24065141e4c"
+        },
+        "src/comani/_runtime/adapter.py": {
+          "physical_lines": 235,
+          "nonblank_noncomment_lines": 196,
+          "sha256": "ae64896928fbcd2dd95a8d9f2dcddb9609b7b62dc5a34796661613f915bcb4e5"
+        },
+        "src/comani/_runtime/http.py": {
+          "physical_lines": 130,
+          "nonblank_noncomment_lines": 116,
+          "sha256": "1416e0952921dff52ab0ab4b6d5ae319a1ae41723afba3b50d1f4ee8fb14a111"
+        },
+        "src/comani/_runtime/objects.py": {
+          "physical_lines": 127,
+          "nonblank_noncomment_lines": 102,
+          "sha256": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537"
+        },
+        "src/comani/_runtime/python_node.py": {
+          "physical_lines": 206,
+          "nonblank_noncomment_lines": 177,
+          "sha256": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021"
+        },
+        "src/comani/_runtime/service.py": {
+          "physical_lines": 505,
+          "nonblank_noncomment_lines": 451,
+          "sha256": "3db6598c56eca9f99b9558a7e130748a99687bb13aba1ab0b6e83c210aade221"
+        }
+      }
+    },
+    "tests": {
+      "file_count": 11,
+      "physical_lines": 1823,
+      "nonblank_noncomment_lines": 1540,
+      "files": {
+        "tests/integration/conftest.py": {
+          "physical_lines": 30,
+          "nonblank_noncomment_lines": 25,
+          "sha256": "a60ba3f4c941917f7b82cfac825d35e70a1486f7e08404e04562a391b32fa03b"
+        },
+        "tests/integration/test_gpu.py": {
+          "physical_lines": 127,
+          "nonblank_noncomment_lines": 109,
+          "sha256": "3b2a0800c3bc45648a3207e7bfdb24b2babca0a94b52116ab325c9715ae2416e"
+        },
+        "tests/integration/test_http.py": {
+          "physical_lines": 334,
+          "nonblank_noncomment_lines": 289,
+          "sha256": "7b08c328efe39aaf63acc2219abc7dcef02bc21bb0326f0c661d198c5a376928"
+        },
+        "tests/integration/test_sdk_environment.py": {
+          "physical_lines": 98,
+          "nonblank_noncomment_lines": 90,
+          "sha256": "57f7151067e33fac42ce37d9f167ef3f607f6eef19701efd5f5e68fc462306f6"
+        },
+        "tests/native/test_gate.py": {
+          "physical_lines": 386,
+          "nonblank_noncomment_lines": 311,
+          "sha256": "cd79e311e669c1be3e96403f68d6d97dc2d6d336c5f07b0eff3cb57410de0132"
+        },
+        "tests/native/test_http_security.py": {
+          "physical_lines": 80,
+          "nonblank_noncomment_lines": 67,
+          "sha256": "eedf43cc044b3577f042b4fa0e93d08ab65557e843437f5d00c3605423cd11fb"
+        },
+        "tests/native/test_packages.py": {
+          "physical_lines": 64,
+          "nonblank_noncomment_lines": 55,
+          "sha256": "9de42fce1f70e6dfc14aa9951f1b15a845a8e1b3aa68f38610957a5b3710d244"
+        },
+        "tests/unit/cache_settlement_probe.py": {
+          "physical_lines": 115,
+          "nonblank_noncomment_lines": 99,
+          "sha256": "cdd8812c39845c45e5a03f353b0fa5f3f8a562f5bf1e969ceace3d25d2d352ea"
+        },
+        "tests/unit/conftest.py": {
+          "physical_lines": 122,
+          "nonblank_noncomment_lines": 103,
+          "sha256": "2ab06a91d6560b27ec3c3ee2e9c007cd81b252c7ae0bb2232437d55fc356c3ff"
+        },
+        "tests/unit/test_runtime_settlement.py": {
+          "physical_lines": 32,
+          "nonblank_noncomment_lines": 28,
+          "sha256": "d866f835db0be6038f84193068bc64d0606b7e333aae22beb28bcc23a37405bc"
+        },
+        "tests/unit/test_sdk.py": {
+          "physical_lines": 435,
+          "nonblank_noncomment_lines": 364,
+          "sha256": "d1ae8110736f6ff1dbf54b15c90ecbed8d0b88f2550e0b6c7928b3ca22ffdeb6"
+        }
+      }
+    },
+    "scripts": {
+      "file_count": 4,
+      "physical_lines": 232,
+      "nonblank_noncomment_lines": 199,
+      "files": {
+        "scripts/bootstrap_runtime.py": {
+          "physical_lines": 55,
+          "nonblank_noncomment_lines": 49,
+          "sha256": "38d7a42dfc9252e1b4ad6536bb44694b29b17e7ce6e062ae0960ee9e20477cae"
+        },
+        "scripts/check_environment.py": {
+          "physical_lines": 46,
+          "nonblank_noncomment_lines": 39,
+          "sha256": "f5eb7ead19442c680b97f2189ca0a9368370fd5935cb9b091fc1843d15fd7fe9"
+        },
+        "scripts/dev_server.py": {
+          "physical_lines": 85,
+          "nonblank_noncomment_lines": 73,
+          "sha256": "dc614720d699e3bf66a8631030c351cd81134d4dc20810de17088ba940f8b3fd"
+        },
+        "scripts/example.py": {
+          "physical_lines": 46,
+          "nonblank_noncomment_lines": 38,
+          "sha256": "81c1cb81256d0d82333cb008bff3462db445399f3a1917c663db235d9f2c2bc2"
+        }
+      }
+    },
+    "documentation": {
+      "file_count": 2,
+      "physical_lines": 346,
+      "nonblank_noncomment_lines": 268,
+      "files": {
+        "README.md": {
+          "physical_lines": 196,
+          "nonblank_noncomment_lines": 150,
+          "sha256": "63978b18c4313bc3dbb2404515b6bf8d33fcf5ecbb82e692e17dc2c61494f1ac"
+        },
+        "docs/delivery.md": {
+          "physical_lines": 150,
+          "nonblank_noncomment_lines": 118,
+          "sha256": "871172c123ebd647572272fa8b19475e859b780fff19908fce49e2824b5812b4"
+        }
+      }
+    },
+    "configuration": {
+      "file_count": 3,
+      "physical_lines": 46,
+      "nonblank_noncomment_lines": 39,
+      "files": {
+        ".gitignore": {
+          "physical_lines": 8,
+          "nonblank_noncomment_lines": 8,
+          "sha256": "e4e45f6febedf1703187950eca36baa259a328beaa9e85217c5e270ea322f5ae"
+        },
+        "pyproject.toml": {
+          "physical_lines": 34,
+          "nonblank_noncomment_lines": 28,
+          "sha256": "5c0c0ebd49bc6f2030e02415e6805c9ec179d47b5fc5d343389bb0bcbde2dadb"
+        },
+        "runtime-constraints.txt": {
+          "physical_lines": 4,
+          "nonblank_noncomment_lines": 3,
+          "sha256": "53c7d054edd6229e2c656737c3aa443d94fb6ac7ba72c0e2ebd8e215c0a929bd"
+        }
+      }
+    }
+  },
+  "state": {
+    "legacy_head": "348d2aa8f7e7aeacf259cad99851bb8ffebd5fe1",
+    "legacy_status": {
+      " D": 89,
+      " M": 7,
+      "??": 224
+    },
+    "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "comfy_status": "",
+    "port8190_listening": false,
+    "recorded_daemon_pid": 589987,
+    "recorded_daemon_pid_exists": false
+  }
+}

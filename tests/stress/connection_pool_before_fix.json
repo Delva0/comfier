@@ -1,0 +1,12 @@
+{
+  "calls_created": 128,
+  "accepted_after_800ms": 128,
+  "native_first_done_before_control_test": false,
+  "http_connections_acquired_before_probe": 100,
+  "separate_control_ms": 1.22,
+  "sdk_heartbeat_timed_out_300ms": true,
+  "sdk_heartbeat_ms": 323.392,
+  "sdk_close_wait_false_timed_out_300ms": true,
+  "sdk_close_ms": 335.803,
+  "passed": false
+}

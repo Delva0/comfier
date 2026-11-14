@@ -1,0 +1,448 @@
+{
+  "native_delay_seconds": 140,
+  "proxy_read_cutoff_seconds": 125,
+  "started": "2026-11-14T22:37:37+0800",
+  "pid": 711132,
+  "long_call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+  "elapsed_seconds": 140.007,
+  "long_call_submissions": 1,
+  "local_waiters": 16,
+  "local_waiters_cancelled": 4,
+  "wait_query_count": 10,
+  "pending_responses": 6,
+  "sdk_wait_query_times": {
+    "n": 10,
+    "p50_ms": 20001.893,
+    "p95_ms": 20026.561,
+    "max_ms": 20026.561
+  },
+  "stable_terminal_ref": "9c1af72275c54e90a83603ff4e1f8da1",
+  "terminal_rechecks": 3,
+  "control_latency": {
+    "n": 278,
+    "p50_ms": 0.966,
+    "p95_ms": 1.772,
+    "max_ms": 3.087
+  },
+  "long_task_passed": true,
+  "after_local_gc_before_close": {
+    "calls": 0,
+    "objects": 0,
+    "sdk_states": 0,
+    "sdk_watchers": 0
+  },
+  "capability_absent_single_legacy_query": true,
+  "passed": true,
+  "completed": "2026-11-14T22:39:55+0800",
+  "rpc_traces": [
+    {
+      "method": "handshake",
+      "params": {
+        "session_id": "e45734baf0114eb38a9d43f6667e816d"
+      },
+      "status": 200,
+      "seconds": 0.005632864995277487
+    },
+    {
+      "method": "submit",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "spec": {
+          "kind": "node",
+          "node_type": "IndependentSlow",
+          "inputs": {
+            "value": 1234567,
+            "delay": 140
+          }
+        }
+      },
+      "status": 200,
+      "seconds": 0.0007486629983759485
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 0.2
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 0.20133717399585294
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 0.5
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 0.5017803859955166
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0003312699991511181
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 20.026560760001303
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.001993764999497216
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0008395990007556975
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 20.004692705995694
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0002725869999267161
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0002675259966054
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 20.001631535000342
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.00024347699945792556
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.00031326700263889506
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 20.002154332003556
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0003816070020548068
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0015490640071220696
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 20.002337190999242
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0002351280054426752
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.00028964599914615974
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": true,
+      "terminal_ids": [],
+      "status": 200,
+      "seconds": 20.002531284000725
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.00022559399803867564
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0005642969990731217
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20.0
+      },
+      "pending": false,
+      "terminal_ids": [
+        "9c1af72275c54e90a83603ff4e1f8da1"
+      ],
+      "status": 200,
+      "seconds": 19.961423849999846
+    },
+    {
+      "method": "fetch",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "ref_id": "9c1af72275c54e90a83603ff4e1f8da1",
+        "epoch": "b4c2132ed0c74d2ab721a7190faed5f2"
+      },
+      "status": 200,
+      "seconds": 0.0008359810017282143
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20
+      },
+      "pending": false,
+      "terminal_ids": [
+        "9c1af72275c54e90a83603ff4e1f8da1"
+      ],
+      "status": 200,
+      "seconds": 0.0004997950018150732
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20
+      },
+      "pending": false,
+      "terminal_ids": [
+        "9c1af72275c54e90a83603ff4e1f8da1"
+      ],
+      "status": 200,
+      "seconds": 0.00045479400432668626
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_id": "cf20522c8bc64291a0ffa3afc44b0d7c",
+        "node_id": null,
+        "wait_seconds": 20
+      },
+      "pending": false,
+      "terminal_ids": [
+        "9c1af72275c54e90a83603ff4e1f8da1"
+      ],
+      "status": 200,
+      "seconds": 0.00043656100024236366
+    },
+    {
+      "method": "release",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "epoch": "b4c2132ed0c74d2ab721a7190faed5f2",
+        "refs": [
+          "9c1af72275c54e90a83603ff4e1f8da1"
+        ]
+      },
+      "status": 200,
+      "seconds": 0.0006074650009395555
+    },
+    {
+      "method": "forget_calls",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58",
+        "call_ids": [
+          "cf20522c8bc64291a0ffa3afc44b0d7c"
+        ],
+        "epoch": "b4c2132ed0c74d2ab721a7190faed5f2"
+      },
+      "status": 200,
+      "seconds": 0.0007112489984137937
+    },
+    {
+      "method": "heartbeat",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0006902660024934448
+    },
+    {
+      "method": "close_session",
+      "params": {
+        "session_id": "b0b7b5b54b3b462f9fa5dc9633ad8e58"
+      },
+      "status": 200,
+      "seconds": 0.0016423170018242672
+    },
+    {
+      "method": "handshake",
+      "params": {
+        "session_id": "c5346dae29f547c3a3434eef53356931"
+      },
+      "status": 200,
+      "seconds": 0.007250233000377193
+    },
+    {
+      "method": "submit",
+      "params": {
+        "session_id": "0864ce5d4c034293ac3d6402366747aa",
+        "call_id": "b3aeb950cd55422a84e29c1b5282703d",
+        "spec": {
+          "kind": "node",
+          "node_type": "IndependentSlow",
+          "inputs": {
+            "value": 7,
+            "delay": 0.05
+          }
+        }
+      },
+      "status": 200,
+      "seconds": 0.0007932739972602576
+    },
+    {
+      "method": "wait_result",
+      "params": {
+        "session_id": "0864ce5d4c034293ac3d6402366747aa",
+        "call_id": "b3aeb950cd55422a84e29c1b5282703d",
+        "node_id": null
+      },
+      "pending": false,
+      "terminal_ids": [
+        "685bbd3d3a3b4dc78c045df2ab3a10bf"
+      ],
+      "status": 200,
+      "seconds": 0.05145881100179395
+    },
+    {
+      "method": "fetch",
+      "params": {
+        "session_id": "0864ce5d4c034293ac3d6402366747aa",
+        "ref_id": "685bbd3d3a3b4dc78c045df2ab3a10bf",
+        "epoch": "b4c2132ed0c74d2ab721a7190faed5f2"
+      },
+      "status": 200,
+      "seconds": 0.0002597330021671951
+    },
+    {
+      "method": "close_session",
+      "params": {
+        "session_id": "0864ce5d4c034293ac3d6402366747aa"
+      },
+      "status": 200,
+      "seconds": 0.0017921850012498908
+    }
+  ],
+  "final": {
+    "calls": 0,
+    "objects": 0,
+    "leases": 0,
+    "active_sessions": 0,
+    "sdk_watchers": 0,
+    "tasks": 3,
+    "rss_mib": 893.54
+  }
+}

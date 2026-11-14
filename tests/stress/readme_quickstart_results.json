@@ -1,0 +1,48 @@
+{
+  "scope": "root README quickstart using existing runtime environment; --cpu documented in development guide",
+  "steps": [
+    {
+      "command": [
+        "/home/delva/projects/comani/next/.venv/bin/python",
+        "-B",
+        "scripts/dev_server.py",
+        "start",
+        "--comfy-root",
+        "/home/delva/projects/ComfyUI",
+        "--port",
+        "8190",
+        "--cpu"
+      ],
+      "returncode": 0,
+      "seconds": 4.86,
+      "stdout": "{\n  \"pid\": 710115,\n  \"identity\": \"4523014\",\n  \"url\": \"http://127.0.0.1:8190\",\n  \"log\": \"/home/delva/projects/comani/next/.local/daemon.log\",\n  \"comfy_root\": \"/home/delva/projects/ComfyUI\",\n  \"cpu\": true,\n  \"started\": \"2026-11-14T22:33:04+0800\",\n  \"ready\": true\n}\n",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "/home/delva/projects/comani/next/.venv/bin/python",
+        "-B",
+        "scripts/example.py",
+        "--url",
+        "http://127.0.0.1:8190"
+      ],
+      "returncode": 0,
+      "seconds": 1.397,
+      "stdout": "{\"eager_shape\": [1, 64, 64, 3], \"workflow_shape\": [1, 64, 64, 3], \"intermediate_ownership\": \"borrowed\", \"native_json_shape\": [1, 64, 64, 3]}\n",
+      "stderr": "/home/delva/projects/comani/next/.venv/lib/python3.11/site-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n"
+    },
+    {
+      "command": [
+        "/home/delva/projects/comani/next/.venv/bin/python",
+        "-B",
+        "scripts/dev_server.py",
+        "stop"
+      ],
+      "returncode": 0,
+      "seconds": 1.075,
+      "stdout": "Stopped recorded PID 710115\n",
+      "stderr": ""
+    }
+  ],
+  "passed": true
+}

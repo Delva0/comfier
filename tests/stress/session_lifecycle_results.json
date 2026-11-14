@@ -1,0 +1,43 @@
+{
+  "ttl_seconds": 0.3,
+  "checks": [
+    "old identifier absent from both active sessions and bounded diagnostics",
+    "evicted stale ID cannot heartbeat/submit/fetch/wait; idempotent close/release does not recreate it",
+    "handshake proposing old ID minted a different ID; old token and input locator remain invalid",
+    "closed inflight session was evicted from diagnostics while its accepted input still held one lease",
+    "late native completion after diagnostic eviction safely reclaimed calls, output captures and input leases"
+  ],
+  "stale_rpc_results": [
+    {
+      "method": "heartbeat",
+      "status": 400,
+      "error": "SessionClosed"
+    },
+    {
+      "method": "submit",
+      "status": 400,
+      "error": "SessionClosed"
+    },
+    {
+      "method": "fetch",
+      "status": 400,
+      "error": "SessionClosed"
+    },
+    {
+      "method": "wait_result",
+      "status": 400,
+      "error": "SessionClosed"
+    }
+  ],
+  "passed": true,
+  "seconds": 2.38,
+  "final": {
+    "calls": 0,
+    "objects": 0,
+    "active_sessions": 0,
+    "closed_diagnostics": 64,
+    "request_records": 0,
+    "tasks": 3,
+    "rss_mib": 904.62
+  }
+}

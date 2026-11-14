@@ -1,0 +1,28 @@
+{
+  "native_delay_seconds": 140,
+  "proxy_read_cutoff_seconds": 125,
+  "started": "2026-11-14T22:32:03+0800",
+  "pid": 709625,
+  "long_call_id": "8116be766fb64d38a1b81e057973fd1b",
+  "elapsed_seconds": 140.003,
+  "long_call_submissions": 1,
+  "local_waiters": 16,
+  "local_waiters_cancelled": 4,
+  "wait_query_count": 10,
+  "pending_responses": 6,
+  "sdk_wait_query_times": {
+    "n": 10,
+    "p50_ms": 20001.448,
+    "p95_ms": 20002.077,
+    "max_ms": 20002.077
+  },
+  "stable_terminal_ref": "81f5d97ff5ed4b0db3ea5b0539edb0d8",
+  "terminal_rechecks": 3,
+  "control_latency": {
+    "n": 279,
+    "p50_ms": 0.794,
+    "p95_ms": 1.831,
+    "max_ms": 12.91
+  },
+  "long_task_passed": true
+}

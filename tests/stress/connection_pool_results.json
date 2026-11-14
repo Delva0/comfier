@@ -1,0 +1,18 @@
+{
+  "calls_created": 128,
+  "accepted_after_800ms": 128,
+  "native_first_done_before_control_test": false,
+  "http_connections_acquired_before_probe": 0,
+  "separate_wait_connections_before_probe": 100,
+  "separate_control_ms": 1.245,
+  "sdk_heartbeat_timed_out_300ms": false,
+  "sdk_heartbeat_ms": 0.353,
+  "sdk_close_wait_false_timed_out_300ms": false,
+  "sdk_close_ms": 13.416,
+  "all_http_sessions_closed": true,
+  "sdk_watchers_after_close": 0,
+  "tasks_after_native_settle": 3,
+  "runtime_calls_after_settle": 0,
+  "runtime_objects_after_settle": 0,
+  "passed": true
+}

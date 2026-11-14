@@ -1,0 +1,23 @@
+{
+  "shape": [
+    1,
+    512,
+    512,
+    3
+  ],
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "daemon_peak_cuda_allocated_bytes": 6876452864,
+  "model": "astralsea_v12.safetensors",
+  "prompt": "cinematic anime illustration, a small red panda sitting in a sunlit Japanese garden, maple leaves, detailed fur, warm colors, high quality",
+  "seed": 20261114,
+  "steps": 12,
+  "cfg": 6.5,
+  "sampler": "euler",
+  "scheduler": "normal",
+  "source": "LOCAL existing AstralSea checkpoint; not remote MiniMax acceptance",
+  "seconds": 19.855,
+  "png_sha256": "059a27eaa3c82be8cd76513799c0e1402e3b13fa9cdcec975f6fdb28fd548896",
+  "png_bytes": 328889,
+  "workflow_id": "12891400c6464db189040082aa7f3de2",
+  "output": "/home/delva/projects/comani/artifacts/local/astralsea-local-512.png"
+}

@@ -1,0 +1,12 @@
+{
+  "passed": true,
+  "handshake_cancelled": true,
+  "pending_call_error": "SessionClosed",
+  "http_sessions_closed": {
+    "_session": true,
+    "_wait_session": true,
+    "_data_session": true
+  },
+  "sender_stopped": true,
+  "client_closed": true
+}

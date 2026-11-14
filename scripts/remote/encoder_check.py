@@ -1,0 +1,41 @@
+"""Exercise the real offloaded H3 encoder while diffusion weights download."""
+import argparse
+import asyncio
+import importlib.util
+import json
+import os
+import time
+from pathlib import Path
+
+from comani import Client
+
+
+def describe(conditioning, latent):
+    import torch
+    return {'conditioning_shape': list(conditioning[0][0].shape),
+            'conditioning_finite': bool(torch.isfinite(conditioning[0][0]).all()),
+            'latent_shape': list(latent['samples'].shape)}
+
+
+async def main(args):
+    spec = importlib.util.spec_from_file_location('actual_h3_example', Path(__file__).parents[2] / 'examples/minimax_h3_remote.py')
+    example = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(example)
+    started = time.monotonic()
+    async with Client(os.environ['COMANI_URL'], token=os.environ['COMANI_TOKEN']) as remote:
+        clip = remote.node('CLIPLoader', clip_name=example.ENCODER, type='minimax', device='default')
+        call = remote.node('MiniMaxH3ImageConditioning', clip=clip.output(), prompt=example.PROMPT,
+                           width=example.WIDTH, height=example.HEIGHT)
+        details = await (await remote.python(describe, inputs={
+            'conditioning': call.output(0), 'latent': call.output(1)}).output()).fetch()
+        assert details['conditioning_finite']
+        result = {'passed': True, 'seconds': time.monotonic() - started, 'clip_call_id': clip.id,
+                  'conditioning_call_id': call.id, **details}
+        args.report.write_text(json.dumps(result, indent=2) + '\n')
+        print(json.dumps(result), flush=True)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--report', type=Path, required=True)
+    asyncio.run(main(parser.parse_args()))

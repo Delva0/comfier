@@ -1,0 +1,39 @@
+{
+  "non_gpu": {
+    "command": ".venv/bin/python -B -m pytest -q -m 'not gpu' -p no:cacheprovider",
+    "passed": 70,
+    "deselected": 2,
+    "seconds": 22.05
+  },
+  "gpu": {
+    "command": "COMANI_TEST_URL=http://127.0.0.1:8190 COMANI_TEST_CHECKPOINT=astralsea_v12.safetensors .venv/bin/python -B -m pytest -q tests/integration/test_gpu.py -p no:cacheprovider",
+    "passed": 2,
+    "seconds": 64.98,
+    "checkpoint": "astralsea_v12.safetensors",
+    "width": 64,
+    "height": 64,
+    "steps": 1,
+    "seed": 42,
+    "max_abs_error": 0.0,
+    "raw_call_id": "3ef837564f2e4f9fba07e2da139e2941",
+    "consumer_id": "cdd0a56c6af44110a437e8fa987c7501",
+    "note": "Final GPU proof uses unchanged native sampling/cache path. Subsequent package importer, HTTP and progress-event changes were verified in the final non-GPU suite."
+  },
+  "lint": {
+    "command": ".venv/bin/ruff check src tests scripts",
+    "result": "passed"
+  },
+  "wheel": {
+    "path": ".local/dist/comani-0.2.0-py3-none-any.whl",
+    "bytes": 35879,
+    "sha256": "027c4b8219756be71813ed82e5dd846663590bbb81d955eef3fbef83882a64a4",
+    "production_python_files": 15,
+    "source_matches": true,
+    "clean_install_environment": ".venv-wheel",
+    "real_http_without_torch": "passed"
+  },
+  "dependency_check": {
+    "distributions": 168,
+    "result": "compatible"
+  }
+}

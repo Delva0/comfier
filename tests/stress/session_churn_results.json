@@ -1,0 +1,100 @@
+{
+  "ttl_seconds": 0.3,
+  "snapshots": [
+    {
+      "label": "baseline",
+      "completed_sessions": 0,
+      "closed_sessions": 0,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 892.08
+    },
+    {
+      "label": "closed_batch",
+      "completed_sessions": 100,
+      "closed_sessions": 64,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 913.32
+    },
+    {
+      "label": "closed_batch",
+      "completed_sessions": 300,
+      "closed_sessions": 64,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 920.75
+    },
+    {
+      "label": "closed_batch",
+      "completed_sessions": 1000,
+      "closed_sessions": 64,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 922.5
+    },
+    {
+      "label": "after_additional_1_ttl",
+      "completed_sessions": 1000,
+      "closed_sessions": 64,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 922.5
+    },
+    {
+      "label": "after_additional_3_ttl",
+      "completed_sessions": 1000,
+      "closed_sessions": 64,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 922.5
+    },
+    {
+      "label": "after_additional_10_ttl",
+      "completed_sessions": 1000,
+      "closed_sessions": 64,
+      "seen_sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "leases": 0,
+      "inflight_calls": 0,
+      "requests_records": 0,
+      "tasks": 3,
+      "rss_mib": 922.5
+    }
+  ],
+  "seconds": 15.161,
+  "no_calls_or_objects_retained": true,
+  "closed_metadata_after_14_ttl": 64,
+  "seen_metadata_after_14_ttl": 0
+}

@@ -1,0 +1,305 @@
+{
+  "started": "2026-11-14T21:37:18+0800",
+  "pid": 664558,
+  "url": "http://127.0.0.1:8190",
+  "python": "3.11.11 (main, Mar 17 2025, 21:02:09) [Clang 20.1.0 ]",
+  "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+  "script_sha256": "7bd3de3aa9a4d32b29f6c12c3feed3a11dc70fd584da9b29cc4ca63b8f7fd3da",
+  "mode": "CPU; real native ComfyUI single worker; SDK requests over loopback HTTP",
+  "phases": [
+    {
+      "name": "semantics",
+      "passed": true,
+      "details": [
+        "borrowed cache eviction -> Expired",
+        "ready reference is not awaitable",
+        "native lazy/expansion -> 16; unselected -> Skipped",
+        "SDK cross-session ref rejected",
+        "wire cross-session token rejected",
+        "built-in native CPU EmptyImage/ImageInvert plus Python verified"
+      ],
+      "seconds": 0.562,
+      "after": {
+        "rss_mib": 891.26,
+        "tasks": 5,
+        "calls": 0,
+        "objects": 0,
+        "leases": 0,
+        "owned": 0,
+        "borrowed": 0,
+        "native_cache": 4,
+        "sessions_seen": 2,
+        "closed_sessions": 2,
+        "listeners": 0,
+        "queue": 0
+      },
+      "metrics": {
+        "rpc": {
+          "handshake": {
+            "n": 2,
+            "p50_ms": 5.96,
+            "p95_ms": 7.992,
+            "max_ms": 7.992
+          },
+          "submit": {
+            "n": 11,
+            "p50_ms": 0.48,
+            "p95_ms": 1.955,
+            "max_ms": 1.955
+          },
+          "wait_result": {
+            "n": 13,
+            "p50_ms": 5.227,
+            "p95_ms": 208.486,
+            "max_ms": 208.486
+          },
+          "fetch": {
+            "n": 10,
+            "p50_ms": 0.299,
+            "p95_ms": 0.734,
+            "max_ms": 0.734
+          },
+          "artifact_put": {
+            "n": 2,
+            "p50_ms": 1.58,
+            "p95_ms": 1.716,
+            "max_ms": 1.716
+          },
+          "release": {
+            "n": 1,
+            "p50_ms": 0.367,
+            "p95_ms": 0.367,
+            "max_ms": 0.367
+          },
+          "close_session": {
+            "n": 2,
+            "p50_ms": 0.859,
+            "p95_ms": 0.964,
+            "max_ms": 0.964
+          }
+        },
+        "control_queue": {
+          "n": 20,
+          "p50_ms": 0.611,
+          "p95_ms": 7.814,
+          "max_ms": 7.814
+        },
+        "accepted_to_running": {
+          "n": 10,
+          "p50_ms": 0.19,
+          "p95_ms": 202.129,
+          "max_ms": 202.129
+        },
+        "native_execution": {
+          "n": 10,
+          "p50_ms": 5.468,
+          "p95_ms": 207.791,
+          "max_ms": 207.791
+        },
+        "events": {
+          "accepted": 11,
+          "queued": 10,
+          "running": 10,
+          "native": 73,
+          "output_ready": 11,
+          "completed": 9,
+          "failed": 2
+        },
+        "peak_rss_mib": 891.26,
+        "peak_tasks": 15
+      }
+    },
+    {
+      "name": "raw_ws_disconnect_ttl",
+      "passed": true,
+      "details": [
+        "real /prompt,/history,/queue,/ws completed; WS listener reclaimed",
+        "disconnected long-poll session TTL reclaimed calls and objects"
+      ],
+      "seconds": 2.181,
+      "after": {
+        "rss_mib": 891.26,
+        "tasks": 5,
+        "calls": 0,
+        "objects": 0,
+        "leases": 0,
+        "owned": 0,
+        "borrowed": 0,
+        "native_cache": 1,
+        "sessions_seen": 4,
+        "closed_sessions": 4,
+        "listeners": 0,
+        "queue": 0
+      },
+      "metrics": {
+        "rpc": {},
+        "control_queue": {
+          "n": 94,
+          "p50_ms": 0.697,
+          "p95_ms": 1.192,
+          "max_ms": 3.063
+        },
+        "accepted_to_running": {
+          "n": 2,
+          "p50_ms": 0.187,
+          "p95_ms": 0.244,
+          "max_ms": 0.244
+        },
+        "native_execution": {
+          "n": 2,
+          "p50_ms": 29.492,
+          "p95_ms": 54.482,
+          "max_ms": 54.482
+        },
+        "events": {
+          "accepted": 2,
+          "queued": 2,
+          "running": 2,
+          "native": 16,
+          "output_ready": 3,
+          "completed": 2
+        },
+        "peak_rss_mib": 891.26,
+        "peak_tasks": 11
+      }
+    },
+    {
+      "name": "load_1_sessions",
+      "passed": true,
+      "sessions": 1,
+      "rounds_per_session": 4,
+      "calls": 16,
+      "waits_started": 58,
+      "waiters_cancelled": 16,
+      "unexpected_count": 0,
+      "unexpected_samples": [],
+      "seconds": 0.594,
+      "calls_per_second": 26.94,
+      "sessions_with_local_states_after": 0,
+      "after": {
+        "rss_mib": 891.26,
+        "tasks": 5,
+        "calls": 0,
+        "objects": 0,
+        "leases": 0,
+        "owned": 0,
+        "borrowed": 0,
+        "native_cache": 2,
+        "sessions_seen": 5,
+        "closed_sessions": 5,
+        "listeners": 0,
+        "queue": 0
+      },
+      "metrics": {
+        "rpc": {
+          "handshake": {
+            "n": 1,
+            "p50_ms": 3.61,
+            "p95_ms": 3.61,
+            "max_ms": 3.61
+          },
+          "submit": {
+            "n": 16,
+            "p50_ms": 1.681,
+            "p95_ms": 3.372,
+            "max_ms": 3.372
+          },
+          "artifact_put": {
+            "n": 2,
+            "p50_ms": 3.888,
+            "p95_ms": 3.963,
+            "max_ms": 3.963
+          },
+          "wait_result": {
+            "n": 16,
+            "p50_ms": 23.317,
+            "p95_ms": 40.607,
+            "max_ms": 40.607
+          },
+          "fetch": {
+            "n": 14,
+            "p50_ms": 1.008,
+            "p95_ms": 7.367,
+            "max_ms": 7.367
+          },
+          "release": {
+            "n": 1,
+            "p50_ms": 1.659,
+            "p95_ms": 1.659,
+            "max_ms": 1.659
+          },
+          "forget_calls": {
+            "n": 1,
+            "p50_ms": 1.501,
+            "p95_ms": 1.501,
+            "max_ms": 1.501
+          },
+          "close_session": {
+            "n": 1,
+            "p50_ms": 3.038,
+            "p95_ms": 3.038,
+            "max_ms": 3.038
+          }
+        },
+        "control_queue": {
+          "n": 14,
+          "p50_ms": 0.789,
+          "p95_ms": 3.036,
+          "max_ms": 3.036
+        },
+        "accepted_to_running": {
+          "n": 16,
+          "p50_ms": 20.447,
+          "p95_ms": 38.081,
+          "max_ms": 38.081
+        },
+        "native_execution": {
+          "n": 16,
+          "p50_ms": 3.038,
+          "p95_ms": 15.4,
+          "max_ms": 15.4
+        },
+        "events": {
+          "accepted": 16,
+          "queued": 16,
+          "running": 16,
+          "native": 128,
+          "output_ready": 22,
+          "completed": 16
+        },
+        "peak_rss_mib": 891.26,
+        "peak_tasks": 93
+      }
+    }
+  ],
+  "initial": {
+    "rss_mib": 886.23,
+    "tasks": 4,
+    "calls": 0,
+    "objects": 0,
+    "leases": 0,
+    "owned": 0,
+    "borrowed": 0,
+    "native_cache": 0,
+    "sessions_seen": 0,
+    "closed_sessions": 0,
+    "listeners": 0,
+    "queue": 0
+  },
+  "final_before_shutdown": {
+    "rss_mib": 891.26,
+    "tasks": 3,
+    "calls": 0,
+    "objects": 0,
+    "leases": 0,
+    "owned": 0,
+    "borrowed": 0,
+    "native_cache": 2,
+    "sessions_seen": 5,
+    "closed_sessions": 5,
+    "listeners": 0,
+    "queue": 0
+  },
+  "all_passed": true,
+  "completed": "2026-11-14T21:37:22+0800"
+}
