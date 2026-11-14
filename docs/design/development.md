@@ -96,11 +96,11 @@ daemon 就绪后，再按原生节点约定下载模型和 companion weights 到
   --wheel-sha256 "$COMANI_WHEEL_SHA256"
 ```
 
-该完整模型例程与最终 PNG 仍待远端执行验证，不能用基础 smoke 替代。实际部署、输出与资源清理结论统一记录在 [远端报告](../remote_acceptance.md)。
+该完整模型例程已在指定 INT8 checkpoint 上完成三路 2048×2048 PNG，原始 Tensor 和 PNG 逐位一致。实际部署、原生显存参数、资源测量与销毁记录统一保存在 [远端报告](../remote_acceptance.md)。
 
 ### 已验证的网络范围
 
-真实远端 HTTPS 的 [10 项基础 smoke](../../artifacts/remote/60662518-20261114/smoke/acceptance.json)、[130 秒长任务](../../artifacts/remote/60662518-20261114/long-wait.json) 和 [NVFP4 小型 fallback 诊断](../../artifacts/remote/60662518-20261114/nvfp4-diagnostics.json) 已通过；长任务仅提交一次，发出七次结果查询。它们证明基础执行链及长等待可用，尚不证明指定完整模型已成功出图。
+真实远端 HTTPS 的 [10 项基础 smoke](../../artifacts/remote/60662518-20261114/smoke/acceptance.json)、[130 秒长任务](../../artifacts/remote/60662518-20261114/long-wait.json) 和 [NVFP4 小型 fallback 诊断](../../artifacts/remote/60662518-20261114/nvfp4-diagnostics.json) 已通过；长任务仅提交一次，发出七次结果查询。完整模型的三路出图另有 [逐位比较记录](../../artifacts/remote/60662518-20261114/image-comparison.json)。
 
 经过带读取超时的反向代理时，服务器协商 [bounded-wait](protocol.md#经过反向代理的等待)，SDK 每轮 20 秒只读等待同一个调用，不重复提交。临时 Quick Tunnel 的 200 个在途请求上限仍适用；本次租机与传输恢复脚本只是验收设施，常规部署可选任何适当的网络入口。
 

@@ -1,0 +1,48 @@
+{
+  "source_python": "/home/delva/projects/comani/.venv/bin/python",
+  "negative_cases": [
+    {
+      "name": "unknown_driver_before_separator",
+      "returncode": 2,
+      "exit_code": 2,
+      "nodes_imported": false
+    },
+    {
+      "name": "unknown_native_after_separator",
+      "returncode": 2,
+      "exit_code": 2,
+      "nodes_imported": false
+    },
+    {
+      "name": "mutually_exclusive_native_flags",
+      "returncode": 2,
+      "exit_code": 2,
+      "nodes_imported": false
+    }
+  ],
+  "native_values_from_actual_cli_http_python": {
+    "reserve_vram": 4.0,
+    "extra_reserved_vram_bytes": 4294967296.0,
+    "cpu": true,
+    "device": "cpu",
+    "nodes_imported": true
+  },
+  "passed": true,
+  "owned_daemon_stopped": true,
+  "wheel_sha256": "16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6",
+  "identity_report": "final-cli-regression-identity.json",
+  "standard_non_gpu_suite": {
+    "passed": 89,
+    "deselected": 2,
+    "seconds": 25.34,
+    "log": "final-cli-regression-pytest.log"
+  },
+  "lint": {
+    "command": "python -m ruff check src tests scripts examples",
+    "passed": true,
+    "log": "final-cli-regression-ruff.log"
+  },
+  "migrated_document_links": 115,
+  "historical_seven_phase_stress_rerun": false,
+  "scope": "Final native-argument CLI/source/wheel and migrated-path regression only; earlier pressure/GPU records remain historical evidence"
+}

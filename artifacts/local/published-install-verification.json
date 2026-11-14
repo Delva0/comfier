@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "repository_url": "https://github.com/Delva0/comani",
+  "repository_id": "1457925460",
+  "cloned_head": "7419afa8b003f8a3f8fb39c92da3ed3823c34f4a",
+  "temporary_workspace": "/tmp/comani-published-7419afa-dw2uirli",
+  "clean_checkout": "/tmp/comani-published-7419afa-dw2uirli/checkout",
+  "sdk_environment": "/tmp/comani-published-7419afa-dw2uirli/sdk",
+  "readme_install_command": "python -m pip install .",
+  "installation_editable": false,
+  "import_origin": "/tmp/comani-published-7419afa-dw2uirli/sdk/lib/python3.11/site-packages/comani/__init__.py",
+  "installed_version": "0.2.0",
+  "torch_absent": true,
+  "comfy_execution_absent": true,
+  "no_current_repo_or_old_next_sys_path": true,
+  "capture_nodes": 2,
+  "installed_python_files_match_pinned_github_source": 15,
+  "help_checks": [
+    {
+      "entrypoint": "comani._runtime",
+      "returned_zero": true
+    },
+    {
+      "entrypoint": "/tmp/comani-published-7419afa-dw2uirli/checkout/scripts/bootstrap_runtime.py",
+      "returned_zero": true
+    },
+    {
+      "entrypoint": "/tmp/comani-published-7419afa-dw2uirli/checkout/scripts/dev_server.py",
+      "returned_zero": true
+    },
+    {
+      "entrypoint": "/tmp/comani-published-7419afa-dw2uirli/checkout/scripts/example.py",
+      "returned_zero": true
+    },
+    {
+      "entrypoint": "/tmp/comani-published-7419afa-dw2uirli/checkout/examples/local_checkpoint.py",
+      "returned_zero": true
+    }
+  ],
+  "git_worktree_clean_after_install": true,
+  "scope": "Pinned fresh GitHub clone and normal isolated SDK installation; no runtime server, GPU, full suite or pressure rerun"
+}

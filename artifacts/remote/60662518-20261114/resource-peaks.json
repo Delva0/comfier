@@ -1,0 +1,8 @@
+{
+  "process_rss_bytes": 73990066176,
+  "gpu_board_used_mib": 20960,
+  "cgroup_current_bytes": 0,
+  "kernel_process_rss_highwater_bytes": 74153021440,
+  "torch_max_allocated_bytes": 20050215936,
+  "torch_max_reserved_bytes": 21369978880
+}

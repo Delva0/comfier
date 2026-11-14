@@ -1,0 +1,22 @@
+{
+  "passed": true,
+  "wheel_sha256": "16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6",
+  "installed": "/home/delva/projects/comani/.local/final-client/lib/python3.11/site-packages/comani",
+  "files": {
+    "comani/__init__.py": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e",
+    "comani/client.py": "a42515ffb0055993d1597479d6bd1547925952b61962f6d4f7e27643abf77c28",
+    "comani/code.py": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+    "comani/errors.py": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+    "comani/graph.py": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+    "comani/protocol.py": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb",
+    "comani/refs.py": "dcf753ba5e56cbd3078d38a579dd95e8a00f65c7649f58e399488fa3658d1e58",
+    "comani/transport.py": "ba293dd843e380efe58b529b8e23c206f8f2d29ffce861b5537f9ad8b4063d07",
+    "comani/_runtime/__init__.py": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+    "comani/_runtime/__main__.py": "5b8e2b50864d84aa1aef5e54a576b80481c55bd51094706f74a7f8daac9e2cd8",
+    "comani/_runtime/adapter.py": "597032216c0ab3e694511bdeb9e3a7e92caa4c532061a84d09eea1131660ecc9",
+    "comani/_runtime/http.py": "476ce3b0bc25f2801f1fce08e46e8f93ee025125f756ab8a3ce610c060097354",
+    "comani/_runtime/objects.py": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+    "comani/_runtime/python_node.py": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+    "comani/_runtime/service.py": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9"
+  }
+}

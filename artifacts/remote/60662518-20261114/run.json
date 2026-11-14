@@ -1,0 +1,91 @@
+{
+  "script": "/home/delva/projects/comani/examples/minimax_h3_remote.py",
+  "started_at_utc": "2026-11-14T16:04:05.591554+00:00",
+  "prompt": "A detailed studio photograph of a small ceramic red fox sitting on a dark blue wooden table. The fox has white ear tips and a white chest, delicate painted fur grooves, and a soft satin glaze. Warm sunlight enters from the upper left. A small green plant and a closed cream sketchbook sit behind it. The fox is centered, fully visible, with crisp detail, believable shadows, and no lettering.",
+  "seed": 426190,
+  "width": 2048,
+  "height": 2048,
+  "steps": 6,
+  "cfg": 1.0,
+  "sampler": "euler",
+  "scheduler": "simple",
+  "model": "minimax_H3_image_pruned_INT8.safetensors",
+  "model_sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+  "wheel_sha256": "16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6",
+  "runs": [
+    {
+      "mode": "eager_node_python_node",
+      "call_id": "0cd63533049f4ecd9fa8d59c05ab4b95",
+      "seconds": 25.578553229002864,
+      "png": "/home/delva/projects/comani/artifacts/remote/60662518-20261114/eager.png",
+      "float_tensor": "/home/delva/projects/comani/artifacts/remote/60662518-20261114/eager.pt",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "float_sha256": "f299f610ca866a539171caee5208836d181e4226780b69c9d75323fa86dd8b3f"
+    },
+    {
+      "mode": "captured_native_graph_then_eager_retention",
+      "call_id": "a0d1df4dbd0141d39d310b416fd829e4",
+      "decode_node_id": "8",
+      "consumer_call_id": "23c73f71333a49a2a04ce3b51b2db20b",
+      "seconds": 34.98310829800175,
+      "max_abs_float_error_vs_eager": 0.0,
+      "png": "/home/delva/projects/comani/artifacts/remote/60662518-20261114/captured_graph.png",
+      "float_tensor": "/home/delva/projects/comani/artifacts/remote/60662518-20261114/captured_graph.pt",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "float_sha256": "a15cae7540b77b71aa223e7662c9de17b70351236c7fc67eece8b54cf46f85a4"
+    },
+    {
+      "mode": "native_api_json_reference",
+      "call_id": "7d8f1dbe2c5d4e5fb2002ab496c1fe7a",
+      "consumer_call_id": "306e512b73c74b07926f6ebe7866b695",
+      "seconds": 33.55510230299842,
+      "max_abs_float_error_vs_eager": 0.0,
+      "png": "/home/delva/projects/comani/artifacts/remote/60662518-20261114/native_api.png",
+      "float_tensor": "/home/delva/projects/comani/artifacts/remote/60662518-20261114/native_api.pt",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "float_sha256": "5f247b403189ee9b78e6c7cb5ba509c98f710b015dcec5f670ae8be91beb5eee"
+    }
+  ],
+  "remote": {
+    "host": "e1a8bc64071b",
+    "python": "3.11.11",
+    "device": "NVIDIA GeForce RTX 4090",
+    "torch": "2.9.1+cu130",
+    "comani_file": "/workspace/comani-acceptance/next/.venv/lib/python3.11/site-packages/comani/__init__.py",
+    "comani_version": "0.2.0",
+    "native_reserve_vram_gib": 4.0,
+    "native_vram_state": "VRAMState.NORMAL_VRAM",
+    "minimum_inference_memory_bytes": 5153960755.2,
+    "model_verification": {
+      "verified_at_utc": "2026-11-14T15:44:41.315060+00:00",
+      "models": [
+        {
+          "name": "diffusion",
+          "path": "/workspace/comani-acceptance/ComfyUI/models/diffusion_models/minimax_H3_image_pruned_INT8.safetensors",
+          "bytes": 20979337386,
+          "sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+          "verified": true,
+          "elapsed_seconds": 1401.375
+        },
+        {
+          "name": "encoder",
+          "path": "/workspace/comani-acceptance/ComfyUI/models/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+          "bytes": 15687142551,
+          "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6",
+          "verified": true,
+          "elapsed_seconds": 343.883
+        },
+        {
+          "name": "vae",
+          "path": "/workspace/comani-acceptance/ComfyUI/models/vae/minimax_h3_image_vae_fp16.safetensors",
+          "bytes": 1168505312,
+          "sha256": "d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af",
+          "verified": true,
+          "elapsed_seconds": 76.78
+        }
+      ]
+    }
+  },
+  "completed_at_utc": "2026-11-14T16:05:41.720803+00:00",
+  "passed": true
+}

@@ -64,7 +64,9 @@ asyncio.run(main())
 
 `await call` 返回按槽排列的 ready refs；`await call.output(i)` 返回其中一个。`RemoteRef` 本身不可 await。无关调用不会因一次本地 await 获得额外的远端顺序依赖。
 
-完整脚本见 [本地最小示例](scripts/example.py) 和 [Minimax H3 远端执行脚本](examples/minimax_h3_remote.py)。后者从环境读取 URL/token，目前仍待实际远端运行验证；运行及输出图片状态见 [独立远端报告](docs/remote_acceptance.md)。
+完整脚本见 [本地最小示例](scripts/example.py)、[本地已有 checkpoint 出图](examples/local_checkpoint.py) 和 [Minimax H3 远端执行脚本](examples/minimax_h3_remote.py)。远端脚本从环境读取 URL/token，已在指定 INT8 模型上完成 eager、captured graph 与 raw API graph 三路 2048×2048 出图；三路原始 Tensor 与 PNG 均完全一致。运行环境、显存参数、资源与清理记录见 [独立远端报告](docs/remote_acceptance.md)。
+
+![指定 Minimax H3 INT8 模型生成的 2048×2048 实际样图](artifacts/remote/60662518-20261114/eager.png)
 
 ## 适用边界
 
@@ -72,7 +74,7 @@ asyncio.run(main())
 
 Eager 输出由会话持有，最后一个本地别名消失后通知释放；workflow 输出借用原生缓存，失效会报 `Expired`，不会自动重算。目录包同名不同内容会报 `PackageConflict`，不会覆盖已安装模块。
 
-[本地独立验收](tests/stress/INDEPENDENT_LOAD_REPORT.md) 已通过：非 GPU suite 为 81 passed、2 deselected，覆盖持续提交、复杂图、GC/会话回收，以及本地 125 秒读取超时代理上的 140 秒调用。真实远端 HTTPS 的基础执行和长任务也已验证；指定 GPU 模型、图片与最终资源清理仍待 [远端报告](docs/remote_acceptance.md)。这些结果不代表原生计算并行或性能上限。
+[本地独立验收](tests/stress/INDEPENDENT_LOAD_REPORT.md) 已通过：非 GPU suite 为 81 passed、2 deselected，覆盖持续提交、复杂图、GC/会话回收，以及本地 125 秒读取超时代理上的 140 秒调用。真实远端 HTTPS 的基础执行、130 秒长任务和指定 GPU 模型出图也已验证，租用实例已销毁，详见 [远端报告](docs/remote_acceptance.md)。这些结果不代表原生计算并行或性能上限。
 
 目录提升与原生启动参数透传后的独立标准非 GPU 回归为 **89 passed、2 deselected**，包含真实原生 runtime、SDK-only 安装和无 Torch 的 wheel HTTP 客户端。
 

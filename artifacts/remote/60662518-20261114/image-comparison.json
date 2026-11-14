@@ -1,0 +1,53 @@
+{
+  "passed": true,
+  "script": "/home/delva/projects/comani/examples/minimax_h3_remote.py",
+  "script_sha256": "e8e7f8f0b2d9621ecc59309e309a442222b7602c9c7d91f79385e12163153650",
+  "native_prompt_sha256": "dcd90a3a9ba9d09da40ead39986e12dbb2b41497f6a2c42800131b87eae8f7d9",
+  "outputs": {
+    "eager": {
+      "tensor_shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "dtype": "torch.float32",
+      "max_abs_error_vs_eager": 0.0,
+      "raw_tensor_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+      "min": 0.0,
+      "max": 1.0,
+      "std": 0.28558582067489624,
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886"
+    },
+    "captured_graph": {
+      "tensor_shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "dtype": "torch.float32",
+      "max_abs_error_vs_eager": 0.0,
+      "raw_tensor_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+      "min": 0.0,
+      "max": 1.0,
+      "std": 0.28558582067489624,
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886"
+    },
+    "native_api": {
+      "tensor_shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "dtype": "torch.float32",
+      "max_abs_error_vs_eager": 0.0,
+      "raw_tensor_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+      "min": 0.0,
+      "max": 1.0,
+      "std": 0.28558582067489624,
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886"
+    }
+  }
+}

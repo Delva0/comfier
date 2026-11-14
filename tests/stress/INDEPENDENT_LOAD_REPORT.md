@@ -1,5 +1,7 @@
 # Independent native HTTP load acceptance
 
+Raw log filenames below refer to files retained locally in this directory; the published repository includes the selected JSON evidence.
+
 **Independent local acceptance: passed within the measured CPU/native boundary.** All local defects found during this acceptance were repaired by the implementation owners and then independently rerun with their original reproductions. The final frozen source also passes the new real 140-second bounded-wait test through a 125-second read-cutoff proxy. This is a local acceptance result; remote GPU/Cloudflare/model acceptance is a separate report.
 
 The acceptance agent did not implement the SDK/runtime and did not use implementation-owner green tests as its conclusion. Old failure evidence is retained alongside current passing results.
@@ -8,8 +10,8 @@ The acceptance agent did not implement the SDK/runtime and did not use implement
 
 | Check | Independently observed final result | Evidence |
 |---|---|---|
-| Full seven-phase native HTTP/SDK acceptance | Exit 0, all phases passed; 2026-11-14 22:35:41–22:37:39 +0800 | [JSON](independent_load_results.json), [log](independent_load.log) |
-| Real 140-second call through 125-second read-cutoff proxy | One long-call submit; six pending responses; stable final ref; cancellation and cleanup pass | [JSON with RPC trace](bounded_wait_results.json), [log](bounded_wait.log) |
+| Full seven-phase native HTTP/SDK acceptance | Exit 0, all phases passed; 2026-11-14 22:35:41–22:37:39 +0800 | [JSON](independent_load_results.json), `independent_load.log` (local log) |
+| Real 140-second call through 125-second read-cutoff proxy | One long-call submit; six pending responses; stable final ref; cancellation and cleanup pass | [JSON with RPC trace](bounded_wait_results.json), `bounded_wait.log` (local log) |
 | Original 100→300→1,000 session churn, then 14 TTLs | Active records 0, bounded diagnostics 64; objects/calls/leases/requests 0, tasks 3 | [JSON](session_churn_results.json) |
 | Stale-ID eviction, fresh handshake, inflight-close safety | All checks pass; final active/calls/objects/requests 0, diagnostics 64, tasks 3 | [JSON](session_lifecycle_results.json) |
 | Original 128-pending-call pool saturation | Wait pool at 100; heartbeat 0.353 ms, close(wait=False) 13.416 ms; full cleanup | [JSON](connection_pool_results.json) |
@@ -17,10 +19,10 @@ The acceptance agent did not implement the SDK/runtime and did not use implement
 | Cancelled startup with a real gated HTTP handshake | Pending call fails only after all three pools/sender are cleaned | [JSON](startup_cancel_results.json) |
 | Root README start→immediate example→stop | All commands exit 0, no inserted sleep; correct eager/workflow/native shapes | [JSON](readme_quickstart_results.json) |
 | Intentionally expired launcher readiness deadline | Own recorded child terminated; port free; ready=false | [JSON](launcher_timeout_results.json) |
-| Normal documented full non-GPU pytest command | **81 passed, 2 deselected**, 22.16 s; includes actual no-Torch wheel HTTP client | [raw log](full_suite_collection.log) |
-| Original explicit unit→integration collection order | **52 tests collected**, no collection error | [raw log](explicit_order_collection.log) |
+| Normal documented full non-GPU pytest command | **81 passed, 2 deselected**, 22.16 s; includes actual no-Torch wheel HTTP client | `full_suite_collection.log` (local log) |
+| Original explicit unit→integration collection order | **52 tests collected**, no collection error | `explicit_order_collection.log` (local log) |
 | Independent wheel audit | All 15 Python files identical in source, archive and installed package; installed import origin correct; Torch absent | [JSON](wheel_audit_results.json) |
-| Full documented Ruff command | All checks passed after the remote owner corrected its script import formatting | [raw log](full_ruff.log) |
+| Full documented Ruff command | All checks passed after the remote owner corrected its script import formatting | `full_ruff.log` (local log) |
 
 ## Environment and measurement scope
 
@@ -92,7 +94,7 @@ The original pool reproduction formerly filled one shared 100-connection connect
 
 The normal documented suite previously failed the real installed-wheel HTTP client because its SDK was stale, and an explicit selection failed by importing the wrong conftest. Both exact commands now pass, including source/archive/installed byte comparison and a clean no-Torch client that performs eager Python and a graph over actual HTTP. The launcher formerly returned before listen; the same immediate example sequence now passes because start waits for actual `/queue` readiness. A separate 0.001-second readiness-deadline test proves failed startup reclaims its own recorded child.
 
-Original evidence remains in [pool before fix](connection_pool_before_fix.json), [session churn before fix](session_churn_before_fix.json), [failed-open before fix](failed_open_before_fix.json), [quickstart before fix](readme_quickstart_before_fix.json), [full-suite before fix](full_suite_before_fix.log), and [collection before fix](explicit_order_collection_before_fix.log). Earlier observer failures are not product defects: one collector needed the store lock, and the first long-task attempt retained a cancelled Task loop alias. Both harness issues were corrected and their complete workloads independently rerun; the long-task first attempt is retained separately.
+Original evidence remains in [pool before fix](connection_pool_before_fix.json), [session churn before fix](session_churn_before_fix.json), [failed-open before fix](failed_open_before_fix.json), [quickstart before fix](readme_quickstart_before_fix.json), `full_suite_before_fix.log` (local log), and `explicit_order_collection_before_fix.log` (local log). Earlier observer failures are not product defects: one collector needed the store lock, and the first long-task attempt retained a cancelled Task loop alias. Both harness issues were corrected and their complete workloads independently rerun; the long-task first attempt is retained separately.
 
 ## Reproduce and limits
 

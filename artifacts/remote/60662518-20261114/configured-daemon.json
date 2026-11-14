@@ -1,0 +1,23 @@
+{
+  "old_pid": 12895,
+  "command": [
+    "/workspace/comani-acceptance/next/.venv/bin/python",
+    "-B",
+    "-m",
+    "comani._runtime",
+    "--comfy-root",
+    "/workspace/comani-acceptance/ComfyUI",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8190",
+    "--no-custom-nodes",
+    "--",
+    "--reserve-vram",
+    "4.0"
+  ],
+  "wheel_sha256": "16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6",
+  "scheduled_unix_time": 1794672128.8258414,
+  "helper_source": "/tmp/comani-code-_ta_bcq4/ca72217e1f937641821fd23d14d36e4606b98de198d8f9de66cb890b1c301f5a/module.py",
+  "helper_pid": 13069
+}

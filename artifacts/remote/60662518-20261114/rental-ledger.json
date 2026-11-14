@@ -1,0 +1,53 @@
+{
+  "all_task_instances_destroyed": true,
+  "instances": [
+    {
+      "instance_id": 60653211,
+      "created_at_utc": "2026-11-14T13:48:41.043486+00:00",
+      "destroyed_at_utc": "2026-11-14T13:58:55.365859+00:00",
+      "destroy_verified_absent": true,
+      "quoted_dph_total": 0.4792592592592593,
+      "quoted_dph_compute": 0.45333333333333337,
+      "quoted_dph_storage": 0.02592592592592592,
+      "quoted_ingress_usd_per_gb": 0.00390625,
+      "quoted_egress_usd_per_gb": 0.00390625,
+      "elapsed_hours_upper_bound": 0.17064511272642346,
+      "estimated_compute_storage_usd_upper_bound": 0.08178325032147851
+    },
+    {
+      "instance_id": 60654415,
+      "created_at_utc": "2026-11-14T14:01:10.954579+00:00",
+      "destroyed_at_utc": "2026-11-14T14:58:24.250500+00:00",
+      "destroy_verified_absent": true,
+      "quoted_dph_total": 0.48185185185185186,
+      "quoted_dph_compute": 0.45333333333333337,
+      "quoted_dph_storage": 0.028518518518518523,
+      "quoted_ingress_usd_per_gb": 0.0026041666666666665,
+      "quoted_egress_usd_per_gb": 0.00390625,
+      "elapsed_hours_upper_bound": 0.9536935142013762,
+      "estimated_compute_storage_usd_upper_bound": 0.45953898591703346
+    },
+    {
+      "instance_id": 60662518,
+      "created_at_utc": "2026-11-14T15:18:56.087307+00:00",
+      "destroyed_at_utc": "2026-11-14T16:09:22.393602+00:00",
+      "destroy_verified_absent": true,
+      "quoted_dph_total": 0.4314444444444444,
+      "quoted_dph_compute": 0.412,
+      "quoted_dph_storage": 0.019444444444444445,
+      "quoted_ingress_usd_per_gb": 0.0026041666666666665,
+      "quoted_egress_usd_per_gb": 0.00390625,
+      "elapsed_hours_upper_bound": 0.8406406487358941,
+      "estimated_compute_storage_usd_upper_bound": 0.36268973767127516
+    }
+  ],
+  "compute_storage_rate_time_usd_upper_bound": 0.9040119739097872,
+  "observed_credit_decrease_usd_approx": 1.180392878290001,
+  "credit_difference_is_not_an_itemized_settled_invoice": true,
+  "official_instance_list_at_2026_11_14_161023_utc": [],
+  "task_watchdog_processes_absent": true,
+  "tunnel_check_at_2026_11_14_161109_utc": {
+    "control_http_status": 530,
+    "daemon_http_status": 530
+  }
+}

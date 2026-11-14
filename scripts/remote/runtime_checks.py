@@ -10,7 +10,16 @@ from comani import Client
 
 def collect():
     import json
+    import os
+    import resource
+    import shutil
+    import sys
     from pathlib import Path
+
+    import comfy.model_management as mm
+    import psutil
+    import torch
+    from comfy.cli_args import args
 
     root = Path('/workspace/comani-acceptance')
     result = {}
@@ -27,10 +36,25 @@ def collect():
     result['cgroup'] = {}
     for name in ['/proc/self/cgroup', '/sys/fs/cgroup/memory.max',
                  '/sys/fs/cgroup/memory.current', '/sys/fs/cgroup/memory/memory.limit_in_bytes',
-                 '/sys/fs/cgroup/memory/memory.max_usage_in_bytes']:
+                 '/sys/fs/cgroup/memory/memory.max_usage_in_bytes',
+                 '/sys/fs/cgroup/memory/memory.usage_in_bytes']:
         path = Path(name)
         if path.is_file():
             result['cgroup'][name] = path.read_text()
+    result['runtime-system.json'] = {
+        'pid': os.getpid(), 'argv': sys.argv, 'native_reserve_vram_gib': args.reserve_vram,
+        'native_vram_state': str(mm.vram_state), 'minimum_inference_memory_bytes': mm.minimum_inference_memory(),
+        'process_rss_bytes': psutil.Process().memory_info().rss,
+        'kernel_process_rss_highwater_bytes': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
+        'disk_bytes': dict(zip(['total', 'used', 'free'], shutil.disk_usage(root))),
+        'torch_max_allocated_bytes': torch.cuda.max_memory_allocated(),
+        'torch_max_reserved_bytes': torch.cuda.max_memory_reserved(),
+        'loaded_models_snapshot': [
+            {'class': loaded.model.model.__class__.__name__, 'load_device': str(loaded.model.load_device),
+             'offload_device': str(loaded.model.offload_device), 'total_model_bytes': loaded.model_memory(),
+             'loaded_model_bytes': loaded.model_loaded_memory(), 'dynamic': loaded.model.is_dynamic()}
+            for loaded in mm.current_loaded_models],
+    }
     return result
 
 

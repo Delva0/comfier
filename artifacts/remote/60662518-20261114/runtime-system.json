@@ -1,0 +1,38 @@
+{
+  "pid": 13069,
+  "argv": [
+    "/workspace/comani-acceptance/next/.venv/lib/python3.11/site-packages/comani/_runtime/__main__.py",
+    "--comfy-root",
+    "/workspace/comani-acceptance/ComfyUI",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "8190",
+    "--no-custom-nodes",
+    "--",
+    "--reserve-vram",
+    "4.0"
+  ],
+  "native_reserve_vram_gib": 4.0,
+  "native_vram_state": "VRAMState.NORMAL_VRAM",
+  "minimum_inference_memory_bytes": 5153960755.2,
+  "process_rss_bytes": 48101089280,
+  "kernel_process_rss_highwater_bytes": 74153021440,
+  "disk_bytes": {
+    "total": 75161927680,
+    "used": 44817641472,
+    "free": 30344286208
+  },
+  "torch_max_allocated_bytes": 20050215936,
+  "torch_max_reserved_bytes": 21369978880,
+  "loaded_models_snapshot": [
+    {
+      "class": "MiniMaxH3ImageVAE",
+      "load_device": "cuda:0",
+      "offload_device": "cpu",
+      "total_model_bytes": 1168458960,
+      "loaded_model_bytes": 1168458960,
+      "dynamic": false
+    }
+  ]
+}

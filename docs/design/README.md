@@ -44,6 +44,6 @@ SDK 不导入 Torch/ComfyUI，不生成 `.nodes` 命名空间或节点源码。�
 | 本地 CPU/native、持续提交、GC 与 session churn | [独立压力报告](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)：通过；标准非 GPU suite 81 passed、2 deselected，32 sessions/4,096 calls 和 224 节点组合图通过 |
 | 长调用经过读取超时代理 | 同一[独立报告](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)：本地 140 秒调用经过 125 秒读取超时代理通过，调用仅提交一次；不是实际远端 HTTPS 验证 |
 | 真正远端 HTTPS 基础执行 | [10 项 smoke](../../artifacts/remote/60662518-20261114/smoke/acceptance.json)、[130 秒单次提交](../../artifacts/remote/60662518-20261114/long-wait.json) 与小型 NVFP4 诊断通过；部署方式见 [开发指南](development.md#远端入口) |
-| 指定 GPU 模型、图片与资源清理 | 仍待完整验收，[远端报告](../remote_acceptance.md) 记录进度；实际 comani 脚本为 [minimax_h3_remote.py](../../examples/minimax_h3_remote.py) |
+| 指定 GPU 模型、图片与资源清理 | 指定 INT8 模型三路 2048×2048 出图逐位一致，租用实例已销毁；[远端报告](../remote_acceptance.md)、[实际脚本](../../examples/minimax_h3_remote.py) 与 [样图](../../artifacts/remote/60662518-20261114/eager.png) |
 
 32 sessions 是实测容量点，不是最大容量或延迟保证。CPU 压力测试不加载模型，模型资源需求须由对应远端实测确定；报价中的 RAM 数字不能当作实际 cgroup 限额或最低配置。

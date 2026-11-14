@@ -1,137 +1,269 @@
 # Independent RTX 4090 acceptance
 
-Status: **not yet passed**. This report distinguishes source research, actual
-local operator testing, provider/container observations, and full remote model
-execution. It must not be read as a completed remote model test.
+**Passed on 2026-11-14 UTC. All rented instances were destroyed and verified
+absent.** This report records tests performed by the independent remote
+acceptance agent, rather than relying on the implementation owner's results.
+The exact requested INT8 checkpoint produced real 2048×2048 images through
+Comani eager, captured graph, and native API JSON execution. The three complete
+float tensors are bitwise equal. The first default-memory attempt failed;
+the successful run used native Comfy `--reserve-vram 4`.
 
-## Requested weights and reproducible inputs
+## Actual output and runnable client
 
-The requested [Civitai model version 3462708](https://civitai.com/api/v1/model-versions/3462708)
-is `Minimax H3 IMAGE INT8`, model `3045867`, file `3365259`,
-`minimax_H3_image_pruned_INT8.safetensors`, 20,979,337,386 bytes. Its required
-SHA256 is `4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8`.
-INT4/INT6 and the differently hashed Comfy-Org INT8 file are not substitutions
-for this acceptance.
+![Actual requested H3 INT8 output](../artifacts/remote/60662518-20261114/eager.png)
 
-The [model author's requirements](https://civitai.com/api/v1/models/3045867)
-identify the H3 Qwen3-VL encoder, including the NVFP4 AWQ variant, and the image
-VAE. The video VAE is not compatible. The three exact URLs, sizes, and SHA256s
-are in [models.json](../scripts/remote/models.json). Companion weights are pinned
-to Comfy-Org HF revision `0bb149f51e3156ed4b90dd45d5620346bfe1df8f`.
-The optional prompt expander is omitted; a detailed prompt is supplied directly.
+The actual executed client is [examples/minimax_h3_remote.py](../examples/minimax_h3_remote.py),
+at `/home/delva/projects/comani/examples/minimax_h3_remote.py` after the project
+directory migration. It reads `COMANI_URL` and `COMANI_TOKEN` from the environment.
+It uses original node names and includes a real Python latent identity between
+`KSampler` and `VAEDecode`; captured outputs are retained by an explicit eager
+consumer. It also submits the equivalent unmodified Comfy API JSON.
 
-The [official image guide](https://docs.comfy.org/tutorials/image/minimax/minimax-h3-image)
-specifies six Euler/simple steps and CFG 1. Its low-VRAM starting canvas is about
-4MP. The planned full generation test uses 2048x2048, six steps, fixed seed,
-native `MiniMaxH3ImageConditioning`/`KSampler`/`VAEDecode`, and compares eager
-node/Python/node output with raw native API prompt output. Tiny image calls only
-test API semantics and do not count as this model generation test.
+```bash
+python examples/minimax_h3_remote.py \
+  --output artifacts/remote/my-run \
+  --wheel-sha256 16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6
+```
 
-## Offload and NVFP4 evidence
+Use a running, authenticated deployment with the exact manifest files; the
+temporary acceptance endpoints have been shut down. The private endpoint/token
+wrapper used during the test is `scripts/remote/run_client.py model`.
 
-Pinned ComfyUI: `eee59185ff4f43ae2d9ad122b245619d27d9daad`.
-The local checkout reports this HEAD and no tracked modifications.
+The [actual run record](../artifacts/remote/60662518-20261114/run.json) includes
+the script path, prompt, seed 426190, 2048×2048 size, six steps, CFG 1,
+Euler/simple, model hash, wheel hash, native reserve value and call IDs.
+The [official guide](https://docs.comfy.org/tutorials/image/minimax/minimax-h3-image)
+recommends this distilled six-step schedule; it is a normal model demonstration.
 
-In [model_management.py](https://github.com/Comfy-Org/ComfyUI/blob/eee59185ff4f43ae2d9ad122b245619d27d9daad/comfy/model_management.py),
-`supports_nvfp4_compute` requires NVIDIA compute major >=10. Ada GPUs have no
-native FP4 matmul. In [ops.py](https://github.com/Comfy-Org/ComfyUI/blob/eee59185ff4f43ae2d9ad122b245619d27d9daad/comfy/ops.py),
-unsupported formats select full-precision matrix multiplication while preserving
-packed parameters. The layer casts/offloads its weight and dequantizes at
-forward time. Default UNet/text encoder offload targets are CPU; native loading
-evicts lower-priority models when GPU space is needed. Summing every model file
-as simultaneously resident VRAM would be an incorrect feasibility test.
+| Actual mode | End-to-end seconds | Max absolute float error versus eager |
+| --- | ---: | ---: |
+| Eager node → Python → node | 25.579 | 0 |
+| Captured native graph → explicit eager retention | 34.983 | 0 |
+| Native API JSON → explicit eager retention | 33.555 | 0 |
 
-Actual operator probe: Python 3.11.11, torch 2.9.1+cu128, comfy-kitchen 0.2.41,
-RTX 4060 Laptop (Ada SM 8.9). A packed NVFP4 `128x256` layer stayed as CPU
-`uint8[128,128]`, executed through Comfy's emulated GPU path, and exactly matched
-explicit dequantized linear output; peak CUDA allocation was 8,609,280 bytes.
-[probe_nvfp4.py](../scripts/remote/probe_nvfp4.py) reproduces the probe. This is
-actual operator evidence on Ada, **not** evidence that the full model ran on the
-rented RTX 4090. The same probe and full generation still need remote execution.
+The successful run began at 16:04:05 UTC and finished at 16:05:41 UTC.
+[image-comparison.json](../artifacts/remote/60662518-20261114/image-comparison.json)
+records a second, independent comparison of the saved tensors with `torch.equal`,
+including identical raw tensor SHA256
+`38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4`.
+All PNGs have SHA256
+`db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886`.
+The image was visually inspected and is a detailed ceramic fox, rather than an
+empty or corrupt output. [native_prompt.json](../artifacts/remote/60662518-20261114/native_prompt.json)
+is the actual native reference submitted to the same native PromptExecutor.
 
-The remote plan uses torch 2.9.1+cu130 because this Comfy version warns that
-optimized comfy-kitchen CUDA operations require cu130. The permanent packed
-diffusion/encoder/VAE files total about 35.24GiB. A quoted 64GB RAM/70 storage-unit
-offer is a candidate, not a measured minimum. Actual filesystem size, free RAM,
-cgroup limits, driver, peak RSS/VRAM, and offload logs must be recorded before
-making a smaller-memory claim.
+One original 4,817,799-byte PNG is published. Duplicate `captured_graph.png`,
+`native_api.png`, and all three complete float `.pt` files are retained locally
+under `/home/delva/projects/comani/artifacts/remote/60662518-20261114/`.
+They are not remote download links. The different `.pt` container hashes in
+`run.json` do not indicate different tensor contents; their raw tensor bytes and
+PNG bytes are identical.
 
-## Rental ledger and transport observations
+## Exact build and model identity
 
-Only this task's instances are managed. No existing instances were present at
-the first account check. The local official Vast CLI reads the user's configured
-key; the key is never printed or copied to the rented container. No top-up or
-reserved/recurring purchase was made.
+The client and daemon used wheel `comani-0.2.0-py3-none-any.whl`, SHA256
+`16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6`.
+All 15 Python files were independently compared between frozen source, archive
+and actual installed client; the actual remote installation was separately
+compared against the archive. See
+[client-wheel-verification.json](../artifacts/remote/60662518-20261114/client-wheel-verification.json)
+and the first case in [smoke/acceptance.json](../artifacts/remote/60662518-20261114/smoke/acceptance.json).
 
-| Instance | UTC start | UTC verified destroyed | GPU+storage USD/hour | Network ingress/egress USD/GB | Outcome |
-| --- | --- | --- | --- | --- | --- |
-| 60653211, Netherlands | 2026-11-14 13:48:41 | 2026-11-14 13:58:55 | 0.479259 | 0.00390625 / 0.00390625 | sshd started; no SSH banner through direct or Vast proxy; destroyed and verified absent |
-| 60654415, Spain | 2026-11-14 14:01:10 | **still active while fallback decision is pending** | 0.481852 | 0.00260417 / 0.00390625 | sshd started; both transport paths time out before authentication |
+Actual remote runtime: Python 3.11.11, cloudpickle 3.1.2, torch 2.9.1+cu130,
+comfy-kitchen 0.2.41, RTX 4090, driver 580.95.05, ComfyUI commit
+`eee59185ff4f43ae2d9ad122b245619d27d9daad`. The ordinary package was installed
+in `site-packages`; unpublished local source was not assumed to exist remotely.
 
-First instance compute/storage estimate upper bound: $0.081784 over 0.170646h.
-This is a rate/time estimate, not a settled invoice. No model bytes were downloaded
-on either instance yet. Container image setup may have separately billed traffic;
-final invoices remain to be checked. The requested disk value was API `70`; actual
-`df` has not been obtainable and is not asserted to be 70GiB.
+The [requested Civitai version](https://civitai.com/api/v1/model-versions/3462708)
+is version 3462708, model 3045867, file 3365259, uploaded by `tsolful`.
+All three files were downloaded **on the rented machine**, with exact size and
+SHA256 verification before generation:
 
-The second instance's local watchdog deadline is 2026-11-14 18:46:10 UTC.
-Its PID, label, rate, and instance ID are in ignored local `rental.json`; every
-30 seconds it records status. Normal completion destroys and verifies absence
-much earlier. A remote `shutdown` is not used as proof of stopped billing.
+| Component / filename | Bytes | SHA256 |
+| --- | ---: | --- |
+| Diffusion: minimax_H3_image_pruned_INT8.safetensors | 20,979,337,386 | 4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8 |
+| Encoder: qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors | 15,687,142,551 | 35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6 |
+| VAE: minimax_h3_image_vae_fp16.safetensors | 1,168,505,312 | d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af |
 
-Provider logs on both machines report `sshd` listening on IPv4/IPv6 port 22.
-Vast's direct and proxy endpoints reach TCP establishment but provide no SSH
-banner. Independent Windows socket reads agree with WSL. Windows has an existing
-local HTTP proxy on `127.0.0.1:10808`; Windows HTTP CONNECT returned 200 but no SSH
-banner. WSL cannot reach that Windows loopback listener. No system proxy, VPN,
-firewall, route, browser security, or authentication setting was changed.
+See [model-verification.json](../artifacts/remote/60662518-20261114/model-verification.json)
+and [models.json](../scripts/remote/models.json). Companion files are pinned to
+[Comfy-Org revision 0bb149f51e3156ed4b90dd45d5620346bfe1df8f](https://huggingface.co/Comfy-Org/MiniMax-H3-Image/tree/0bb149f51e3156ed4b90dd45d5620346bfe1df8f).
+The differently hashed Comfy-Org `int8_convrot` diffusion file and INT4/INT6 files
+were not substituted. The optional prompt-expander was omitted because a detailed
+prompt was supplied directly.
 
-Computer Use could not inspect the current Civitai browser tab because its URL
-was refused by that tool. Browser work stopped; no cookie/secret export or URL
-policy workaround was attempted. This does not establish Vast browser login
-status. CLI authentication was subsequently configured by the user and verified.
+The third instance completed all hashes at 15:44:41 UTC. Diffusion took
+1,401.375 seconds, encoder 343.883, VAE 76.780. Diffusion temporarily slowed to
+about 0.61 MB/s, then recovered to 22.75 MB/s over the next measured 205 seconds.
+A separate ordinary Range capability probe returned HTTP 403 before the stop
+step, so the sole original writer was left running and completed successfully.
+A normal local public API request reported Cloudflare error 1010. No challenge,
+authentication or request-policy control was bypassed.
 
-## Prepared acceptance and deployment
+## SDK and transport acceptance
 
-[bootstrap.sh](../scripts/remote/bootstrap.sh) pins the Comfy revision and
-Python/cloudpickle ABI; [download_models.py](../scripts/remote/download_models.py)
-downloads on the rented machine, resumes partial files, verifies size/SHA256,
-and rejects authentication/hash failures. [hardware_preflight.py](../scripts/remote/hardware_preflight.py)
-records actual container resources before large downloads.
+[acceptance.py](../scripts/remote/acceptance.py) passed all ten cases over the
+actual local-client → HTTPS → remote-daemon route, on the final wheel:
 
-[acceptance.py](../scripts/remote/acceptance.py) is the independent local SDK test:
-real remote GPU metadata, eager future chaining, driver responsiveness during
-synchronous compute, captured graph intermediate readiness, explicit eager
-retention, borrowed-cache expiry, GC input handoff, alias release, errors and
-recovery, source/package reuse/conflict, session close, and full model comparison.
-It has not yet run remotely. Native-cache eviction in this disposable acceptance
-daemon is an explicit test helper, not a new public SDK method.
+- Actual GPU/build identity and handshake `bounded_wait=true`.
+- Immediate eager submission, pending native/Python/native dependencies and
+  explicit tensor fetch.
+- A 0.382-second heartbeat while synchronous work occupied the native worker.
+- Captured graph early intermediate refs, borrowed cache ownership, deliberate
+  native-cache expiry, and explicit eager-owned output retention.
+- Accepted consumer input retention across local GC, explicit alias release,
+  upstream/dependency errors and subsequent worker recovery.
+- Source-file execution, identical-content ordinary package reuse, changed-content
+  package conflict, and reference invalidation on session close.
 
-Final acceptance must rebuild the frozen SDK/runtime wheel, record its SHA256,
-and test those exact bytes after the ongoing lifecycle fix. Earlier source
-archives are not evidence for the final build.
+The disposable cache-eviction helper is a test action, not a new public SDK API.
+See [the complete result](../artifacts/remote/60662518-20261114/smoke/acceptance.json).
 
-Deployment should stay small: one official rental command, one pinned Comfy
-checkout, one package/wheel, a three-file model manifest, native offload, and a
-loopback daemon reached by SSH tunnel. New custom nodes use the native registry;
-no SDK namespace regeneration or separate communication plugin is needed.
+[long_wait.py](../scripts/remote/long_wait.py) ran a real 130-second operation
+through Cloudflare on the final build: 137.473 seconds end to end,
+**one submit, seven bounded 20-second queries, one call ID, one remote execution**.
+[long-wait.json](../artifacts/remote/60662518-20261114/long-wait.json) retains the
+result. No timeout handler resubmitted the operation.
 
-## Proposed HTTPS fallback: not activated
+The independent agent also reran the eight native argument tests, including real
+fresh-process Comfy parsing and explicit rejection of unknown/mutually exclusive
+native flags. Those tests passed independently after the implementation freeze.
 
-Vast's [documented SSH launch mode](https://docs.vast.ai/guides/instances/connect/overview.md)
-supports an onstart script as its normal entrypoint. The official CLI's
-`update instance --onstart` updates/recreates that owned instance through a
-separate deployment API. It does not encode arbitrary commands into the limited
-`execute` file-management endpoint. The latter's rejected command is left
-rejected; no injection or whitelist bypass is attempted.
+## Default OOM, native offload, and measured resources
 
-A possible fallback is normal onstart deployment and a temporary, strong-token
-HTTPS endpoint through Cloudflare Quick Tunnel. It has not been submitted or
-exposed. [Quick Tunnel limitations](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
-include 200 in-flight requests, no SSE, changing hostnames, and no uptime guarantee.
-Cloudflare supports WebSocket proxying. Its [current connection limits](https://developers.cloudflare.com/fundamentals/reference/connection-limits/)
-state a 125-second proxy read timeout and 30-second write timeout. Current
-single-request `wait_result` can exceed this; an unchanged SDK is not claimed to
-work for long H3 jobs through that channel. Correct support needs bounded wait
-responses with repeated read-only queries for the same call ID, never resubmission.
-Local high-concurrency stress results must not be relabeled as Quick Tunnel tests.
+The first exact-model 4MP eager attempt used the default Comfy reserve of 400 MiB.
+It failed inside native INT8 linear: allocating 172 MiB with 157.75 MiB free,
+21.76 GiB allocated and 1.09 GiB reserved. The error propagated correctly through
+Comani; Comfy unloaded the models. The original full error and resource data are
+retained locally under `artifacts/remote/60662518-20261114/attempt-default-oom/`.
+
+The actual project CLI now forwards native Comfy initialization arguments after
+`--`. The successful standard startup command was:
+
+```bash
+python -m comani._runtime --comfy-root /path/to/ComfyUI \
+  --host 127.0.0.1 --port 8190 --no-custom-nodes -- --reserve-vram 4
+```
+
+The strong token was supplied through the environment, not the command text.
+The real new PID was 13069. Parsed `args.reserve_vram` was 4.0,
+`VRAMState.NORMAL_VRAM`, and `minimum_inference_memory()` was
+5,153,960,755.2 bytes. This was a normal native memory-policy setting, not a
+post-import global patch, custom model manager, lower precision, smaller image or
+different checkpoint. [configured-daemon.json](../artifacts/remote/60662518-20261114/configured-daemon.json)
+and [runtime-system.json](../artifacts/remote/60662518-20261114/runtime-system.json)
+record the sanitized command/PID and actual native values.
+
+Pinned [model_management.py](https://github.com/Comfy-Org/ComfyUI/blob/eee59185ff4f43ae2d9ad122b245619d27d9daad/comfy/model_management.py)
+uses the reserve in its native model-loading/partial-offload budget. Default
+UNet/text-encoder offload is CPU; the loader evicts models as needed.
+The final loaded-model snapshot contains only the VAE on CUDA, with CPU as its
+offload device. This snapshot is after generation, not a per-layer residency trace.
+All model files were not assumed to coexist in VRAM.
+
+| Measured quantity | Actual value |
+| --- | ---: |
+| Quoted RAM | 64,396 MiB |
+| Actual cgroup-v1 RAM limit | 129,646,985,216 bytes = 120.75 GiB |
+| Process RSS high-water, successful three-mode process | 74,153,021,440 bytes ≈ 69.06 GiB |
+| Cgroup cumulative high-water | 82,377,285,632 bytes ≈ 76.72 GiB |
+| GPU board peak sampled every second | 20,960 MiB |
+| Torch maximum allocated / reserved | 20,050,215,936 / 21,369,978,880 bytes |
+| Actual filesystem capacity | 75,161,927,680 bytes = 70 GiB |
+| Final disk used / free | 44,817,641,472 / 30,344,286,208 bytes |
+
+See [resource-peaks.json](../artifacts/remote/60662518-20261114/resource-peaks.json),
+[cgroup.json](../artifacts/remote/60662518-20261114/cgroup.json), and
+[runtime-system.json](../artifacts/remote/60662518-20261114/runtime-system.json).
+One-second raw samples and full logs remain local. The sampler's cgroup-v2 field
+is zero because this host used cgroup v1; the separate v1 records supply the real
+limit/high-water. The reported process peak is kernel-tracked as well as sampled.
+
+**This is not a hard-64-GiB pass or proof of minimum RAM/disk.** The quote and
+actual enforced limit differ, and the three-mode process exceeded 64 GiB RSS.
+At least 80 GiB of RAM allowance is a practical starting suggestion for repeating
+this particular acceptance workload, not an experimentally established minimum.
+70 GiB disk was sufficient, with 28.26 GiB remaining; smaller disks were not tested.
+
+## Actual Ada NVFP4 support
+
+Native NVFP4 compute requires NVIDIA compute major >=10 in pinned Comfy.
+RTX 4090 is Ada SM 8.9, so it uses the native packed-weight/dequantization fallback
+in [ops.py](https://github.com/Comfy-Org/ComfyUI/blob/eee59185ff4f43ae2d9ad122b245619d27d9daad/comfy/ops.py),
+rather than a Blackwell-only FP4 matrix kernel.
+
+The actual 4090/cu130 diagnostic used a packed 128×256 layer: native FP4 false,
+fallback true, permanent parameter on CPU, BF16 output. The layer exactly matched
+same-CUDA-backend dequantization plus BF16 linear: max absolute error 0, ULP 0.
+CPU versus GPU dequantization differed by at most 0.015625, relative 0.0072993,
+one BF16 ULP. CUDA TF32 matmul was false; float32 precision was `highest`.
+See [nvfp4-diagnostics.json](../artifacts/remote/60662518-20261114/nvfp4-diagnostics.json).
+The actual full-size encoder also produced finite `[1,84,5120]` conditioning and
+`[1,24,1,128,128]` latent in 7.384 seconds before diffusion testing.
+
+An earlier startup probe incorrectly required CPU/GPU dequantization to match
+bitwise. That failure is retained locally in the earlier instance's artifacts.
+The corrected oracle compares the same GPU computation; it did not loosen the
+tolerance. Full-model success is established separately by the three real images.
+
+## Rental cost and verified cleanup
+
+Only this task's instances were managed. The official CLI used the user's normal
+local credential configuration; the Vast account API key was never printed or
+sent to a rented machine. No top-up or recurring purchase was made.
+
+| Instance | UTC created | UTC destroyed and verified absent | Compute + storage USD/hour |
+| --- | --- | --- | ---: |
+| 60653211, Netherlands | 13:48:41 | 13:58:55 | 0.479259 |
+| 60654415, Spain | 14:01:10 | 14:58:24 | 0.481852 |
+| 60662518, Sweden | 15:18:56 | 16:09:22 | 0.431444 |
+
+The successful instance rate comprised compute $0.412/hour and storage
+$0.019444/hour, ingress $0.00260417/GB and egress $0.00390625/GB. Its
+compute/storage rate-time upper estimate is $0.362690. All three rate-time
+estimates total **$0.904012**, excluding traffic and billing-category differences.
+At 16:10:27 UTC, the observed account-credit change showed about **$1.1804
+deducted** for this task. Account balances remain in the private local record.
+This observed credit change is not an itemized settled invoice.
+
+[rental-ledger.json](../artifacts/remote/60662518-20261114/rental-ledger.json)
+records all rates, traffic prices, timestamps and verified absence. At
+16:10:23 UTC the official account instance list was empty. The local watchdog
+exited, and both temporary tunnels returned HTTP 530/disconnected. The original
+18:40 UTC destruction deadline was preserved through the directory migration;
+normal completion destroyed the instance much earlier. Container shutdown alone
+was never treated as proof of stopped billing.
+
+## Deployment lessons and scope
+
+Earlier SSH routes established TCP but returned no SSH banner despite sshd
+listening in the container. System proxy/firewall/VPN settings were left alone.
+The restricted provider `execute` endpoint was not converted into a shell.
+The final deployment used the documented Docker entrypoint/args route.
+
+An onstart metadata ACK did not establish actual execution. One recycle lost the
+container filesystem; a reboot retained it but still ran the older wrapper's
+startup file. Those observations do not establish a provider bug. The successful
+explicit args launcher printed a unique run ID and payload/landed-source hashes,
+which were checked before real authenticated requests.
+
+The working deployment separates environment/wheel/daemon readiness from model
+download and optional probes. A diagnostic failure cannot kill its control plane;
+the fixed resume actions are stage names, not arbitrary shell commands. Download
+budgeting subtracts existing partial bytes and verifies complete files. The later
+reserve configuration used an explicit audited restart helper and the genuine
+project CLI, without recreating the container or downloading weights again.
+
+For ordinary deployment, use the [normal deployment instructions](design/development.md):
+one pinned Comfy checkout, one wheel, the model manifest and a loopback daemon,
+normally reached through an SSH tunnel. The rental controller and dual tunnels
+are acceptance infrastructure, not required product services. Native runtime
+arguments should remain a thin pass-through; custom native nodes do not require
+SDK namespace regeneration or a separate communication plugin.
+
+The temporary TLS/token fallback used Cloudflare Quick Tunnels. Its
+[official limits](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
+include 200 in-flight requests, no SSE, changing hostnames and no uptime guarantee.
+The [125-second read timeout](https://developers.cloudflare.com/fundamentals/reference/connection-limits/)
+was crossed by a real operation using bounded polling. Local high-concurrency
+stress results are not claimed as proxy capacity tests.
