@@ -1,8 +1,9 @@
-"""Run the documented eager, graph, intermediate and native-JSON SDK examples."""
+"""Run eager, graph, intermediate and native-JSON calls against a configured daemon."""
 
 import argparse
 import asyncio
 import json
+import os
 
 from comani import Client
 
@@ -37,7 +38,7 @@ async def run(url, token):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:8190")
-    parser.add_argument("--token")
+    parser.add_argument("--token", default=os.environ.get("COMANI_TOKEN"))
     args = parser.parse_args()
     asyncio.run(run(args.url, args.token))
 

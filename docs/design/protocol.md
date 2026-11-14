@@ -34,6 +34,8 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 
 单节点 spec 包含 `kind=node`、原始 `node_type` 和编码后的 inputs。Workflow spec 包含节点、输入端口、声明 outputs、执行 targets、bindings 及是否为原生 prompt JSON。
 
+两类提交均可携带可选 JSON `extra_data` 执行 metadata，与节点 inputs 分开。SDK 的 [显式输入 Mapping 形式](sdk.md#可选执行-metadata) 保证同名真实节点端口不被执行选项占用；capture 中的 metadata 只在最外层提交时提供。
+
 输出 metadata 包含 opaque `id`、runtime `epoch`、`owner=owned|borrowed`。输入引用通过 producer locator 传递：session、epoch、call ID、slot，以及可选 workflow node ID。对象不通过文件名或 Python 内存地址跨进程访问。
 
 SDK 采用握手返回的服务器 session ID，首批调用在握手完成后才编码引用。服务器仅从 active 表授权会话；未知/已关闭 ID 不会被普通 RPC 重新注册。最近关闭的最多 64 个 ID 只用于诊断，内部 raw/prompt 频道也不能作为用户 RPC 会话使用。

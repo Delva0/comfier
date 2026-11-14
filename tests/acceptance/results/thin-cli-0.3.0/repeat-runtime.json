@@ -1,0 +1,17 @@
+[
+  {
+    "instance": 0,
+    "cuda_malloc": true,
+    "value": 1
+  },
+  {
+    "instance": 1,
+    "cuda_malloc": true,
+    "value": 2
+  },
+  {
+    "instance": 2,
+    "cuda_malloc": true,
+    "value": 3
+  }
+]

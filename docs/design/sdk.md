@@ -28,6 +28,20 @@ async with Client(url, token=token) as remote:
 
 取消某个本地 waiter 不取消底层远端调用。`close(wait=False)` 关闭会话并令待处理 SDK 等待失败；原生正在执行的同步工作不保证立即停止，见 [Runtime](runtime.md)。
 
+## 可选执行 metadata
+
+普通 `node(name, **inputs)` 的所有 kwargs 都是节点端口，名为 `inputs`、`node_inputs` 或 `extra_data` 的真实输入也保持原意。需要额外执行 metadata 时，才把输入 Mapping 放在第二个位置：
+
+```python
+plain = remote.node("OriginalClassName", extra_data=node_input)
+call = remote.node("OriginalClassName", {"extra_data": node_input}, extra_data=metadata)
+run = remote.submit(workflow, inputs=bindings, extra_data=metadata)
+```
+
+第二位置 Mapping 形式的 kwargs 只允许执行选项 `extra_data`，其他选项会报 `TypeError`。metadata 必须是 JSON 兼容 Mapping，在调用时生成快照；不能放 RemoteRef、Future 或任意 Python 对象。它传给原生执行上下文，不会变成节点端口。`submit` 的选项同时适用于 captured graph 与 raw API prompt。
+
+构图时，单个节点或嵌套 `submit` 的非空执行 metadata 会立即报 `ValueError`；统一放到构图结束后的最外层 `remote.submit(..., extra_data=...)`。普通 capture 不增加步骤。这里的 API 节点是调用外部服务的原生后端节点类别，不是 SDK 新增的固定节点名。
+
 ## Graph receiver
 
 ```python

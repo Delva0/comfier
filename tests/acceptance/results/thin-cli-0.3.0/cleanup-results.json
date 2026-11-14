@@ -1,0 +1,64 @@
+{
+  "manifest": {
+    "operations": 36,
+    "counts": {
+      "retire": 22,
+      "migrate": 9,
+      "adapt": 4,
+      "create": 1
+    },
+    "active_scripts": [
+      "scripts/check_environment.py",
+      "scripts/refresh_wheel.py"
+    ],
+    "protected_changes": [
+      "tests/stress/launcher_timeout_probe.py",
+      "tests/stress/readme_quickstart_probe.py"
+    ]
+  },
+  "acceptance-help": {
+    "returncode": 0
+  },
+  "long_wait-help": {
+    "returncode": 0
+  },
+  "verify_wheel-help": {
+    "returncode": 0
+  },
+  "encoder_check-help": {
+    "returncode": 0
+  },
+  "probe_nvfp4-help": {
+    "returncode": 0
+  },
+  "library-signatures": {
+    "returncode": 0,
+    "observed": {
+      "nvfp4_diagnostics": {
+        "run": "()"
+      },
+      "resource_monitor": {
+        "start": "(directory)",
+        "stop": "(directory)"
+      }
+    }
+  },
+  "timeout": {
+    "returncode": 0
+  },
+  "quickstart": {
+    "returncode": 0
+  },
+  "environment-cpu": {
+    "returncode": 0
+  },
+  "wheel-tool": {
+    "returncode": 0
+  },
+  "links": {
+    "returncode": 0
+  },
+  "source-and-installed": {
+    "returncode": 0
+  }
+}

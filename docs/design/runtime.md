@@ -1,6 +1,29 @@
 # Driver 与原生 runtime 边界
 
-实现：[service.py](../../src/comani/_runtime/service.py)、[adapter.py](../../src/comani/_runtime/adapter.py)、[入口](../../src/comani/_runtime/__main__.py)。
+实现：[CLI](../../src/comani/__main__.py)、[runtime 入口](../../src/comani/_runtime/__main__.py)、[service.py](../../src/comani/_runtime/service.py)、[adapter.py](../../src/comani/_runtime/adapter.py)。
+
+## 启动边界
+
+当前 `comani daemon` 与 `python -m comani daemon` 把参数交给同一解释器中的 runtime。部署者先准备可用的 ComfyUI 环境，`--comfy-root` 再选择其源码来源；这个启动入口不创建环境、安装依赖、选择版本或托管机器。原有 `python -m comani._runtime` 也保留。
+
+原生计算参数通过 `--` 传入，在原生模块初始化前应用。这个入口运行 headless backend，没有再启动第二个 ComfyUI HTTP/WebUI 服务；原生 parser 的语法覆盖范围不等于 driver 的实现范围。不支持的服务或 cache 模式必须明确拒绝，不能静默接受后忽略。
+
+### 原生参数的实际边界
+
+设备环境在 Torch 首次导入前设置；精度、显存 reserve、smart-memory 等计算策略交给所选 backend。CLASSIC、LRU、RAM_PRESSURE cache 及 RAM 阈值遵循原生设置，`--high-ram` 沿用原生别名语义。base/models 路径在 `folder_paths` 首次导入时应用；额外模型 YAML、input/output/user 路径、preview、自定义节点治理、prestartup 与 backend 节点初始化复用原生初始化流程。指定 temp 目录时，实际临时路径按原生规则为 `<指定目录>/temp`。
+
+API/partner 后端节点不会被 driver 永久禁用；`--offline`、`--disable-api-nodes` 沿用所选 backend 的节点治理。节点依赖和所需执行 metadata 仍由调用方提供，见 [SDK metadata](sdk.md#可选执行-metadata)。这不增加 WebUI、前端 JS 或第三方 HTTP route 的兼容承诺。
+
+当前保留 `NoAssets` headless 边界。下列 **`--` 后的原生选项** 被明确拒绝，作为参数错误在 Torch 初始化前结束；Comani 自己的 `--host/--port` 仍可用：
+
+| 不提供的服务/行为 | 拒绝的原生选项 |
+|---|---|
+| 第二个原生 HTTP/TLS/CORS 服务 | `--listen`、`--port`、`--tls-keyfile`、`--tls-certfile`、`--enable-cors-header`、`--max-upload-size`、`--enable-compress-response-body` |
+| 原生前端与浏览器启动 | `--auto-launch`、`--disable-auto-launch`、`--front-end-version`、`--front-end-root`、`--multi-user`、`--dont-print-server` |
+| Manager、agent、asset/database 服务 | `--enable-manager`、`--enable-manager-legacy-ui`、`--disable-manager-ui`、`--enable-agent`、`--enable-assets`、`--enable-asset-hashing`、`--database-url` |
+| 独立测试/打包/挂起模式 | `--quick-test-for-ci`、`--windows-standalone-build`、`--debug-hang` |
+
+另行拒绝 `--cache-none`：当前对象绑定需要 cache provider，原生 NullCache 不提供它。以上不是覆盖所有原生参数的 allowlist，也不承诺未来 ComfyUI 新参数自动兼容；更换 backend 后需要验证对应选项及节点。
 
 ## 一个设备入口
 

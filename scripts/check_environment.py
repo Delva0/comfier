@@ -1,6 +1,7 @@
 """Verify import provenance, native ComfyUI imports and a real CUDA operation."""
 
 import argparse
+import hashlib
 import importlib.metadata
 import json
 import sys
@@ -16,10 +17,16 @@ def main():
     import comani
 
     package = Path(comani.__file__).resolve()
-    if not package.is_relative_to(project / "src"):
-        raise RuntimeError(f"legacy/wrong comani import: {package}")
+    expected = {path.relative_to(project / 'src/comani').as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in (project / 'src/comani').rglob('*.py')}
+    actual = {path.relative_to(package.parent).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in package.parent.rglob('*.py')}
+    if actual != expected:
+        raise RuntimeError(f'Imported Comani files differ from this checkout: {package}')
     sys.path.insert(0, str(args.comfy_root.resolve()))
-    sys.argv = ["comani-environment-check"]
+    sys.argv = ['comani-environment-check'] + ([] if args.cuda else ['--cpu'])
+    import comfy.options
+    comfy.options.enable_args_parsing()
     import execution
     import nodes
     import torch

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import json
 import sys
 import uuid
@@ -11,6 +10,7 @@ from comani.errors import PackageConflict
 
 from .objects import CallFailed
 from .python_node import INPUT_NODE, Artifacts, register_python_nodes
+from .startup import cache_configuration, initialize
 
 
 class NativeAdapter:
@@ -37,35 +37,45 @@ class NativeAdapter:
             raise RuntimeError("Native ComfyUI arguments require a fresh process before importing comfy.cli_args")
         sys.path.insert(0, str(self.root))
         original_argv = sys.argv
-        sys.argv = ["comani-runtime", "--disable-assets", "--disable-partner-nodes"]
+        sys.argv = ["comani-runtime", "--disable-assets"]
         if self.cpu:
             sys.argv.append("--cpu")
+        if not self.custom_nodes:
+            sys.argv.append("--disable-all-custom-nodes")
         sys.argv.extend(self.comfy_args)
         try:
             import comfy.options
 
             comfy.options.enable_args_parsing()
-            from comfy.cli_args import args
-
-            self.nodes = importlib.import_module("nodes")
-            self.execution = importlib.import_module("execution")
-            native_server = importlib.import_module("server")
+            native, args = initialize(self.root, self.comfy_args, custom_nodes=self.custom_nodes)
+            self.nodes = native.nodes
+            self.execution = native.execution
+            native_server = native.server
             from app.assets.manager import NoAssets
 
             event_loop = asyncio.new_event_loop()
             self.server = native_server.PromptServer(event_loop, NoAssets(args))
             self.server.client_id = "comani"
             self.server.send_sync = self._event
-            event_loop.run_until_complete(self.nodes.init_extra_nodes(init_custom_nodes=self.custom_nodes, init_api_nodes=False))
-            event_loop.close()
+            native.hook_breaker_ac10a0.save_functions()
+            try:
+                event_loop.run_until_complete(self.nodes.init_extra_nodes(
+                    init_custom_nodes=self.custom_nodes and (not args.disable_all_custom_nodes or bool(args.whitelist_custom_nodes)),
+                    init_api_nodes=not args.disable_partner_nodes,
+                ))
+            finally:
+                native.hook_breaker_ac10a0.restore_functions()
+                event_loop.close()
+            disabled = native.governance.load_disabled_nodes(args.disabled_nodes_config) if args.disabled_nodes_config else set()
+            native.governance.apply_disabled_nodes(disabled)
+            native.comfy.model_management.set_cudnn_benchmark()
             register_python_nodes(self.nodes, self.artifacts)
             import comfy.model_management
 
-            total_gb = comfy.model_management.total_ram / 1024.0
+            cache_type, cache_args = cache_configuration(args, self.execution, comfy.model_management.total_ram)
             self.executor = self.execution.PromptExecutor(
                 self.server,
-                cache_type=self.execution.CacheType.RAM_PRESSURE,
-                cache_args={"ram": min(10.0, max(2.0, total_gb * 0.10)), "ram_inactive": min(128.0, total_gb), "lru": 0},
+                cache_type=cache_type, cache_args=cache_args,
             )
             self._install_cache_hooks()
             self._install_progress_hook()

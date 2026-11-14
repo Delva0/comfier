@@ -1,13 +1,14 @@
 """Small disposable-daemon resource sampler used by independent acceptance."""
 
 
-def start():
+def start(directory):
     import json
     import threading
     import time
     from pathlib import Path
 
-    directory = Path('/workspace/comani-acceptance')
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
     stop_file = directory / 'monitor.stop'
     stop_file.unlink(missing_ok=True)
 
@@ -48,11 +49,11 @@ def start():
     return {'sampling_started': True, 'interval_seconds': 1}
 
 
-def stop():
+def stop(directory):
     import json
     import time
     from pathlib import Path
-    directory = Path('/workspace/comani-acceptance')
+    directory = Path(directory)
     (directory / 'monitor.stop').touch()
     time.sleep(1.1)
     return json.loads((directory / 'resource-peaks.json').read_text())

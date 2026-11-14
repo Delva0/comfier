@@ -1,0 +1,24 @@
+{
+  "version": "0.3.0",
+  "wheel_filename": "comani-0.3.0-py3-none-any.whl",
+  "wheel_sha256": "bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a",
+  "baseline_commit": "758738ee07e1d13223fde9013effd4fa6286f942",
+  "production_manifest": "production-manifest.json",
+  "production_files_verified": 18,
+  "package_python_files_verified": 17,
+  "standard_non_gpu_suite": {
+    "passed": 113,
+    "deselected": 2,
+    "seconds": 76.08,
+    "raw_log_retained_locally": "core-pytest-v2.log"
+  },
+  "post_cleanup_collection": 115,
+  "post_cleanup_native_cpu_acceptance_cases": 10,
+  "source_archive_installed_match": true,
+  "installed_environments": ["runtime", "wheel_gate", "fresh_sdk"],
+  "scripts_remaining": ["scripts/check_environment.py", "scripts/refresh_wheel.py"],
+  "new_gpu_or_model_execution": false,
+  "new_cloud_deployment": false,
+  "historical_large_stress_rerun": false,
+  "scope": "Independently accepted thin daemon CLI, native startup, metadata API and reviewed script cleanup. Historical GPU results belong to the baseline commit; cloud/GPU revalidation of this build remains pending."
+}

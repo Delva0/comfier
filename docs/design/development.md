@@ -1,74 +1,29 @@
-# 开发、本地部署与节点扩展
+# 启动、部署与开发
 
 当前项目入口是仓库根目录的 [`pyproject.toml`](../../pyproject.toml)。下面命令在 Linux/WSL 的 `comani/` 仓库根目录执行。
 
-## 环境
+## 在已有环境中启动
 
-前提：Python 3.11+、`uv`、已有的 ComfyUI 源码 checkout，以及与硬件匹配的原生依赖。
-
-```sh
-cd /path/to/comani
-python3 scripts/bootstrap_runtime.py \
-  --python /path/to/python3.11 --comfy-root /path/to/ComfyUI
-.venv/bin/python -B scripts/check_environment.py \
-  --comfy-root /path/to/ComfyUI --cuda
-```
-
-[Bootstrap](../../scripts/bootstrap_runtime.py) 在 `.venv` 安装 ComfyUI requirements 与本项目，并使用 [runtime constraints](../../runtime-constraints.txt)。它不修改原 ComfyUI venv、源码或模型目录；这不是自动下载模型的步骤。
-
-可选 `--seed-from /path/to/ComfyUI/.venv` 仅用于新环境，要求源和目标 Python 版本完全一致且源无 editable 导入；它复制第三方 site-packages 后重新解析依赖。脚本还移除新环境中可能与 Torch 不匹配的 xformers；原环境不变。
-
-SDK-only 安装只需要 aiohttp/cloudpickle：`python -m pip install /path/to/comani`。不导入 Torch 即可连接、构图并传 opaque refs；显式 fetch 某个库的对象时，本地仍需其反序列化依赖。
-
-本机环境快照见 [environment.json](../environment.json)，历史测量见 [delivery.md](../delivery.md)。快照记录不是对任意 ComfyUI revision 或硬件的兼容保证。
-
-## 启动与停止
+使用部署者或模板已经配置好的 ComfyUI 运行环境：Python 3.11+、对应 backend 源码，以及其 Torch/CUDA、模型和节点依赖。进入该解释器后安装轻量 Comani 包：
 
 ```sh
-.venv/bin/python -B scripts/dev_server.py start \
-  --comfy-root /path/to/ComfyUI --port 8190
-.venv/bin/python -B scripts/dev_server.py status
-.venv/bin/python -B scripts/example.py --url http://127.0.0.1:8190
-.venv/bin/python -B scripts/dev_server.py stop
+python -m pip install "git+https://github.com/Delva0/comani.git"
+comani daemon --comfy-root /path/to/ComfyUI -- --reserve-vram 4
 ```
 
-[开发 launcher](../../scripts/dev_server.py) 固定 loopback、默认禁用 custom nodes；记录 `.local/daemon.json` 的 PID/start identity 和 `.local/daemon.log`。它拒绝占用端口，仅停止自己记录的进程。`--cpu` 可用于 CPU 图验证。
+尚未发布 PyPI 包，也可安装部署者自己的 wheel。`python -m comani daemon ...` 与 console 命令是同一入口；原有 `python -m comani._runtime ...` 保留。
 
-`start` 在 `/queue` 就绪检查成功后才返回，默认最多等待 120 秒，可用 `--startup-timeout` 调整。启动提前退出或超时会报告日志路径，并清理本次创建的进程；不会结束其他 daemon。Client 连接失败或启动被取消时也会关闭所有 HTTP 池和后台 sender，不依赖尚未进入的上下文执行 `__aexit__`。
+CLI 直接在当前解释器中启动同一个 runtime。`--comfy-root` 选择已有源码位置，不承担 clone、更新、依赖安装、venv、版本锁定或模型下载。环境版本由部署者决定；既有源码和环境不会被启动命令重置。
 
-## 加载新的原生节点
+daemon 默认监听 `127.0.0.1:8190`，前台运行，用 Ctrl-C/SIGTERM 或部署方进程管理器停止；没有额外 controller 或产品级 start/status/stop 服务。`--reserve-vram 4` 只是原生参数示例，按实际硬件选择。
 
-依照节点项目的正常方式，把 custom node 安装到指定 ComfyUI checkout，并将 Python 依赖安装到 **daemon 使用的环境**。随后用不带 `--no-custom-nodes` 的前台入口重启：
+独立客户端安装相同轻量包即可，不需要本地 Torch/ComfyUI。显式取回 Tensor 等对象时，本地仍需其反序列化依赖；callable 传输的版本约束见 [Python artifacts](python-artifacts.md)。
 
-```sh
-.venv/bin/python -B -m comani._runtime \
-  --comfy-root /path/to/ComfyUI --host 127.0.0.1 --port 8190
-```
+## 就绪与网络入口
 
-节点注册成功后，新建 Client 会话获取 metadata，按原名调用：`remote.node("OriginalClassName", ...)`。自定义输出作为 opaque refs 传递，无需 SDK 发布新类型或生成函数。模型权重按原生节点约定放置，由 ComfyUI/model management 加载。
+可使用 `--host`、`--port`、`--cpu` 和 `--no-custom-nodes`；token 由 `--token` 或 `COMANI_TOKEN` 提供。非 loopback 绑定要求 token。可以使用 SSH 转发或部署方提供的鉴权 HTTPS 反代；租机、隧道、模板和恢复控制面均不属于 daemon。
 
-原生 ComfyUI 启动参数放在 `--` 后，例如追加 `-- --lowvram --reserve-vram 4`。daemon 在导入原生节点前解析并应用这些参数，具体显存策略由部署方按硬件选择。参数无效或互斥时启动失败；已初始化的 runtime 不接受事后修改启动参数。
-
-依赖图上下文的节点放在 workflow；前端 JS 和自定义 HTTP route 不会因 registry 中有同名类就自动得到支持。安装节点依赖或改变 ComfyUI revision 后，应重新跑对应 native/集成用例。
-
-## 远端入口
-
-### 先部署环境与 daemon
-
-准备一个能运行目标 ComfyUI revision 的 Python 环境，将匹配硬件的 PyTorch/CUDA、ComfyUI requirements 和 custom node 依赖安装到同一环境，再安装 wheel。SDK 客户端可使用更轻的独立环境；callable 传输的版本约束见 [Python artifacts](python-artifacts.md)。
-
-```sh
-/path/to/runtime/bin/python -m pip install /path/to/comani-0.2.0-py3-none-any.whl
-
-# COMANI_TOKEN 已由部署环境注入；daemon 从环境读取，不写入脚本。
-/path/to/runtime/bin/python -B -m comani._runtime \
-  --comfy-root /path/to/ComfyUI --host 127.0.0.1 --port 8190 \
-  --no-custom-nodes
-```
-
-这是普通前台启动方式，应由部署方的进程管理器管理。需要原生 custom nodes 时去掉 `--no-custom-nodes`。可以通过 SSH 转发或自己的鉴权 HTTPS 反代访问 loopback；直接绑定非 loopback 地址则必须配置 token。核心架构仍是一个 daemon 对应一个 runtime，不依赖租机平台、双隧道或验收用恢复控制面。
-
-进程已创建、隧道已有 URL 都不等于就绪。等目标地址可达后，用真正 Client 握手确认环境可用；连接失败应让部署步骤失败或由部署方有界重试。下面检查不加载模型：
+进程创建或 URL 可达不等于 runtime 已就绪。使用真正 Client 完成握手，失败时让部署步骤失败或由部署方有界重试：
 
 ```python
 import asyncio
@@ -82,33 +37,45 @@ async def check_ready():
 asyncio.run(check_ready())
 ```
 
-本次远端已验证的环境为 Python 3.11.11、cloudpickle 3.1.2、Torch 2.9.1+cu130 和固定 ComfyUI revision，详见 [smoke metadata](../../artifacts/remote/60662518-20261114/smoke/acceptance.json)。[验收 bootstrap](../../scripts/remote/bootstrap.sh) 与 [constraints](../../runtime-constraints.txt) 记录该组合；它是本次复现环境，不是所有 GPU 的通用安装器。
+这个检查不加载模型。Client 连接失败或启动被取消时会清理 HTTP 池与后台 sender。经过带读取超时的反向代理时，SDK 协商 [bounded-wait](protocol.md#经过反向代理的等待)，每轮 20 秒只读等待同一调用，不重复提交。
 
-### 模型准备与用户例程
+## 加载新的原生节点
 
-daemon 就绪后，再按原生节点约定下载模型和 companion weights 到 ComfyUI `models/` 下对应目录，核对文件大小与 SHA256；安装 wheel 不会下载模型。指定 H3 的三文件与目录见 [模型清单](../../scripts/remote/models.json)。实际磁盘、RAM/cgroup 和显存应单独核实，供应商报价不是模型运行的最低资源证明。
+依照节点项目的正常方式，把 custom node 安装到选定 ComfyUI 源码目录，并将 Python 依赖安装到 **启动 daemon 的同一解释器环境**。随后用不带 `--no-custom-nodes` 的入口重启：
+
+```sh
+comani daemon \
+  --comfy-root /path/to/ComfyUI --host 127.0.0.1 --port 8190
+```
+
+节点注册成功后，新建 Client 会话获取 metadata，按原名调用：`remote.node("OriginalClassName", ...)`。自定义输出作为 opaque refs 传递，无需 SDK 发布新类型或生成函数。模型权重按原生节点约定放置，由 ComfyUI/model management 加载。
+
+原生 ComfyUI 启动参数放在 `--` 后，例如 `-- --lowvram --reserve-vram 4`。daemon 在导入原生节点前应用支持的参数；无效、互斥或 driver 明确不支持的参数会失败。它是 headless backend，不能把官方 parser 接受的所有 WebUI/server/asset 选项都当成已支持，具体边界见 [Runtime](runtime.md)。已初始化的 runtime 不接受事后修改启动参数。
+
+依赖图上下文的节点放在 workflow；前端 JS 和自定义 HTTP route 不会因 registry 中有同名类就自动得到支持。安装节点依赖或改变 ComfyUI revision 后，应重新跑对应 native/集成用例。
+
+## 模型与实际例程
+
+按原生节点约定，将模型和 companion weights 放到选定 backend 的 `models/` 或额外模型路径，并核对大小与 SHA256。指定 H3 的三文件和实际目录见 [历史模型清单](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/remote/models.json)。磁盘、RAM/cgroup 与显存按真实运行核实，供应商报价不是最低资源证明。
 
 [实际 comani 例程](../../examples/minimax_h3_remote.py) 包含 eager node/Python/node、captured graph 和 raw API graph 三条链；URL/token 从环境读取。环境、模型及本地 Tensor 反序列化依赖齐备后，配置 `COMANI_URL`、`COMANI_TOKEN` 与实际 wheel 的 `COMANI_WHEEL_SHA256`，在本项目目录运行：
 
 ```sh
-.venv/bin/python -B examples/minimax_h3_remote.py \
+python -B examples/minimax_h3_remote.py \
   --output artifacts/my-h3-run \
   --wheel-sha256 "$COMANI_WHEEL_SHA256"
 ```
 
-该完整模型例程已在指定 INT8 checkpoint 上完成三路 2048×2048 PNG，原始 Tensor 和 PNG 逐位一致。实际部署、原生显存参数、资源测量与销毁记录统一保存在 [远端报告](../remote_acceptance.md)。
-
-### 已验证的网络范围
-
-真实远端 HTTPS 的 [10 项基础 smoke](../../artifacts/remote/60662518-20261114/smoke/acceptance.json)、[130 秒长任务](../../artifacts/remote/60662518-20261114/long-wait.json) 和 [NVFP4 小型 fallback 诊断](../../artifacts/remote/60662518-20261114/nvfp4-diagnostics.json) 已通过；长任务仅提交一次，发出七次结果查询。完整模型的三路出图另有 [逐位比较记录](../../artifacts/remote/60662518-20261114/image-comparison.json)。
-
-经过带读取超时的反向代理时，服务器协商 [bounded-wait](protocol.md#经过反向代理的等待)，SDK 每轮 20 秒只读等待同一个调用，不重复提交。临时 Quick Tunnel 的 200 个在途请求上限仍适用；本次租机与传输恢复脚本只是验收设施，常规部署可选任何适当的网络入口。
+该实际脚本在 0.2.0 执行基线上完成了三路 2048×2048 PNG，原始 Tensor 和 PNG 逐位一致；本地真实来源另见 [local_checkpoint.py](../../examples/local_checkpoint.py)。[远端报告](../remote_acceptance.md) 保留其 wheel、环境、原生显存参数、资源和销毁证据，不把它改记为新 CLI 验收。
 
 ## 测试
 
+以下是开发者命令，不是启动 daemon 的部署条件。先选择具有测试所需 ComfyUI/Torch 依赖的解释器，再安装测试 extras；SDK-only 用例本身不需要 native 依赖。
+
 ```sh
-.venv/bin/python -B -m pytest -q -m 'not gpu' -p no:cacheprovider
-.venv/bin/python -m ruff check src tests scripts
+python -m pip install -e ".[test]"
+python -B -m pytest -q -m 'not gpu' -p no:cacheprovider
+python -m ruff check src tests scripts
 ```
 
 主要层次：
@@ -130,16 +97,30 @@ COMANI_TEST_CHECKPOINT=existing_checkpoint.safetensors \
 上述命令不下载/复制 checkpoint。保留大量 MODEL/CLIP/VAE refs 会保留 owned 对象，测试不同 pipeline 时应让不再需要的局部引用自然退出；workflow 要长期保留的结果使用显式 eager 消费者，遵循 [所有权](ownership.md)。
 
 新增压力与远端验收由独立 agent 执行；实现者的 unit、历史 GPU 测量和文档检查不能替代其结论。
-[本地独立验收](../../tests/stress/INDEPENDENT_LOAD_REPORT.md) 已通过：上述标准非 GPU suite 为 81 passed、2 deselected；原始显式 unit→integration 选择可收集 52 项；无 Torch wheel 的 15 个 Python 文件与源码、archive 一致。原 README 启动→立即示例→停止、连接失败/取消清理、pool 饱和、session churn 和完整持续负载均已独立复测通过。本地 140 秒代理验证也已通过，但不代表实际远端 HTTPS 或 GPU 模型验收。
+[历史本地独立验收](../../tests/stress/INDEPENDENT_LOAD_REPORT.md) 记录原非 GPU suite、持续负载、生命周期与 140 秒代理验证；758738e 基线标准非 GPU 回归为 **89 passed、2 deselected**。本轮薄 CLI、原生选项和 execution metadata 的 [独立非 GPU 回归](../../tests/acceptance/THIN_CLI_REPORT.md) 为 **113 passed、2 deselected**，包含真实 CPU HTTP、缓存/设备/路径及 metadata eager/captured/raw 三路验证。新的 ComfyUI 模板 GPU 重测尚待后续，不能把历史 2048×2048 出图改记为本轮结果。
 
-目录提升和原生启动参数透传后的独立标准非 GPU 回归为 **89 passed、2 deselected**（25.34 秒），覆盖真实 native 与无 Torch wheel HTTP；另外通过真实 CLI 验证 `--reserve-vram 4` 已在 ComfyUI 模块初始化时生效。上段压力测量保留原始运行记录。
+历史 [environment.json](../environment.json) 和 [delivery.md](../delivery.md) 是对应测量环境的快照，不是产品中的版本选择或安装策略。
+
+`scripts/` 仅保留 [环境诊断](../../scripts/check_environment.py) 与 [wheel 刷新](../../scripts/refresh_wheel.py)，属于开发/验证工具，不是 daemon 启动条件。可复用验收器放在 [tests/acceptance](../../tests/acceptance/)，模型与历史约束分别保存在 [模型 fixture](../../tests/fixtures/minimax_h3_models.json)、[环境 fixture](../../tests/fixtures/native_runtime_constraints.txt)；daemon 不消费这些 fixture 来安装或管理环境。已退役脚本的历史来源见 [758738e 记录](../delivery.md)。
 
 ## 打包
 
 ```sh
-.venv/bin/python -m pip wheel --no-deps --wheel-dir dist .
+python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-wheel 使用本目录的 `src/comani/`，发布前应在源码冻结后重建。旧项目及其环境保存在同级 `comani-old/`；停止记录的 daemon 并停止使用本仓库的 `.venv` 即可退出本地开发部署。
+wheel 使用 `src/comani/`，发布前应在源码冻结后重建。构建工具、测试环境及历史 constraints 都属于开发/验证资料，daemon 不读取它们来管理运行环境。
 
-本仓库的干净安装验收使用独立 `.venv-wheel`。源码更新后运行 `.venv/bin/python -B scripts/refresh_wheel.py`，重建并 force reinstall 当前 wheel；脚本同时核对 source/archive/installed Python 文件 hash 和无 Torch import origin，保存 `docs/wheel_manifest.json`。只更新 editable 环境不会更新已安装 wheel，完整 suite 会检查这一点。
+开发者可用 `scripts/refresh_wheel.py` 刷新本地 wheel 测试环境；只更新 editable 安装不会更新已安装 wheel。仓库现存 [docs/wheel_manifest.json](../wheel_manifest.json) 是历史 **0.2.0** 快照，不能用作当前 0.3.0 证明。
+
+本轮独立验收的原始 wheel 为 `comani-0.3.0-py3-none-any.whl`，SHA256 为 `bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a`。在装有该 wheel 的解释器中，可用迁移后的 [verifier](../../tests/acceptance/verify_wheel.py) 核对实际文件：
+
+```sh
+mkdir -p .local/verification
+python tests/acceptance/verify_wheel.py \
+  --wheel /path/to/comani-0.3.0-py3-none-any.whl \
+  --sha256 bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a \
+  --report .local/verification/wheel.json
+```
+
+对应 [源码清单](../../tests/acceptance/results/thin-cli-0.3.0/production-manifest.json) 与 [实际安装比对](../../tests/acceptance/results/thin-cli-0.3.0/cleanup-wheel.json) 独立保留。后续重新构建的产物需要记录自己的 hash，不能直接沿用本次验收 wheel 的值。

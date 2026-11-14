@@ -8,7 +8,7 @@ from comani._runtime.adapter import NativeAdapter
 
 
 @pytest.mark.parametrize("native_args", [[], ["--reserve-vram", "4", "--disable-smart-memory"]])
-def test_launcher_forwards_native_arguments_after_separator(monkeypatch, native_args):
+def test_launcher_forwards_native_arguments_after_separator(monkeypatch, tmp_path, native_args):
     captured = {}
     runtime = object()
     app = object()
@@ -29,12 +29,14 @@ def test_launcher_forwards_native_arguments_after_separator(monkeypatch, native_
     monkeypatch.setattr(launcher, "NativeRuntime", make_runtime)
     monkeypatch.setattr(launcher, "create_app", make_app)
     monkeypatch.setattr(launcher.web, "run_app", run_app)
+    monkeypatch.setattr(launcher.importlib.util, "find_spec", lambda _: object())
+    (tmp_path / "execution.py").touch()
     launcher.main([
-        "--comfy-root", "/native", "--cpu", "--no-custom-nodes", "--token", "test-token",
+        "--comfy-root", str(tmp_path), "--cpu", "--no-custom-nodes", "--token", "test-token",
         *(["--", *native_args] if native_args else []),
     ])
     assert captured == {
-        "root": "/native", "cpu": True, "custom_nodes": False, "comfy_args": native_args,
+        "root": tmp_path, "cpu": True, "custom_nodes": False, "comfy_args": native_args,
     }
 
 

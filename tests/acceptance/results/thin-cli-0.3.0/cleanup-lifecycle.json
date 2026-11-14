@@ -1,0 +1,20 @@
+{
+  "occupied_port": {
+    "unrelated_listener_preserved": true,
+    "child_created": false
+  },
+  "early_exit": {
+    "returncode": 2,
+    "port_closed": true,
+    "idempotent_stop": true
+  },
+  "acceptance": {
+    "returncode": 0,
+    "cases": 10
+  },
+  "wait": {
+    "returncode": 0,
+    "caller_directory_used": true
+  },
+  "final_child_stopped": true
+}

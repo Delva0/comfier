@@ -1,0 +1,43 @@
+{
+  "scope": "thin CLI and basic SDK example in the current configured environment",
+  "steps": [
+    {
+      "command": [
+        "/home/delva/projects/comani/.venv/bin/python",
+        "-B",
+        "-m",
+        "comani",
+        "daemon",
+        "--comfy-root",
+        "/home/delva/projects/ComfyUI",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "44785",
+        "--cpu",
+        "--no-custom-nodes"
+      ],
+      "ready": true,
+      "pid": 885807,
+      "seconds": 8.283431991003454
+    },
+    {
+      "command": [
+        "/home/delva/projects/comani/.venv/bin/python",
+        "-B",
+        "/home/delva/projects/comani/examples/basic.py",
+        "--url",
+        "http://127.0.0.1:44785"
+      ],
+      "returncode": 0,
+      "stdout": "{\"eager_shape\": [1, 64, 64, 3], \"workflow_shape\": [1, 64, 64, 3], \"intermediate_ownership\": \"borrowed\", \"native_json_shape\": [1, 64, 64, 3]}\n",
+      "stderr": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/torch/cuda/__init__.py:63: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\n"
+    },
+    {
+      "action": "terminate only the owned foreground CLI process",
+      "pid": 885807,
+      "returncode": 0
+    }
+  ],
+  "passed": true
+}

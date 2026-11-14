@@ -1,0 +1,40 @@
+{
+  "legacy": {
+    "port": "legacy-port",
+    "number": 8,
+    "auth": null,
+    "key": null,
+    "png": null
+  },
+  "eager": {
+    "port": "mapped-port",
+    "number": 9,
+    "auth": "independent-dummy-auth",
+    "key": "independent-dummy-key",
+    "png": {
+      "revision": "before"
+    }
+  },
+  "captured": {
+    "port": "captured-port",
+    "number": 10,
+    "auth": "independent-dummy-auth",
+    "key": "independent-dummy-key",
+    "png": {
+      "revision": "before-captured"
+    }
+  },
+  "raw": {
+    "port": "raw-port",
+    "number": 11,
+    "auth": "independent-dummy-auth",
+    "key": "independent-dummy-key",
+    "png": {
+      "revision": "before-raw"
+    }
+  },
+  "capture_node_keys": [
+    "class_type",
+    "inputs"
+  ]
+}

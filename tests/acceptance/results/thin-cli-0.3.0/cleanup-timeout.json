@@ -1,0 +1,11 @@
+{
+  "passed": true,
+  "scope": "test-fixture readiness timeout, not a daemon background-management API",
+  "recorded_pid": 885805,
+  "start_returncode": -15,
+  "ready": false,
+  "startup_error": "Test fixture readiness deadline 0.001s expired; inspect /home/delva/projects/comani/.local/thin-cli-probes/daemon-1794677331185234507.log",
+  "recorded_child_alive": false,
+  "port_listening": false,
+  "log": "/home/delva/projects/comani/.local/thin-cli-probes/daemon-1794677331185234507.log"
+}

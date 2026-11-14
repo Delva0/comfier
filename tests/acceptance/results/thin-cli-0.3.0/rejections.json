@@ -1,0 +1,91 @@
+[
+  {
+    "flags": [
+      "--cache-none"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--listen=0.0.0.0"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--port",
+      "8189"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--auto-lau"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--enable-assets"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--enable-manager"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--enable-agent"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--enable-cors-header",
+      "*"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--database-url",
+      "sqlite:///:memory:"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--front-end-root",
+      "/home/delva/projects/comani/.local/thin-cli-acceptance"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--lowvram",
+      "--highvram"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  },
+  {
+    "flags": [
+      "--unknown-comani-native-option"
+    ],
+    "returncode": 2,
+    "before_torch": true
+  }
+]

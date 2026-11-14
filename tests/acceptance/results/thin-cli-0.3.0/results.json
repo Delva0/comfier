@@ -1,0 +1,352 @@
+{
+  "package": {
+    "wheel_sha256": "bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a",
+    "production_files_verified": 18,
+    "core_dependencies": [
+      "Requires-Dist: aiohttp>=3.11",
+      "Requires-Dist: cloudpickle>=3.1"
+    ]
+  },
+  "sdk-cli-0": {
+    "returncode": 0,
+    "seconds": 0.149
+  },
+  "sdk-cli-1": {
+    "returncode": 0,
+    "seconds": 0.121
+  },
+  "sdk-cli-2": {
+    "returncode": 2,
+    "seconds": 0.098
+  },
+  "sdk-cli-3": {
+    "returncode": 2,
+    "seconds": 0.119
+  },
+  "sdk-cli-4": {
+    "returncode": 2,
+    "seconds": 0.12
+  },
+  "sdk-cli-5": {
+    "returncode": 2,
+    "seconds": 0.115
+  },
+  "sdk-cli-6": {
+    "returncode": 2,
+    "seconds": 0.117
+  },
+  "sdk-cli-7": {
+    "returncode": 2,
+    "seconds": 0.119
+  },
+  "sdk-cli-8": {
+    "returncode": 2,
+    "seconds": 0.116
+  },
+  "sdk-console-help": {
+    "returncode": 0,
+    "seconds": 0.119
+  },
+  "native-classic": {
+    "returncode": 0,
+    "seconds": 10.055,
+    "observed": {
+      "comani": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani/__init__.py",
+      "torch_import_environment": {
+        "CUDA_VISIBLE_DEVICES": "9,8",
+        "HIP_VISIBLE_DEVICES": "9,8",
+        "ASCEND_RT_VISIBLE_DEVICES": null,
+        "ONEAPI_DEVICE_SELECTOR": null,
+        "CUBLAS_WORKSPACE_CONFIG": null,
+        "PYTORCH_CUDA_ALLOC_CONF": "backend:cudaMallocAsync"
+      },
+      "device": "cpu",
+      "reserve_arg": 4.0,
+      "reserve_actual": 4294967296.0,
+      "cache_type": "CLASSIC",
+      "cache_args": {
+        "lru": 0,
+        "ram": 0,
+        "ram_inactive": 0
+      },
+      "cache_class": "HierarchicalCache",
+      "cache_limit": null,
+      "paths": {
+        "base": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/base",
+        "models": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models",
+        "output": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output",
+        "input": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/input",
+        "temp": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/temporary/temp",
+        "previews": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/previews",
+        "user": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/user",
+        "checkpoints": [
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/extra/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output/checkpoints"
+        ]
+      },
+      "api_node_present": false,
+      "api_node_names": [],
+      "registry_size": 702,
+      "network_attempts": [],
+      "execution": {
+        "eager_latent_shape": [
+          1,
+          4,
+          8,
+          8
+        ],
+        "borrowed_value": 15
+      }
+    }
+  },
+  "native-lru": {
+    "returncode": 0,
+    "seconds": 4.605,
+    "observed": {
+      "comani": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani/__init__.py",
+      "torch_import_environment": {
+        "CUDA_VISIBLE_DEVICES": "9,8",
+        "HIP_VISIBLE_DEVICES": "9,8",
+        "ASCEND_RT_VISIBLE_DEVICES": null,
+        "ONEAPI_DEVICE_SELECTOR": null,
+        "CUBLAS_WORKSPACE_CONFIG": null,
+        "PYTORCH_CUDA_ALLOC_CONF": "backend:cudaMallocAsync"
+      },
+      "device": "cpu",
+      "reserve_arg": 4.0,
+      "reserve_actual": 4294967296.0,
+      "cache_type": "LRU",
+      "cache_args": {
+        "lru": 2,
+        "ram": 0,
+        "ram_inactive": 0
+      },
+      "cache_class": "LRUCache",
+      "cache_limit": 2,
+      "paths": {
+        "base": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/base",
+        "models": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models",
+        "output": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output",
+        "input": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/input",
+        "temp": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/temporary/temp",
+        "previews": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/previews",
+        "user": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/user",
+        "checkpoints": [
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/extra/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output/checkpoints"
+        ]
+      },
+      "api_node_present": false,
+      "api_node_names": [],
+      "registry_size": 702,
+      "network_attempts": [],
+      "execution": {
+        "eager_latent_shape": [
+          1,
+          4,
+          8,
+          8
+        ],
+        "borrowed_value": 15
+      }
+    }
+  },
+  "native-ram-device-api": {
+    "returncode": 0,
+    "seconds": 7.258,
+    "observed": {
+      "comani": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani/__init__.py",
+      "torch_import_environment": {
+        "CUDA_VISIBLE_DEVICES": "3",
+        "HIP_VISIBLE_DEVICES": "3",
+        "ASCEND_RT_VISIBLE_DEVICES": "3",
+        "ONEAPI_DEVICE_SELECTOR": "level_zero:gpu",
+        "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+        "PYTORCH_CUDA_ALLOC_CONF": null
+      },
+      "device": "cpu",
+      "reserve_arg": 4.0,
+      "reserve_actual": 4294967296.0,
+      "cache_type": "RAM_PRESSURE",
+      "cache_args": {
+        "lru": 0,
+        "ram": 1.25,
+        "ram_inactive": 2.5
+      },
+      "cache_class": "RAMPressureCache",
+      "cache_limit": 0,
+      "paths": {
+        "base": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/base",
+        "models": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models",
+        "output": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output",
+        "input": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/input",
+        "temp": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/temporary/temp",
+        "previews": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/previews",
+        "user": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/user",
+        "checkpoints": [
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/extra/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output/checkpoints"
+        ]
+      },
+      "api_node_present": true,
+      "api_node_names": [
+        "OpenAIChatConfig",
+        "OpenAIChatNode",
+        "OpenAIGPTImage1",
+        "OpenAIGPTImageGIFNode",
+        "OpenAIGPTImageNodeV2",
+        "OpenAIGPTImageNodeV3",
+        "OpenAIGPTImageSVGNode",
+        "OpenAIInputFiles"
+      ],
+      "registry_size": 1061,
+      "network_attempts": [],
+      "execution": {
+        "eager_latent_shape": [
+          1,
+          4,
+          8,
+          8
+        ],
+        "borrowed_value": 15
+      }
+    }
+  },
+  "native-default-device": {
+    "returncode": 0,
+    "seconds": 4.989,
+    "observed": {
+      "comani": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani/__init__.py",
+      "torch_import_environment": {
+        "CUDA_VISIBLE_DEVICES": "5,0,1,2,3,4,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+        "HIP_VISIBLE_DEVICES": "5,0,1,2,3,4,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31",
+        "ASCEND_RT_VISIBLE_DEVICES": null,
+        "ONEAPI_DEVICE_SELECTOR": null,
+        "CUBLAS_WORKSPACE_CONFIG": null,
+        "PYTORCH_CUDA_ALLOC_CONF": "backend:cudaMallocAsync"
+      },
+      "device": "cpu",
+      "reserve_arg": 4.0,
+      "reserve_actual": 4294967296.0,
+      "cache_type": "RAM_PRESSURE",
+      "cache_args": {
+        "lru": 0,
+        "ram": 2.0,
+        "ram_inactive": 7.7510986328125
+      },
+      "cache_class": "RAMPressureCache",
+      "cache_limit": 0,
+      "paths": {
+        "base": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/base",
+        "models": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models",
+        "output": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output",
+        "input": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/input",
+        "temp": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/temporary/temp",
+        "previews": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/previews",
+        "user": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/user",
+        "checkpoints": [
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/extra/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output/checkpoints"
+        ]
+      },
+      "api_node_present": false,
+      "api_node_names": [],
+      "registry_size": 702,
+      "network_attempts": [],
+      "execution": {
+        "eager_latent_shape": [
+          1,
+          4,
+          8,
+          8
+        ],
+        "borrowed_value": 15
+      }
+    }
+  },
+  "native-all-devices": {
+    "returncode": 0,
+    "seconds": 5.002,
+    "observed": {
+      "comani": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani/__init__.py",
+      "torch_import_environment": {
+        "CUDA_VISIBLE_DEVICES": "9,8",
+        "HIP_VISIBLE_DEVICES": "9,8",
+        "ASCEND_RT_VISIBLE_DEVICES": null,
+        "ONEAPI_DEVICE_SELECTOR": null,
+        "CUBLAS_WORKSPACE_CONFIG": null,
+        "PYTORCH_CUDA_ALLOC_CONF": "backend:cudaMallocAsync"
+      },
+      "device": "cpu",
+      "reserve_arg": 4.0,
+      "reserve_actual": 4294967296.0,
+      "cache_type": "RAM_PRESSURE",
+      "cache_args": {
+        "lru": 0,
+        "ram": 2.0,
+        "ram_inactive": 7.7510986328125
+      },
+      "cache_class": "RAMPressureCache",
+      "cache_limit": 0,
+      "paths": {
+        "base": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/base",
+        "models": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models",
+        "output": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output",
+        "input": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/input",
+        "temp": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/temporary/temp",
+        "previews": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/previews",
+        "user": "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/user",
+        "checkpoints": [
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/models/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/extra/checkpoints",
+          "/home/delva/projects/comani/.local/thin-cli-acceptance/native-paths/output/checkpoints"
+        ]
+      },
+      "api_node_present": false,
+      "api_node_names": [],
+      "registry_size": 702,
+      "network_attempts": [],
+      "execution": {
+        "eager_latent_shape": [
+          1,
+          4,
+          8,
+          8
+        ],
+        "borrowed_value": 15
+      }
+    }
+  },
+  "daemon": {
+    "pid": 869575,
+    "startup_seconds": 3.92,
+    "command": [
+      "/home/delva/projects/comani/.venv/bin/comani",
+      "daemon",
+      "--comfy-root",
+      "/home/delva/projects/ComfyUI",
+      "--port",
+      "39971",
+      "--cpu",
+      "--",
+      "--reserve-vram",
+      "4",
+      "--base-directory",
+      "/home/delva/projects/comani/.local/thin-cli-acceptance/http-base",
+      "--disable-partner-nodes"
+    ],
+    "exitcode": 0
+  },
+  "wheel-sdk-http": {
+    "returncode": 0,
+    "seconds": 0.153
+  },
+  "wheel-sdk-metadata": {
+    "returncode": 0,
+    "seconds": 0.123
+  }
+}

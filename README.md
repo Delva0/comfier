@@ -2,7 +2,7 @@
 
 Comani 是面向 ComfyUI 的 Python SDK 与 daemon。把 **ComfyUI 看作执行设备，daemon 看作下发驱动**：本地调用节点、运行 Python 或提交原生工作流，结果以远端对象引用继续传递，需要时才取回本地。
 
-当前版本为 `0.2.0`，仓库根目录是项目入口，源码位于 [`src/comani/`](src/comani/)。当前先重建通用的后端执行基础；旧项目已单独归档，后续逐步迁入其功能。
+当前版本为 `0.3.0`，源码位于 [`src/comani/`](src/comani/)。当前 daemon 入口使用部署者已配置的 ComfyUI 环境，直接启动 driver；Python、PyTorch、模型和机器部署由部署方准备。
 
 ## 能做什么
 
@@ -15,28 +15,16 @@ Comani 是面向 ComfyUI 的 Python SDK 与 daemon。把 **ComfyUI 看作执行�
 
 ## 快速开始
 
-需要 Python 3.11+、`uv` 和已有的 ComfyUI 源码目录。下面是本地 Linux/WSL 开发流程，替换 ComfyUI 路径与 Python 解释器即可：
+先进入已能运行 ComfyUI 的 Python 3.11+ 环境，在同一解释器中安装轻量包并启动 daemon：
 
 ```sh
-cd /path/to/comani
-python3 scripts/bootstrap_runtime.py \
-  --python python3.11 --comfy-root /path/to/ComfyUI
-.venv/bin/python -B scripts/dev_server.py start \
-  --comfy-root /path/to/ComfyUI --port 8190
-.venv/bin/python -B scripts/example.py --url http://127.0.0.1:8190
-.venv/bin/python -B scripts/dev_server.py stop
+python -m pip install "git+https://github.com/Delva0/comani.git"
+comani daemon --comfy-root /path/to/ComfyUI
 ```
 
-Bootstrap 使用独立的 `.venv`，不替换原 ComfyUI 环境，也不复制模型。完整环境前提、启动方式和测试命令见 [开发与本地部署](docs/design/development.md)。
+`python -m comani daemon ...` 是同一入口。命令在前台运行，默认监听 `127.0.0.1:8190`；`--comfy-root` 选择已有 backend 源码。按硬件选择的原生参数放在 `--` 后，具体支持范围见 [启动与原生参数](docs/design/development.md)。
 
-已有 daemon 时，在本目录只安装本地 SDK：
-
-```sh
-python -m pip install .
-```
-
-SDK 本身不依赖 Torch/ComfyUI；若要在本地反序列化 Tensor 等对象，本地仍需相应库。
-运行示例时使用仓库根目录，或在其他工作目录使用已安装的 SDK。
+尚未发布 PyPI 版本，使用上面的 Git URL 或 `pip install /path/to/comani.whl`。安装不会 clone ComfyUI、创建 runtime venv 或下载模型。独立客户端只需同一轻量包，无需本地 Torch/ComfyUI；取回 Tensor 等对象时仍需对应库。
 
 ## 一段 Python
 
@@ -64,7 +52,7 @@ asyncio.run(main())
 
 `await call` 返回按槽排列的 ready refs；`await call.output(i)` 返回其中一个。`RemoteRef` 本身不可 await。无关调用不会因一次本地 await 获得额外的远端顺序依赖。
 
-完整脚本见 [本地最小示例](scripts/example.py)、[本地已有 checkpoint 出图](examples/local_checkpoint.py) 和 [Minimax H3 远端执行脚本](examples/minimax_h3_remote.py)。远端脚本从环境读取 URL/token，已在指定 INT8 模型上完成 eager、captured graph 与 raw API graph 三路 2048×2048 出图；三路原始 Tensor 与 PNG 均完全一致。运行环境、显存参数、资源与清理记录见 [独立远端报告](docs/remote_acceptance.md)。
+实际出图来源保留为 [本地 checkpoint 例程](examples/local_checkpoint.py) 和 [Minimax H3 远端例程](examples/minimax_h3_remote.py)。下图来自 0.2.0 执行基线：指定 INT8 模型的 eager、captured graph 与 raw API graph 三路原始 Tensor/PNG 完全一致；环境、原生显存参数及清理记录见 [历史远端报告](docs/remote_acceptance.md)。该记录不替代新 CLI 的独立验收。
 
 ![指定 Minimax H3 INT8 模型生成的 2048×2048 实际样图](artifacts/remote/60662518-20261114/eager.png)
 
@@ -74,9 +62,7 @@ asyncio.run(main())
 
 Eager 输出由会话持有，最后一个本地别名消失后通知释放；workflow 输出借用原生缓存，失效会报 `Expired`，不会自动重算。目录包同名不同内容会报 `PackageConflict`，不会覆盖已安装模块。
 
-[本地独立验收](tests/stress/INDEPENDENT_LOAD_REPORT.md) 已通过：非 GPU suite 为 81 passed、2 deselected，覆盖持续提交、复杂图、GC/会话回收，以及本地 125 秒读取超时代理上的 140 秒调用。真实远端 HTTPS 的基础执行、130 秒长任务和指定 GPU 模型出图也已验证，租用实例已销毁，详见 [远端报告](docs/remote_acceptance.md)。这些结果不代表原生计算并行或性能上限。
-
-目录提升与原生启动参数透传后的独立标准非 GPU 回归为 **89 passed、2 deselected**，包含真实原生 runtime、SDK-only 安装和无 Torch 的 wheel HTTP 客户端。
+后端执行、生命周期及长等待的历史证据见 [独立压力报告](tests/stress/INDEPENDENT_LOAD_REPORT.md)。原生 CLI 的 parser 接受某个参数，不等于 headless driver 已实现对应服务；支持项和明确拒绝项见 [Runtime 边界](docs/design/runtime.md)。
 
 ## 文档
 
@@ -90,9 +76,10 @@ Eager 输出由会话持有，最后一个本地别名消失后通知释放；wo
 | callable、文件和目录包 | [Python artifacts](docs/design/python-artifacts.md) |
 | 环境、运行、扩展节点与测试 | [开发指南](docs/design/development.md) |
 | 环境与验收记录 | [文档目录](docs/README.md) |
+| 当前薄 CLI、metadata 与 CPU 验收 | [独立 0.3.0 报告](tests/acceptance/THIN_CLI_REPORT.md) |
 
-历史环境与交付测量保存在 [`docs/`](docs/)，新增结果见 [独立压力报告](tests/stress/INDEPENDENT_LOAD_REPORT.md) 和 [独立远端报告](docs/remote_acceptance.md)。当前 API 以本仓库的 `docs/design/` 和 `src/comani/` 为准；旧项目资料保留在独立的 `comani-old` 归档目录。
+历史环境与交付测量保存在 [`docs/`](docs/)，按报告中的源码版本和硬件范围解读；当前 API 以 `docs/design/` 和 `src/comani/` 为准。
 
 ## 开发
 
-本机环境、扩展节点、测试、wheel 刷新及部署步骤见 [开发指南](docs/design/development.md)。环境版本快照见 [environment.json](docs/environment.json)，完整组件地图见 [设计索引](docs/design/README.md)。
+扩展节点、测试及 wheel 发布工具见 [开发指南](docs/design/development.md)，它们不是使用 daemon 的部署前提。

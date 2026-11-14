@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import json
 import uuid
 import weakref
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .code import prepare_code
@@ -14,6 +16,8 @@ from .graph import Graph, GraphInput, GraphRef, _receiver
 from .protocol import PYTHON_NODE, encode_tree, lift_arguments, unpack_pickle
 from .refs import Call, OutputFuture, RemoteRef, _CallState
 from .transport import HTTPTransport
+
+_NODE_INPUTS = object()
 
 
 @dataclass
@@ -143,17 +147,35 @@ class Client:
             raise InvalidReference("A graph receiver belongs to another client")
         return graph
 
-    def node(self, node_type, /, **inputs):
-        return self._node(node_type, inputs)
+    def node(self, node_type, node_inputs=_NODE_INPUTS, /, **inputs):
+        if node_inputs is _NODE_INPUTS:
+            return self._node(node_type, inputs)
+        if not isinstance(node_inputs, Mapping):
+            raise TypeError("The second positional argument to node must be an input mapping")
+        unknown = set(inputs) - {"extra_data"}
+        if unknown:
+            raise TypeError(f"Unknown node execution options: {sorted(unknown)}")
+        return self._node(node_type, dict(node_inputs), extra_data=inputs.get("extra_data"))
 
-    def _node(self, node_type, inputs, artifacts=()):
+    @staticmethod
+    def _extra_data(value):
+        if value is None:
+            return None
+        if not isinstance(value, Mapping):
+            raise TypeError("extra_data must be a JSON-compatible mapping")
+        return json.loads(json.dumps(dict(value), allow_nan=False))
+
+    def _node(self, node_type, inputs, artifacts=(), *, extra_data=None):
         if not isinstance(node_type, str):
             raise TypeError("Node names must be original registry strings")
+        extra_data = self._extra_data(extra_data)
         graph = self._capture()
         if graph is not None:
+            if extra_data:
+                raise ValueError("Execution extra_data belongs to the whole native run; pass it to submit(graph, extra_data=...) after capture")
             return graph.add(node_type, inputs, artifacts)
         self._validate_live(inputs)
-        return self._enqueue("node", {"node_type": node_type, "inputs": inputs},
+        return self._enqueue("node", {"node_type": node_type, "inputs": inputs, "extra_data": extra_data},
                              artifacts, output_count=self._output_count(node_type))
 
     def python(self, function=None, /, *, source=None, entry=None, inputs=None, args=()):
@@ -164,7 +186,8 @@ class Client:
     def graph(self):
         return Graph(self)
 
-    def submit(self, graph, /, *, inputs=None, outputs=None, targets=None):
+    def submit(self, graph, /, *, inputs=None, outputs=None, targets=None, extra_data=None):
+        extra_data = self._extra_data(extra_data)
         if not isinstance(graph, Graph):
             graph = self._raw_graph(graph, outputs=outputs, targets=targets)
         elif outputs is not None or targets is not None:
@@ -175,11 +198,13 @@ class Client:
             raise ValueError(f"Invalid workflow bindings: missing={sorted(missing)}, extra={sorted(extra)}")
         capture = self._capture()
         if capture is not None:
+            if extra_data:
+                raise ValueError("Execution extra_data belongs to the whole native run; pass it to the outer submit after capture")
             return capture.compose(graph, bindings)
         self._validate_live(bindings)
         if not graph.sealed or graph._failed:
             raise ValueError("Submit a successfully sealed graph")
-        call = self._enqueue("workflow", {"graph": graph, "bindings": bindings},
+        call = self._enqueue("workflow", {"graph": graph, "bindings": bindings, "extra_data": extra_data},
                              tuple(graph.artifacts.values()), output_count=len(graph.outputs),
                              names={name: i for i, name in enumerate(graph.outputs)})
         call._graph = graph
@@ -252,6 +277,8 @@ class Client:
                     spec = {"kind": "workflow", "graph": item.payload["graph"].to_wire(self),
                             "bindings": {k: encode_tree(v, self._encode_special)
                                          for k, v in item.payload["bindings"].items()}}
+                if item.payload.get("extra_data") is not None:
+                    spec["extra_data"] = item.payload["extra_data"]
                 item.state.status = "submitting"
                 await self.transport.request("submit", session_id=self.session_id,
                                              call_id=item.state.call_id, spec=spec)

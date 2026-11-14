@@ -1,0 +1,33 @@
+{
+  "runtime": {
+    "pid": 869575,
+    "executable": "/home/delva/projects/comani/.venv/bin/python",
+    "package": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani/__init__.py",
+    "device": "cpu",
+    "torch": "2.9.1+cu128",
+    "reserve_arg": 4.0,
+    "reserve_actual": 4294967296.0
+  },
+  "image": {
+    "shape": [
+      1,
+      64,
+      64,
+      3
+    ],
+    "sum": 12288.0,
+    "device": "cpu"
+  },
+  "latent": {
+    "shape": [
+      1,
+      4,
+      8,
+      8
+    ],
+    "sum": 0.0,
+    "device": "cpu"
+  },
+  "source_answer": 42,
+  "captured_answer": 7
+}

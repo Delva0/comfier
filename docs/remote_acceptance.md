@@ -1,5 +1,11 @@
 # Independent RTX 4090 acceptance
 
+This is the **historical 0.2.0 execution baseline** preserved at
+[758738e](https://github.com/Delva0/comani/tree/758738ee07e1d13223fde9013effd4fa6286f942).
+Its scripts, exact build and commands describe that run. They do not validate
+later CLI or native-option changes; use the [current startup guide](design/development.md)
+for the supported product entrypoint. Raw artifacts below are unchanged.
+
 **Passed on 2026-11-14 UTC. All rented instances were destroyed and verified
 absent.** This report records tests performed by the independent remote
 acceptance agent, rather than relying on the implementation owner's results.
@@ -27,7 +33,8 @@ python examples/minimax_h3_remote.py \
 
 Use a running, authenticated deployment with the exact manifest files; the
 temporary acceptance endpoints have been shut down. The private endpoint/token
-wrapper used during the test is `scripts/remote/run_client.py model`.
+wrapper used during the test is the archived
+[run_client.py model](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/remote/run_client.py).
 
 The [actual run record](../artifacts/remote/60662518-20261114/run.json) includes
 the script path, prompt, seed 426190, 2048×2048 size, six steps, CFG 1,
@@ -86,7 +93,7 @@ SHA256 verification before generation:
 | VAE: minimax_h3_image_vae_fp16.safetensors | 1,168,505,312 | d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af |
 
 See [model-verification.json](../artifacts/remote/60662518-20261114/model-verification.json)
-and [models.json](../scripts/remote/models.json). Companion files are pinned to
+and [models.json](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/remote/models.json). Companion files are pinned to
 [Comfy-Org revision 0bb149f51e3156ed4b90dd45d5620346bfe1df8f](https://huggingface.co/Comfy-Org/MiniMax-H3-Image/tree/0bb149f51e3156ed4b90dd45d5620346bfe1df8f).
 The differently hashed Comfy-Org `int8_convrot` diffusion file and INT4/INT6 files
 were not substituted. The optional prompt-expander was omitted because a detailed
@@ -102,7 +109,7 @@ authentication or request-policy control was bypassed.
 
 ## SDK and transport acceptance
 
-[acceptance.py](../scripts/remote/acceptance.py) passed all ten cases over the
+[acceptance.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/remote/acceptance.py) passed all ten cases over the
 actual local-client → HTTPS → remote-daemon route, on the final wheel:
 
 - Actual GPU/build identity and handshake `bounded_wait=true`.
@@ -119,7 +126,7 @@ actual local-client → HTTPS → remote-daemon route, on the final wheel:
 The disposable cache-eviction helper is a test action, not a new public SDK API.
 See [the complete result](../artifacts/remote/60662518-20261114/smoke/acceptance.json).
 
-[long_wait.py](../scripts/remote/long_wait.py) ran a real 130-second operation
+[long_wait.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/remote/long_wait.py) ran a real 130-second operation
 through Cloudflare on the final build: 137.473 seconds end to end,
 **one submit, seven bounded 20-second queries, one call ID, one remote execution**.
 [long-wait.json](../artifacts/remote/60662518-20261114/long-wait.json) retains the
@@ -137,8 +144,8 @@ It failed inside native INT8 linear: allocating 172 MiB with 157.75 MiB free,
 Comani; Comfy unloaded the models. The original full error and resource data are
 retained locally under `artifacts/remote/60662518-20261114/attempt-default-oom/`.
 
-The actual project CLI now forwards native Comfy initialization arguments after
-`--`. The successful standard startup command was:
+The driver entrypoint used for this recorded run forwarded native Comfy
+initialization arguments after `--`. The successful startup command was:
 
 ```bash
 python -m comani._runtime --comfy-root /path/to/ComfyUI \
@@ -254,9 +261,10 @@ budgeting subtracts existing partial bytes and verifies complete files. The late
 reserve configuration used an explicit audited restart helper and the genuine
 project CLI, without recreating the container or downloading weights again.
 
-For ordinary deployment, use the [normal deployment instructions](design/development.md):
-one pinned Comfy checkout, one wheel, the model manifest and a loopback daemon,
-normally reached through an SSH tunnel. The rental controller and dual tunnels
+For ordinary deployment, use the [current startup instructions](design/development.md)
+with a deployment-provided Comfy environment and the lightweight daemon command.
+Environment versions, models and network access are deployment choices.
+The rental controller and dual tunnels
 are acceptance infrastructure, not required product services. Native runtime
 arguments should remain a thin pass-through; custom native nodes do not require
 SDK namespace regeneration or a separate communication plugin.

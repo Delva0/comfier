@@ -3,6 +3,15 @@
 This is the historical pre-migration record. Paths containing `next/` describe
 the original measurement location; the project now lives at the repository root.
 Use [the development guide](design/development.md) for current commands.
+The script-based deployment below belongs to the
+[758738e baseline](https://github.com/Delva0/comani/tree/758738ee07e1d13223fde9013effd4fa6286f942),
+not the current CLI. Archived sources:
+[bootstrap_runtime.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/bootstrap_runtime.py),
+[check_environment.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/check_environment.py),
+[dev_server.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/dev_server.py),
+[example.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/example.py).
+The measurements and raw evidence remain the original results; later startup
+changes require their own acceptance.
 
 ## Result
 

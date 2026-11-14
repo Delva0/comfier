@@ -2,7 +2,9 @@
 
 This never starts a local daemon or substitutes local model weights. Results
 are written only after real operations finish. Use a private SSH tunnel URL or
-provide COMANI_TOKEN for an authenticated HTTPS endpoint.
+provide COMANI_TOKEN for an authenticated HTTPS endpoint. Run only against a
+disposable test daemon: one case deliberately evicts its native cache. The client
+requires its normal tensor/serializer dependencies; this script installs nothing.
 """
 import argparse
 import asyncio
@@ -42,17 +44,23 @@ def metadata():
     import comani
 
     package = Path(comani.__file__).parent
+    comfy_root = Path(mm.__file__).resolve().parents[1]
+    try:
+        commit = subprocess.check_output(['git', '-C', str(comfy_root), 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        commit = None
+    device = mm.get_torch_device()
+    device_name = torch.cuda.get_device_name(device) if device.type == 'cuda' else str(device)
     return {'host': socket.gethostname(), 'python': platform.python_version(),
             'cloudpickle': importlib.metadata.version('cloudpickle'),
-            'device': torch.cuda.get_device_name(0), 'torch': torch.__version__,
-            'comani_file': comani.__file__,
+            'device': device_name, 'torch': torch.__version__,
+            'comani_file': comani.__file__, 'comani_version': importlib.metadata.version('comani'),
             'installed_source_sha256': {str(path.relative_to(package.parent)): hashlib.sha256(path.read_bytes()).hexdigest()
                                         for path in package.rglob('*.py')},
             'native_reserve_vram_gib': args.reserve_vram,
             'native_vram_state': str(mm.vram_state),
             'minimum_inference_memory_bytes': mm.minimum_inference_memory(),
-            'wheel_sha256': hashlib.sha256(Path('/workspace/comani-acceptance/next/dist/comani-0.2.0-py3-none-any.whl').read_bytes()).hexdigest(),
-            'comfy_commit': subprocess.check_output(['git', '-C', '/workspace/comani-acceptance/ComfyUI', 'rev-parse', 'HEAD'], text=True).strip()}
+            'comfy_root': str(comfy_root), 'comfy_commit': commit}
 
 
 def explicit_test_cache_eviction():
@@ -100,18 +108,22 @@ async def main(args):
         await remote.start()
         assert remote.handshake.get('capabilities', {}).get('bounded_wait') is True
         info = await (await remote.python(metadata).output()).fetch()
-        assert '4090' in info['device']
-        assert info['wheel_sha256'] == '16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6'
-        assert '/site-packages/comani/' in info['comani_file']
         import hashlib
         import zipfile
-        with zipfile.ZipFile(Path(__file__).resolve().parents[2] / '.local/dist/comani-0.2.0-py3-none-any.whl') as wheel:
+        wheel_sha256 = hashlib.sha256(args.wheel.read_bytes()).hexdigest()
+        if args.wheel_sha256:
+            assert wheel_sha256 == args.wheel_sha256
+        with zipfile.ZipFile(args.wheel) as wheel:
             expected_sources = {name: hashlib.sha256(wheel.read(name)).hexdigest()
                                 for name in wheel.namelist() if name.startswith('comani/') and name.endswith('.py')}
         assert info['installed_source_sha256'] == expected_sources
-        assert info['native_reserve_vram_gib'] == 4.0
-        assert info['comfy_commit'] == 'eee59185ff4f43ae2d9ad122b245619d27d9daad'
-        record('real_remote_4090_metadata', **info)
+        if args.expected_device:
+            assert args.expected_device in info['device']
+        if args.expected_comfy_commit:
+            assert info['comfy_commit'] == args.expected_comfy_commit
+        if args.expected_reserve_vram is not None:
+            assert info['native_reserve_vram_gib'] == args.expected_reserve_vram
+        record('runtime_metadata_and_installed_source_identity', client_wheel_sha256=wheel_sha256, **info)
         started = time.monotonic()
         first = remote.node('EmptyImage', width=64, height=64, batch_size=1, color=0x204080)
         transformed = remote.python(lambda x: x * 0.5, inputs={'x': first.output()})
@@ -285,5 +297,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', required=True)
     parser.add_argument('--output', required=True, type=Path)
-    parser.add_argument('--model', action='store_true')
+    parser.add_argument('--model', action='store_true', help='Optional H3 fixture; requires pre-existing requested weights')
+    parser.add_argument('--wheel', required=True, type=Path, help='Client-side wheel whose Python files must match the remote installation')
+    parser.add_argument('--wheel-sha256')
+    parser.add_argument('--expected-device')
+    parser.add_argument('--expected-comfy-commit')
+    parser.add_argument('--expected-reserve-vram', type=float)
     asyncio.run(main(parser.parse_args()))
