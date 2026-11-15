@@ -1,0 +1,1641 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-15",
+  "status": "local_and_remote_feature_acceptance_complete_performance_observations_not_a_speedup_guarantee",
+  "candidate_commit": "cae8c24ff13f97256d0b6b79a361c7ba1fbcacde",
+  "wheel_sha256": "38ddaf7d879c39e5402ecbad554b41bf4499138a10aa3e1e00707359908f58ee",
+  "scope": "Curated scalar/array evidence only. No raw logs/tensors/pickle, credentials, endpoints, balances or per-call/session identifiers. Prior slow-host measurements are retained with limits.",
+  "build_identity": {
+    "actual_installed_package_python_files": 21,
+    "client_and_server_source_hashes_match_frozen_manifest": true,
+    "public_recipe_sha256": "cd1e1d5dbd219aed00b4d4c75218207ca13627e9f6a50e4d7477af9ab8e722ae",
+    "public_source_ops_sha256": "3afaae491527a1212d1d75a6d646629a2c366528a09df7991865471465266242",
+    "actual_harness_sha256": "6b3b765834c558d07a2d55da94a615b878e09e5c111fe3e283ee15125b3987c6",
+    "actual_instrumentation_sha256": "6f20ea63ae33e635313b3b8335bd4c8ec5402b447d7c2164d815cd06657841e2",
+    "actual_proc_sampler_sha256": "58d1539f2a0d9bafdab13ec5df75cbd7d85b96507ae884c97f2b166f5be38661",
+    "public_recipe": "examples/minimax_h3_reuse.py",
+    "actual_harness": "acceptance.py (independent local orchestration, not a shipped example)",
+    "production_manifest": "product-manifest.json",
+    "freeze_manifest": "final-feature-freeze.json",
+    "production_manifest_sha256": "26d2ca637b98f3b03fd6f7e491d569d5630cbde302c57d896d74f257619e8e49",
+    "freeze_manifest_sha256": "88e6b57429b8aaaa8d8f1b2e1c40510b2284f657cacda2180c644c7a4dc05126",
+    "readme_sha256": "0a1e953b461af0ee1252a9943b1da932a34da62abda5e2747fcf69acd3657fc3"
+  },
+  "clean_host": {
+    "status": "passed",
+    "environment": {
+      "image_tag": "vastai/comfy:v0.44.0-cuda-13.2-py312",
+      "immutable_image_digest": null,
+      "cpu": "AMD EPYC 9654 96-Core Processor",
+      "cpu_count": 32,
+      "affinity_count": 32,
+      "cpu_max": "3071999 100000\n",
+      "memory_max_bytes": 111387082752,
+      "gpu_initial_idle_observation": "NVIDIA GeForce RTX 4090, 610.57.04, 00000000:06:00.0, 1 MiB, 0 %, 1, 4, 16, 16, 210 MHz, 405 MHz, 300.00 W",
+      "gpu_initial_query_seconds": 0.02219741395674646,
+      "server_python": "3.12.15",
+      "server_torch": "2.10.0+cu130",
+      "server_versions": {
+        "comani": "0.3.0",
+        "cloudpickle": "3.1.2",
+        "aiohttp": "3.14.5",
+        "lz4": "4.4.5"
+      },
+      "client_versions": {
+        "comani": "0.3.0",
+        "torch": "2.9.1",
+        "cloudpickle": "3.1.2",
+        "aiohttp": "3.13.2",
+        "lz4": "4.4.5"
+      },
+      "client_torch_runtime": "2.9.1+cu128",
+      "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+      "torch_threads": 32,
+      "torch_interop_threads": 32,
+      "native_command": [
+        "/venv/main/bin/python",
+        "/venv/main/bin/comani",
+        "daemon",
+        "--comfy-root",
+        "/workspace/ComfyUI",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "18188",
+        "--no-custom-nodes",
+        "--",
+        "--reserve-vram",
+        "4"
+      ],
+      "native_reserve_vram_GiB": 4.0,
+      "native_vram_state": "VRAMState.NORMAL_VRAM"
+    },
+    "execution_scope": {
+      "setup_calls": 1,
+      "batch": 1,
+      "native_executor_workers": 1,
+      "model_cold_definition": "daemon had tiny file/generic smoke; no previous H3 weights or inference",
+      "script_clock_scope": "client async workflow before Client/provenance, after Python imports; excludes provisioning, package/model installation and model download",
+      "provenance_seconds": 3.0830018459964776,
+      "setup_seconds": 6.46890095800336,
+      "first_image_seconds_from_client_workflow_start": 27.606558054001653,
+      "warmup_generate_seconds": 10.691844583998318,
+      "warmup_fetch_seconds": 5.794281916998443,
+      "warmup_save_seconds": 1.466073037001479,
+      "full_test_client_total_seconds": 188.7343760349977,
+      "included_transfer_probe_seconds": 70.4898410809983,
+      "abba_wall_seconds_including_barrier_probes": 89.29905452499952,
+      "abba_order": [
+        "serial2",
+        "overlap2",
+        "overlap2",
+        "serial2"
+      ],
+      "block_boundary_scope": "each two-image block starts with no next generation in flight; both first-image and total block costs include fill/drain boundaries"
+    },
+    "native_execution": {
+      "all_nine_sampler_calls_have_six_forwards": true,
+      "conditioning_graph_seconds": 4.812893569003791,
+      "conditioning_inner_spans": {
+        "CLIP.tokenize": {
+          "count": 1,
+          "sum_wall_seconds": 0.0008475140202790499,
+          "max_wall_seconds": 0.0008475140202790499,
+          "sum_process_cpu_seconds": 0.0008483429999976977
+        },
+        "comfy.model_management.free_memory": {
+          "count": 1,
+          "sum_wall_seconds": 0.00021501700393855572,
+          "max_wall_seconds": 0.00021501700393855572,
+          "sum_process_cpu_seconds": 0.00021373000000224351
+        },
+        "LoadedModel.model_load": {
+          "count": 1,
+          "sum_wall_seconds": 0.11532233702018857,
+          "max_wall_seconds": 0.11532233702018857,
+          "sum_process_cpu_seconds": 0.1155562649999986
+        },
+        "comfy.model_management.load_models_gpu": {
+          "count": 1,
+          "sum_wall_seconds": 0.12203659594524652,
+          "max_wall_seconds": 0.12203659594524652,
+          "sum_process_cpu_seconds": 0.12228005800000119
+        },
+        "CLIP.load_model": {
+          "count": 1,
+          "sum_wall_seconds": 0.12206729303579777,
+          "max_wall_seconds": 0.12206729303579777,
+          "sum_process_cpu_seconds": 0.12231084400000114
+        },
+        "comfy.ops.cast_modules_with_vbar": {
+          "count": 351,
+          "sum_wall_seconds": 4.244821398984641,
+          "max_wall_seconds": 0.1695331110386178,
+          "sum_process_cpu_seconds": 97.52785250399998
+        },
+        "MiniMaxH3ClipModel.encode_token_weights": {
+          "count": 1,
+          "sum_wall_seconds": 4.67381974007003,
+          "max_wall_seconds": 4.67381974007003,
+          "sum_process_cpu_seconds": 104.242370102
+        },
+        "SD1ClipModel.encode_token_weights": {
+          "count": 1,
+          "sum_wall_seconds": 4.673862784053199,
+          "max_wall_seconds": 4.673862784053199,
+          "sum_process_cpu_seconds": 104.242411914
+        },
+        "CLIP.encode_from_tokens_scheduled": {
+          "count": 1,
+          "sum_wall_seconds": 4.796029255026951,
+          "max_wall_seconds": 4.796029255026951,
+          "sum_process_cpu_seconds": 104.36483190199999
+        },
+        "comfy.model_prefetch.cleanup_prefetch_queues": {
+          "count": 1,
+          "sum_wall_seconds": 1.2187054380774498e-05,
+          "max_wall_seconds": 1.2187054380774498e-05,
+          "sum_process_cpu_seconds": 1.18879999888577e-05
+        },
+        "comfy.model_management.reset_cast_buffers": {
+          "count": 1,
+          "sum_wall_seconds": 0.010725755942985415,
+          "max_wall_seconds": 0.010725755942985415,
+          "sum_process_cpu_seconds": 0.2464423450000055
+        }
+      },
+      "inner_span_limit": "nested wall/CPU spans overlap and must not be added together; process CPU includes all threads; only graph boundary includes the existing completion barrier",
+      "samplers": [
+        {
+          "class_type": "KSampler",
+          "seed": 426490,
+          "seconds": 8.672029030974954,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426500,
+          "seconds": 3.3818569289287552,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426501,
+          "seconds": 3.3910041929921135,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426502,
+          "seconds": 3.367476467974484,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426503,
+          "seconds": 3.4681514350231737,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426504,
+          "seconds": 3.380967565928586,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426505,
+          "seconds": 3.47330642293673,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426506,
+          "seconds": 3.3842442230088636,
+          "forwards": 6
+        },
+        {
+          "class_type": "KSampler",
+          "seed": 426507,
+          "seconds": 3.381785442936234,
+          "forwards": 6
+        }
+      ]
+    },
+    "modes": {
+      "serial": {
+        "images": 4,
+        "seeds": [
+          426500,
+          426501,
+          426506,
+          426507
+        ],
+        "block_generation_fetch_save_seconds": [
+          22.437010497997107,
+          20.79420667100203
+        ],
+        "sum_generation_fetch_save_block_seconds": 43.23121716899914,
+        "images_per_minute": 5.551543900829668,
+        "native_median_seconds": {
+          "sample": 3.3830505759688094,
+          "python": 0.0027132489485666156,
+          "decode": 0.8372489854227751
+        }
+      },
+      "overlap": {
+        "images": 4,
+        "seeds": [
+          426502,
+          426503,
+          426504,
+          426505
+        ],
+        "block_generation_fetch_save_seconds": [
+          19.314410418999614,
+          23.22766648400284
+        ],
+        "sum_generation_fetch_save_block_seconds": 42.54207690300245,
+        "images_per_minute": 5.641473512146788,
+        "native_median_seconds": {
+          "sample": 3.4245595004758798,
+          "python": 0.003047071979381144,
+          "decode": 0.8409213494742289
+        }
+      }
+    },
+    "blocks": [
+      {
+        "block_index": 0,
+        "mode": "serial",
+        "max_images_in_flight": 1,
+        "seeds": [
+          426500,
+          426501
+        ],
+        "generation_seconds": 22.437010497997107,
+        "first_image_seconds_after_setup": 10.216477772999497,
+        "images_per_minute_generation": 5.348306094999246,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426500,
+            "await_output_seconds": 4.724836539004173,
+            "fetch_seconds": 4.148249969002791,
+            "save_seconds": 1.3430264299968258,
+            "latency_seconds": 10.216476321998925,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "708ff4e2c70de0f6be99edeb7be2d0bea672ab3999532b4899fb7380f0349846",
+            "native_seconds": {
+              "sample": 3.3818569289287552,
+              "python": 0.002801374066621065,
+              "decode": 0.8354131309315562
+            }
+          },
+          {
+            "index": 1,
+            "seed": 426501,
+            "await_output_seconds": 4.250931906004553,
+            "fetch_seconds": 6.633244342003309,
+            "save_seconds": 1.3340219169986085,
+            "latency_seconds": 12.218491516003269,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "cc068fab4e16c2b183ae422d7b659cfdd296d5be7d8aa6c0bc4a190801b8dba3",
+            "native_seconds": {
+              "sample": 3.3910041929921135,
+              "python": 0.0026586130261421204,
+              "decode": 0.8390848399139941
+            }
+          }
+        ]
+      },
+      {
+        "block_index": 1,
+        "mode": "overlap",
+        "max_images_in_flight": 2,
+        "seeds": [
+          426502,
+          426503
+        ],
+        "generation_seconds": 19.314410418999614,
+        "first_image_seconds_after_setup": 11.435593524998694,
+        "images_per_minute_generation": 6.212977636736756,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426502,
+            "await_output_seconds": 4.783248178006033,
+            "fetch_seconds": 5.220220039002015,
+            "save_seconds": 1.431732192999334,
+            "latency_seconds": 11.435591073000978,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "a924b3b2f3733c915c73bcece538a2cf0f10ab21dc2acf600c085b10bb821990",
+            "native_seconds": {
+              "sample": 3.367476467974484,
+              "python": 0.0026945749996230006,
+              "decode": 0.8375580209540203
+            }
+          },
+          {
+            "index": 1,
+            "seed": 426503,
+            "await_output_seconds": 4.632684403004532,
+            "fetch_seconds": 6.358990481006913,
+            "save_seconds": 1.517377314994519,
+            "latency_seconds": 14.528577558994584,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "14fb93ad1edae76bfe23a78012265cebfdcd8f309235da9ee21ecfc48de8b89a",
+            "native_seconds": {
+              "sample": 3.4681514350231737,
+              "python": 0.0033995689591392875,
+              "decode": 0.9045907290419564
+            }
+          }
+        ]
+      },
+      {
+        "block_index": 2,
+        "mode": "overlap",
+        "max_images_in_flight": 2,
+        "seeds": [
+          426504,
+          426505
+        ],
+        "generation_seconds": 23.22766648400284,
+        "first_image_seconds_after_setup": 14.59343788100523,
+        "images_per_minute_generation": 5.166252928706609,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426504,
+            "await_output_seconds": 4.505305074999342,
+            "fetch_seconds": 8.732436114994925,
+            "save_seconds": 1.3553990010041161,
+            "latency_seconds": 14.593436544004362,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "aef81ef3c2f1d84ded4ad60fc8b1b4e39fe192d629d1431726236ba89f169f93",
+            "native_seconds": {
+              "sample": 3.380967565928586,
+              "python": 0.0034238339867442846,
+              "decode": 0.8442846779944375
+            }
+          },
+          {
+            "index": 1,
+            "seed": 426505,
+            "await_output_seconds": 4.857347030992969,
+            "fetch_seconds": 7.353363005000574,
+            "save_seconds": 1.2792541980015812,
+            "latency_seconds": 18.72101744599786,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "eb24f4cd29cdf7bc713574f36fb59345095c7f52c2a468a75a246124ec5d64b5",
+            "native_seconds": {
+              "sample": 3.47330642293673,
+              "python": 0.0026915010530501604,
+              "decode": 0.83673135493882
+            }
+          }
+        ]
+      },
+      {
+        "block_index": 3,
+        "mode": "serial",
+        "max_images_in_flight": 1,
+        "seeds": [
+          426506,
+          426507
+        ],
+        "generation_seconds": 20.79420667100203,
+        "first_image_seconds_after_setup": 10.987234241001715,
+        "images_per_minute_generation": 5.770838094407448,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426506,
+            "await_output_seconds": 4.474655662997975,
+            "fetch_seconds": 5.037913455002126,
+            "save_seconds": 1.474230202002218,
+            "latency_seconds": 10.987231020000763,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "3d111dfd6a64133888a1964f4d1b3414e3b6e2fabbe0e6abc0be2183682a1d01",
+            "native_seconds": {
+              "sample": 3.3842442230088636,
+              "python": 0.0026968199526891112,
+              "decode": 0.8347411889117211
+            }
+          },
+          {
+            "index": 1,
+            "seed": 426507,
+            "await_output_seconds": 4.524530030001188,
+            "fetch_seconds": 3.8661113459966145,
+            "save_seconds": 1.4123900440026773,
+            "latency_seconds": 9.803308595000999,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "4650b5360310d4fca73af395e20ad4ec8794aa67f3e561f7e0dd7165c4d95159",
+            "native_seconds": {
+              "sample": 3.381785442936234,
+              "python": 0.00272967794444412,
+              "decode": 0.8660593630047515
+            }
+          }
+        ]
+      }
+    ],
+    "transfer": {
+      "sample_order": [
+        "identity",
+        "lz4",
+        "json",
+        "lz4",
+        "json",
+        "identity",
+        "json",
+        "identity",
+        "lz4"
+      ],
+      "sdk_fetches": [
+        {
+          "mode": "identity",
+          "sdk_fetch_seconds": 4.243229580002662,
+          "client_cpu_seconds": 0.3671008589999989,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.009157999999999333,
+            "system_seconds": 0.06285100000000199
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "50332082",
+            "raw_entity_counter_bytes": 50332082,
+            "read_decoded_entity_bytes": 50332082
+          }
+        },
+        {
+          "mode": "lz4",
+          "sdk_fetch_seconds": 4.300142760999734,
+          "client_cpu_seconds": 0.4445882609999998,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.11521499999999207,
+            "system_seconds": 0.0751679999999979
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "44664470",
+            "raw_entity_counter_bytes": 44664470,
+            "read_decoded_entity_bytes": 44664470
+          }
+        },
+        {
+          "mode": "json",
+          "sdk_fetch_seconds": 3.994309934001649,
+          "client_cpu_seconds": 1.0637478719999987,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.1874740000000088,
+            "system_seconds": 0.13210900000000692
+          },
+          "fetch_http": {
+            "content_encoding": "gzip",
+            "content_length": null,
+            "raw_entity_counter_bytes": 39665170,
+            "read_decoded_entity_bytes": 67109487
+          }
+        },
+        {
+          "mode": "lz4",
+          "sdk_fetch_seconds": 4.417556369000522,
+          "client_cpu_seconds": 0.41889078400000024,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.11176600000000292,
+            "system_seconds": 0.07790099999999711
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "44664470",
+            "raw_entity_counter_bytes": 44664470,
+            "read_decoded_entity_bytes": 44664470
+          }
+        },
+        {
+          "mode": "json",
+          "sdk_fetch_seconds": 4.288891512995178,
+          "client_cpu_seconds": 1.0113115939999986,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.18598599999999976,
+            "system_seconds": 0.13918999999999926
+          },
+          "fetch_http": {
+            "content_encoding": "gzip",
+            "content_length": null,
+            "raw_entity_counter_bytes": 39663758,
+            "read_decoded_entity_bytes": 67109487
+          }
+        },
+        {
+          "mode": "identity",
+          "sdk_fetch_seconds": 3.719295911003428,
+          "client_cpu_seconds": 0.3248004350000002,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.021005000000002383,
+            "system_seconds": 0.05072900000000402
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "50332082",
+            "raw_entity_counter_bytes": 50332082,
+            "read_decoded_entity_bytes": 50332082
+          }
+        },
+        {
+          "mode": "json",
+          "sdk_fetch_seconds": 3.849659444997087,
+          "client_cpu_seconds": 0.9956071499999997,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.1728739999999931,
+            "system_seconds": 0.15262899999999746
+          },
+          "fetch_http": {
+            "content_encoding": "gzip",
+            "content_length": null,
+            "raw_entity_counter_bytes": 39663758,
+            "read_decoded_entity_bytes": 67109487
+          }
+        },
+        {
+          "mode": "identity",
+          "sdk_fetch_seconds": 4.55049713000335,
+          "client_cpu_seconds": 0.35997273099999916,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.026936000000006288,
+            "system_seconds": 0.04553399999999641
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "50332082",
+            "raw_entity_counter_bytes": 50332082,
+            "read_decoded_entity_bytes": 50332082
+          }
+        },
+        {
+          "mode": "lz4",
+          "sdk_fetch_seconds": 3.6310804819950135,
+          "client_cpu_seconds": 0.34900551399999813,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.1243780000000072,
+            "system_seconds": 0.06695700000000215
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "44664470",
+            "raw_entity_counter_bytes": 44664470,
+            "read_decoded_entity_bytes": 44664470
+          }
+        }
+      ],
+      "sdk_fetch_median_seconds": {
+        "json": 3.994309934001649,
+        "identity": 4.243229580002662,
+        "lz4": 4.300142760999734
+      },
+      "raw_http_captures": [
+        {
+          "mode": "json",
+          "content_type": "application/json; charset=utf-8",
+          "content_encoding": "gzip",
+          "content_length": null,
+          "encoded_http_entity_bytes": 39663758,
+          "http_decoded_entity_bytes": 67109487,
+          "decoded_pickle_payload_bytes": 50332082,
+          "auto_decompress": false,
+          "seconds_through_decode_and_hash": 4.855434363998938
+        },
+        {
+          "mode": "identity",
+          "content_type": "application/vnd.comani.pickle",
+          "content_encoding": null,
+          "content_length": "50332082",
+          "encoded_http_entity_bytes": 50332082,
+          "http_decoded_entity_bytes": 50332082,
+          "decoded_pickle_payload_bytes": 50332082,
+          "auto_decompress": false,
+          "seconds_through_decode_and_hash": 4.825003652003943
+        },
+        {
+          "mode": "lz4",
+          "content_type": "application/vnd.comani.pickle+lz4",
+          "content_encoding": null,
+          "content_length": "44664470",
+          "encoded_http_entity_bytes": 44664470,
+          "http_decoded_entity_bytes": 44664470,
+          "decoded_pickle_payload_bytes": 50332082,
+          "auto_decompress": false,
+          "seconds_through_decode_and_hash": 8.438471715999185
+        }
+      ],
+      "scope": "Same ready IMAGE ref per host; actual HTTPS quick-tunnel/Caddy route. Raw captures disable auto-decompression. Entity bytes exclude HTTP/TLS/TCP framing. SDK fetch includes protocol decode and unpickle; raw capture time also includes hashing.",
+      "tensor": {
+        "shape": [
+          1,
+          2048,
+          2048,
+          3
+        ],
+        "stride": [
+          4194304,
+          2048,
+          1,
+          4194304
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "bytes": 50331648,
+        "sha256": "b2ce3b6031da346d69ef65b9abf27af5854af3af5ac5dd4392c5a563e1e8b577"
+      }
+    },
+    "resource_observation": {
+      "agent_started_continuous_NVML_or_nvidia_smi_polling": false,
+      "initial_idle_nvidia_smi_query_count": 1,
+      "proc_sampling_interval_target_seconds": 2,
+      "actual_interval_median_seconds": 2.0007574445,
+      "actual_interval_max_seconds": 2.001041438,
+      "proc_collection_elapsed_max_seconds": 0.0007374510169029236,
+      "whole_sampler_window": {
+        "samples": 305,
+        "sampled_process_rss_peak_bytes": 27307429888,
+        "process_kernel_hwm_observed_bytes": 27390758912,
+        "sampled_cgroup_current_peak_bytes": 50390212608
+      },
+      "first_CLIPLoader_to_last_VAEDecode_window": {
+        "samples": 87,
+        "sampled_process_rss_peak_bytes": 27307429888,
+        "process_kernel_hwm_observed_bytes": 27390758912,
+        "sampled_cgroup_current_peak_bytes": 50390212608
+      },
+      "client_sampled_rss_peak_bytes": 1161052160,
+      "client_kernel_hwm_observed_bytes": 1211260928,
+      "cgroup_memory_events_final": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n",
+      "cgroup_cpu_pressure_some_stall_delta_usec_in_h3_window": 385573,
+      "system_proc_cpu_pressure_some_stall_delta_usec_in_h3_window": 387789,
+      "pressure_scope": "paths are respectively /sys/fs/cgroup/cpu.pressure and /proc/pressure/cpu; main-thread and single native worker schedstat are separately labeled in raw samples",
+      "gpu_board_peak_memory_bytes": null,
+      "gpu_peak_limit": "not sampled during this clean run by design; Torch allocator counters in trace exclude some native allocations and are not GPU-board peaks",
+      "ram_limit": "completed under the actual 111387082752-byte cgroup limit; observed sampled/HWM counters are not a minimum RAM requirement or hard-64GiB result"
+    },
+    "pipeline_comparison": {
+      "observed_throughput_ratio": 1.016199027319892,
+      "observed_percent_difference": 1.6199027319891979,
+      "interpretation": "about 1.6% in these small samples; no demonstrated reliable throughput improvement"
+    },
+    "functional_scope": {
+      "small_WAN_file_and_core_noTorch_noLZ4_smoke_passed": true,
+      "large_129MiB_cancel_persistence_model_roots_and_130s_task": "Passed on prior slow host only, not rerun here."
+    },
+    "comparison_limits": [
+      "Host CPU, driver, CPU visibility/quota, Torch defaults, memory limit, GPU power limit and external GPU observer changed together; the speed difference does not isolate a cause.",
+      "Old-host same-flags restart did not occur because GPU context release could not be established; no warm-cache same-host repeat is available.",
+      "Four different-seed images per mode in two blocks and three fetch samples per protocol are small samples; tiny pipeline differences do not establish an improvement.",
+      "HTTP entity byte counts exclude HTTP/TLS/TCP framing and are not physical wire bytes. JSON was gzip-compressed by the template route."
+    ],
+    "cleanup": {
+      "verified_at_utc": "2026-11-15T12:17:42.573697+00:00",
+      "destroyed_instance_id": 60782747,
+      "instances": []
+    }
+  },
+  "prior_slow_host": {
+    "feature_acceptance": "passed",
+    "performance_status": "host_and_observer_limited_no_valid_same_host_restart_control",
+    "model_cold_scope": "daemon had file/generic QA, but no earlier H3 weights or inference; measured setup is model-cold, not full daemon startup",
+    "execution_scope": {
+      "setup_seconds": 208.58405210800265,
+      "provenance_seconds": 4.9449793999956455,
+      "first_image_seconds_from_client_function_start": 328.7257852679977,
+      "warmup_generate_seconds": 106.9490762189962,
+      "warmup_fetch_seconds": 6.488360041003034,
+      "warmup_save_seconds": 1.643885006000346,
+      "full_test_client_total_seconds": 686.0954912079978,
+      "full_test_includes_transfer_probes_seconds": 72.23605084099836,
+      "abba_wall_seconds_including_barriers": 284.0890445719997,
+      "abba_order": [
+        "serial2",
+        "overlap2",
+        "overlap2",
+        "serial2"
+      ]
+    },
+    "native_samplers": [
+      {
+        "seed": 426490,
+        "seconds": 83.13447854481637,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426500,
+        "seconds": 15.030651583336294,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426501,
+        "seconds": 20.876371016260237,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426502,
+        "seconds": 25.286068208049983,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426503,
+        "seconds": 22.18295570416376,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426504,
+        "seconds": 15.447198508772999,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426505,
+        "seconds": 32.3959107180126,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426506,
+        "seconds": 33.16475020395592,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      },
+      {
+        "seed": 426507,
+        "seconds": 5.764190759975463,
+        "forwards": 6,
+        "gpu_completion_barrier": true
+      }
+    ],
+    "modes": {
+      "serial": {
+        "images": 4,
+        "seeds": [
+          426500,
+          426501,
+          426506,
+          426507
+        ],
+        "sum_generation_fetch_save_block_seconds": 132.6795812640048,
+        "images_per_minute": 1.8088691395735554,
+        "median_per_image_latency_seconds": 33.81490591200054
+      },
+      "overlap": {
+        "images": 4,
+        "seeds": [
+          426502,
+          426503,
+          426504,
+          426505
+        ],
+        "sum_generation_fetch_save_block_seconds": 145.48919126699911,
+        "images_per_minute": 1.6496070801545413,
+        "median_per_image_latency_seconds": 39.589617159002955
+      }
+    },
+    "blocks": [
+      {
+        "block_index": 0,
+        "mode": "serial",
+        "max_images_in_flight": 1,
+        "seeds": [
+          426500,
+          426501
+        ],
+        "generation_seconds": 67.63218882500223,
+        "first_image_seconds_after_setup": 26.602005628999905,
+        "images_per_minute_generation": 1.7743030661110064,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426500,
+            "await_output_seconds": 20.512089599003957,
+            "fetch_seconds": 4.682161155003996,
+            "save_seconds": 1.4058992869977374,
+            "latency_seconds": 26.601970429001085,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "708ff4e2c70de0f6be99edeb7be2d0bea672ab3999532b4899fb7380f0349846"
+          },
+          {
+            "index": 1,
+            "seed": 426501,
+            "await_output_seconds": 32.51096604899794,
+            "fetch_seconds": 7.206785752001451,
+            "save_seconds": 1.3097292319944245,
+            "latency_seconds": 41.027841394999996,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "cc068fab4e16c2b183ae422d7b659cfdd296d5be7d8aa6c0bc4a190801b8dba3"
+          }
+        ]
+      },
+      {
+        "block_index": 1,
+        "mode": "overlap",
+        "max_images_in_flight": 2,
+        "seeds": [
+          426502,
+          426503
+        ],
+        "generation_seconds": 70.37688802600314,
+        "first_image_seconds_after_setup": 43.427463140003965,
+        "images_per_minute_generation": 1.7051052322129092,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426502,
+            "await_output_seconds": 34.62332813199464,
+            "fetch_seconds": 7.164386912998452,
+            "save_seconds": 1.6391604930031463,
+            "latency_seconds": 43.42746055000316,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "a924b3b2f3733c915c73bcece538a2cf0f10ab21dc2acf600c085b10bb821990"
+          },
+          {
+            "index": 1,
+            "seed": 426503,
+            "await_output_seconds": 29.162409085001855,
+            "fetch_seconds": 5.060702854003466,
+            "save_seconds": 1.527737463999074,
+            "latency_seconds": 35.75177376800275,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "14fb93ad1edae76bfe23a78012265cebfdcd8f309235da9ee21ecfc48de8b89a"
+          }
+        ]
+      },
+      {
+        "block_index": 2,
+        "mode": "overlap",
+        "max_images_in_flight": 2,
+        "seeds": [
+          426504,
+          426505
+        ],
+        "generation_seconds": 75.11230324099597,
+        "first_image_seconds_after_setup": 26.268885047997173,
+        "images_per_minute_generation": 1.5976077795801702,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426504,
+            "await_output_seconds": 20.464316362005775,
+            "fetch_seconds": 4.3500549890013644,
+            "save_seconds": 1.4539677590000792,
+            "latency_seconds": 26.26888172499457,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "aef81ef3c2f1d84ded4ad60fc8b1b4e39fe192d629d1431726236ba89f169f93"
+          },
+          {
+            "index": 1,
+            "seed": 426505,
+            "await_output_seconds": 49.24649303100159,
+            "fetch_seconds": 4.0586604720010655,
+            "save_seconds": 1.3409793940008967,
+            "latency_seconds": 54.64650912200159,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "eb24f4cd29cdf7bc713574f36fb59345095c7f52c2a468a75a246124ec5d64b5"
+          }
+        ]
+      },
+      {
+        "block_index": 3,
+        "mode": "serial",
+        "max_images_in_flight": 1,
+        "seeds": [
+          426506,
+          426507
+        ],
+        "generation_seconds": 65.04739243900258,
+        "first_image_seconds_after_setup": 48.22257537700352,
+        "images_per_minute_generation": 1.8448087694295905,
+        "images": [
+          {
+            "index": 0,
+            "seed": 426506,
+            "await_output_seconds": 40.91826433400274,
+            "fetch_seconds": 5.865825165004935,
+            "save_seconds": 1.4377785379983834,
+            "latency_seconds": 48.222571976002655,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "3d111dfd6a64133888a1964f4d1b3414e3b6e2fabbe0e6abc0be2183682a1d01"
+          },
+          {
+            "index": 1,
+            "seed": 426507,
+            "await_output_seconds": 8.941568267997354,
+            "fetch_seconds": 6.404782917998091,
+            "save_seconds": 1.4753889179992257,
+            "latency_seconds": 16.82309963699663,
+            "shape": [
+              1,
+              2048,
+              2048,
+              3
+            ],
+            "dtype": "torch.float32",
+            "raw_tensor_sha256": "4650b5360310d4fca73af395e20ad4ec8794aa67f3e561f7e0dd7165c4d95159"
+          }
+        ]
+      }
+    ],
+    "transfer": {
+      "sample_order": [
+        "identity",
+        "lz4",
+        "json",
+        "json",
+        "lz4",
+        "identity"
+      ],
+      "sdk_fetches": [
+        {
+          "mode": "identity",
+          "sdk_fetch_seconds": 8.33205428099609,
+          "client_cpu_seconds": 0.48338646899999915,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.095673000000005,
+            "system_seconds": 0.05649999999999977
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "50332082",
+            "raw_entity_counter_bytes": 50332082,
+            "read_decoded_entity_bytes": 50332082
+          }
+        },
+        {
+          "mode": "lz4",
+          "sdk_fetch_seconds": 6.5626417029998265,
+          "client_cpu_seconds": 0.6799169470000006,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.1985830000000135,
+            "system_seconds": 0.09941500000000758
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "44664470",
+            "raw_entity_counter_bytes": 44664470,
+            "read_decoded_entity_bytes": 44664470
+          }
+        },
+        {
+          "mode": "json",
+          "sdk_fetch_seconds": 7.248887172994728,
+          "client_cpu_seconds": 1.5939527000000009,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.30077599999998483,
+            "system_seconds": 0.23023399999999583
+          },
+          "fetch_http": {
+            "content_encoding": "gzip",
+            "content_length": null,
+            "raw_entity_counter_bytes": 39663759,
+            "read_decoded_entity_bytes": 67109487
+          }
+        },
+        {
+          "mode": "json",
+          "sdk_fetch_seconds": 7.2951652940028,
+          "client_cpu_seconds": 1.2353408080000001,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.2978479999999877,
+            "system_seconds": 0.2516080000000045
+          },
+          "fetch_http": {
+            "content_encoding": "gzip",
+            "content_length": null,
+            "raw_entity_counter_bytes": 39663759,
+            "read_decoded_entity_bytes": 67109487
+          }
+        },
+        {
+          "mode": "lz4",
+          "sdk_fetch_seconds": 4.37048901199887,
+          "client_cpu_seconds": 0.3554493749999992,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.19244000000000483,
+            "system_seconds": 0.11664299999999628
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "44664470",
+            "raw_entity_counter_bytes": 44664470,
+            "read_decoded_entity_bytes": 44664470
+          }
+        },
+        {
+          "mode": "identity",
+          "sdk_fetch_seconds": 7.962406589998864,
+          "client_cpu_seconds": 0.3982912789999986,
+          "server_process_cpu_delta_including_two_probe_dispatches": {
+            "user_seconds": 0.06290100000001075,
+            "system_seconds": 0.07779800000000137
+          },
+          "fetch_http": {
+            "content_encoding": null,
+            "content_length": "50332082",
+            "raw_entity_counter_bytes": 50332082,
+            "read_decoded_entity_bytes": 50332082
+          }
+        }
+      ],
+      "sdk_fetch_median_seconds": {
+        "json": 7.272026233498764,
+        "identity": 8.147230435497477,
+        "lz4": 5.4665653574993485
+      },
+      "raw_http_captures": [
+        {
+          "mode": "json",
+          "content_type": "application/json; charset=utf-8",
+          "content_encoding": "gzip",
+          "content_length": null,
+          "encoded_http_entity_bytes": 39663759,
+          "http_decoded_entity_bytes": 67109487,
+          "decoded_pickle_payload_bytes": 50332082,
+          "auto_decompress": false,
+          "seconds_through_decode_and_hash": 5.547002152001369
+        },
+        {
+          "mode": "identity",
+          "content_type": "application/vnd.comani.pickle",
+          "content_encoding": null,
+          "content_length": "50332082",
+          "encoded_http_entity_bytes": 50332082,
+          "http_decoded_entity_bytes": 50332082,
+          "decoded_pickle_payload_bytes": 50332082,
+          "auto_decompress": false,
+          "seconds_through_decode_and_hash": 4.175434990997019
+        },
+        {
+          "mode": "lz4",
+          "content_type": "application/vnd.comani.pickle+lz4",
+          "content_encoding": null,
+          "content_length": "44664470",
+          "encoded_http_entity_bytes": 44664470,
+          "http_decoded_entity_bytes": 44664470,
+          "decoded_pickle_payload_bytes": 50332082,
+          "auto_decompress": false,
+          "seconds_through_decode_and_hash": 4.343852352001704
+        }
+      ],
+      "scope": "Same ready IMAGE ref per host; actual HTTPS quick-tunnel/Caddy route. Raw captures disable auto-decompression. Entity bytes exclude HTTP/TLS/TCP framing. SDK fetch includes protocol decode and unpickle; raw capture time also includes hashing.",
+      "tensor": {
+        "shape": [
+          1,
+          2048,
+          2048,
+          3
+        ],
+        "stride": [
+          4194304,
+          2048,
+          1,
+          4194304
+        ],
+        "dtype": "torch.float32",
+        "device": "cpu",
+        "bytes": 50331648,
+        "sha256": "b2ce3b6031da346d69ef65b9abf27af5854af3af5ac5dd4392c5a563e1e8b577"
+      }
+    },
+    "resources": {
+      "whole_sampler_window": {
+        "samples": 445,
+        "sampled_process_rss_peak_bytes": 42850037760,
+        "process_kernel_hwm_observed_bytes": 42986065920,
+        "sampled_cgroup_current_peak_bytes": 51556122624,
+        "sampled_gpu_board_memory_peak_MiB": 20624
+      },
+      "h3_first_CLIPLoader_start_to_last_VAEDecode_end_window": {
+        "samples": 128,
+        "sampled_process_rss_peak_bytes": 42799759360,
+        "process_kernel_hwm_observed_bytes": 42933207040,
+        "sampled_cgroup_current_peak_bytes": 51556122624,
+        "sampled_gpu_board_memory_peak_MiB": 20624
+      },
+      "sampler_actual_interval_seconds": {
+        "median": 3.3904457335,
+        "max": 13.015019422
+      },
+      "gpu_query_successes": 425,
+      "gpu_query_timeouts": 20,
+      "gpu_timestamp_limit": "row timestamp precedes GPU query; elapsed/end were not recorded in first run. Successful NVML results can be seconds later than /proc values; GPU phase attribution is approximate and timed-out queries are missing samples.",
+      "client_sampled_rss_peak_bytes": 715407360,
+      "client_kernel_hwm_observed_bytes": 795750400,
+      "counter_limit": "2s sampler plus collection overhead; native allocations are not all included in Torch allocator counters; HWM may include earlier setup"
+    },
+    "same_flags_restart_attempt": {
+      "status": "aborted_before_second_worker",
+      "reason": "old worker gone, saved board GPU use 20284MiB and one bounded compute-apps query timed out; context release could not be established",
+      "old_worker_status": "absent",
+      "own_sampler_status": "absent",
+      "saved_gpu_used_after_stop_MiB": "20284",
+      "one_bounded_compute_query": {
+        "timeout_seconds": 5,
+        "seconds": 5.113274845760316
+      }
+    },
+    "files": {
+      "status": "passed",
+      "checks": {
+        "default_stat_metadata_only": true,
+        "create_only_error": "RemoteError",
+        "native_LoadImage_captured_ImageInvert_retained": true,
+        "local_path_did_not_upload": {
+          "remote_exists": false
+        },
+        "generic_failure": "RemoteError",
+        "generic_recovered_alias_cycle_bytes": 3000000,
+        "upload_cancel": {
+          "done_before_cancel": false,
+          "result_type": "CancelledError",
+          "committed_after_cancel": false,
+          "partial_cleanup_and_recovery": true
+        },
+        "persists_across_session_close": true,
+        "explicit_remove_confirmed": true,
+        "file_failure_recovery": true
+      },
+      "WAN_large_upload": {
+        "attempt_bytes": 135266304,
+        "old_rpc_limit_bytes": 134217728,
+        "status": "passed",
+        "seconds": 35.64127646799898
+      },
+      "fixture_bytes": 158,
+      "fixture_sha256": "2d9baf5ad65bb3fc1ed63b82285746b432c721e7c4dc78ea214c286820b818a9"
+    },
+    "model_roots": {
+      "default_stat_seconds": 0.8753845339961117,
+      "default_stat_sha256": null,
+      "same_name_shadow_or_collision_rejected": "RemoteError",
+      "own_model_root_file_create_checksum_remove": true,
+      "preexisting_model_preserved": true,
+      "passed": true,
+      "roots": [
+        {
+          "path": "/workspace/ComfyUI/models/text_encoders",
+          "directory": null,
+          "category": "text_encoders",
+          "priority": 0
+        },
+        {
+          "path": "/workspace/ComfyUI/models/clip",
+          "directory": null,
+          "category": "text_encoders",
+          "priority": 1
+        },
+        {
+          "path": "/workspace/ComfyUI/output/clip",
+          "directory": null,
+          "category": "text_encoders",
+          "priority": 2
+        }
+      ],
+      "existing_encoder": {
+        "relative_path": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "native_name": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "size": 15687142551,
+        "sha256": null
+      }
+    },
+    "long_task": {
+      "work": {
+        "requested_seconds": 130,
+        "work_seconds": 130.0000868779607,
+        "executions": 1
+      },
+      "end_to_end_seconds": 138.24547992500447,
+      "rpc_method_counts": {
+        "artifact_put": 1,
+        "submit": 1,
+        "wait_result": 7,
+        "fetch": 1
+      }
+    },
+    "core_WAN": {
+      "passed": true,
+      "torch_absent": true,
+      "lz4_absent": true,
+      "binary_identity": true
+    },
+    "network_scope": "same existing official-template HTTPS quick tunnel via Caddy for public client fetch and file IO; entity bytes exclude HTTP/TLS/TCP framing and are not physical wire bytes",
+    "cleanup": {
+      "verified_at_utc": "2026-11-15T11:54:38.387882+00:00",
+      "destroyed_instance_id": 60777375,
+      "instances": []
+    },
+    "environment": {
+      "cpu": "AMD EPYC 7R13 48-Core Processor",
+      "cpu_count": 96,
+      "affinity_count": 96,
+      "cpu_max": "2304000 100000\n",
+      "memory_max_bytes": 259515219968,
+      "gpu_initial_idle_observation": "NVIDIA GeForce RTX 4090, 615.71.09, 00000000:81:00.0, 1, 4, 16, 16, 210 MHz, 405 MHz, 450.00 W",
+      "torch_threads": 48,
+      "torch_interop_threads": 96,
+      "server_python": "3.12.15",
+      "server_torch": "2.10.0+cu130",
+      "runtime_comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+      "native_reserve_vram_GiB": 4.0,
+      "native_vram_state": "VRAMState.NORMAL_VRAM"
+    }
+  },
+  "independent_native_analysis": {
+    "scope": "Offline independent analysis of sealed evidence; no further rental, inference or source change.",
+    "candidate_commit": "cae8c24ff13f97256d0b6b79a361c7ba1fbcacde",
+    "runtime_comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "all_sampler_graphs_forwards": [
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6,
+      6
+    ],
+    "conditioning": {
+      "native_graph_seconds": 4.812893569003791,
+      "inner": {
+        "CLIP.tokenize": {
+          "count": 1,
+          "wall_sum_seconds": 0.0008475140202790499,
+          "wall_max_seconds": 0.0008475140202790499,
+          "cpu_sum_seconds": 0.0008483429999976977
+        },
+        "comfy.model_management.free_memory": {
+          "count": 1,
+          "wall_sum_seconds": 0.00021501700393855572,
+          "wall_max_seconds": 0.00021501700393855572,
+          "cpu_sum_seconds": 0.00021373000000224351
+        },
+        "LoadedModel.model_load": {
+          "count": 1,
+          "wall_sum_seconds": 0.11532233702018857,
+          "wall_max_seconds": 0.11532233702018857,
+          "cpu_sum_seconds": 0.1155562649999986
+        },
+        "comfy.model_management.load_models_gpu": {
+          "count": 1,
+          "wall_sum_seconds": 0.12203659594524652,
+          "wall_max_seconds": 0.12203659594524652,
+          "cpu_sum_seconds": 0.12228005800000119
+        },
+        "CLIP.load_model": {
+          "count": 1,
+          "wall_sum_seconds": 0.12206729303579777,
+          "wall_max_seconds": 0.12206729303579777,
+          "cpu_sum_seconds": 0.12231084400000114
+        },
+        "comfy.ops.cast_modules_with_vbar": {
+          "count": 351,
+          "wall_sum_seconds": 4.244821398984641,
+          "wall_max_seconds": 0.1695331110386178,
+          "cpu_sum_seconds": 97.52785250399998
+        },
+        "MiniMaxH3ClipModel.encode_token_weights": {
+          "count": 1,
+          "wall_sum_seconds": 4.67381974007003,
+          "wall_max_seconds": 4.67381974007003,
+          "cpu_sum_seconds": 104.242370102
+        },
+        "SD1ClipModel.encode_token_weights": {
+          "count": 1,
+          "wall_sum_seconds": 4.673862784053199,
+          "wall_max_seconds": 4.673862784053199,
+          "cpu_sum_seconds": 104.242411914
+        },
+        "CLIP.encode_from_tokens_scheduled": {
+          "count": 1,
+          "wall_sum_seconds": 4.796029255026951,
+          "wall_max_seconds": 4.796029255026951,
+          "cpu_sum_seconds": 104.36483190199999
+        },
+        "comfy.model_prefetch.cleanup_prefetch_queues": {
+          "count": 1,
+          "wall_sum_seconds": 1.2187054380774498e-05,
+          "wall_max_seconds": 1.2187054380774498e-05,
+          "cpu_sum_seconds": 1.18879999888577e-05
+        },
+        "comfy.model_management.reset_cast_buffers": {
+          "count": 1,
+          "wall_sum_seconds": 0.010725755942985415,
+          "wall_max_seconds": 0.010725755942985415,
+          "cpu_sum_seconds": 0.2464423450000055
+        }
+      },
+      "proc": {
+        "samples": 3,
+        "covered_seconds": 4.001506537,
+        "process_cpu_seconds": 90.72,
+        "process_cpu_cores": 22.6714611512329,
+        "user_seconds": 76.63,
+        "system_seconds": 14.090000000000002,
+        "throttled_usec_delta": 0,
+        "throttled_periods_delta": 0,
+        "minor_faults_delta": 3035770,
+        "major_faults_delta": 0,
+        "max_rss_gib": 16.3011474609375,
+        "max_cgroup_memory_gib": 46.929542541503906,
+        "io_delta": {
+          "rchar": 11084139518,
+          "wchar": 75910,
+          "syscr": 10378,
+          "syscw": 311,
+          "read_bytes": 0,
+          "write_bytes": 77824,
+          "cancelled_write_bytes": 0
+        },
+        "cgroup_cpu_pressure_delta_seconds": {
+          "some": 0.213226,
+          "full": 0.00206
+        },
+        "system_proc_cpu_pressure_delta_seconds": {
+          "some": 0.210827,
+          "full": 0.0
+        },
+        "native_worker_schedstat": {
+          "runtime_seconds": 2.022545401,
+          "runqueue_wait_seconds": 0.563097013,
+          "timeslices_delta": 1049
+        },
+        "process_schedstat": {
+          "runtime_seconds": 0.003173708,
+          "runqueue_wait_seconds": 0.000102204,
+          "timeslices_delta": 8
+        }
+      }
+    },
+    "warmup_sampler_seconds": 8.672029030974954,
+    "warm_sampler_seconds": {
+      "count": 8,
+      "min": 3.367476467974484,
+      "median": 3.3830505759688094,
+      "max": 3.47330642293673
+    },
+    "warm_decode_seconds": {
+      "count": 8,
+      "min": 0.8347411889117211,
+      "median": 0.8383214304340072,
+      "max": 0.9045907290419564
+    },
+    "warm_sampler_plus_decode_seconds": {
+      "count": 8,
+      "min": 4.205034488928504,
+      "median": 4.2276706384145655,
+      "max": 4.37274216406513
+    },
+    "warm_first_progress_after_load_seconds": {
+      "count": 8,
+      "min": 0.544663708,
+      "median": 0.5483573315,
+      "max": 0.566204678
+    },
+    "warm_progress_2_to_6_seconds": {
+      "count": 40,
+      "min": 0.535325645,
+      "median": 0.5536217635,
+      "max": 0.567654902
+    },
+    "warm_tail_seconds": {
+      "count": 8,
+      "min": 0.018043338,
+      "median": 0.018452714000000002,
+      "max": 0.020598227
+    },
+    "inner_span_summary": {
+      "comfy.model_prefetch.pin_modules": {
+        "warm_wall_sum_seconds": {
+          "count": 8,
+          "min": 0.09198933211155236,
+          "median": 0.09382875653682277,
+          "max": 0.09757755673490465
+        },
+        "warmup_wall_sum_seconds": 5.022145782131702
+      },
+      "comfy.ops.cast_modules_with_vbar": {
+        "warm_wall_sum_seconds": {
+          "count": 8,
+          "min": 0.08371444814838469,
+          "median": 0.08478009124519303,
+          "max": 0.0858826368348673
+        },
+        "warmup_wall_sum_seconds": 5.658924316405319
+      },
+      "comfy.model_prefetch.cleanup_prefetch_queues": {
+        "warm_wall_sum_seconds": {
+          "count": 8,
+          "min": 0.0054630100494250655,
+          "median": 0.005492534022778273,
+          "max": 0.005522848921827972
+        },
+        "warmup_wall_sum_seconds": 0.005785658024251461
+      },
+      "comfy.model_management.reset_cast_buffers": {
+        "warm_wall_sum_seconds": {
+          "count": 8,
+          "min": 0.00976502406410873,
+          "median": 0.0098181469948031,
+          "max": 0.009866373031400144
+        },
+        "warmup_wall_sum_seconds": 0.009727298049256206
+      }
+    },
+    "h3_window_proc": {
+      "samples": 87,
+      "covered_seconds": 172.067210926,
+      "process_cpu_seconds": 211.01,
+      "process_cpu_cores": 1.2263231260879093,
+      "user_seconds": 144.46,
+      "system_seconds": 66.55,
+      "throttled_usec_delta": 7970,
+      "throttled_periods_delta": 1,
+      "minor_faults_delta": 10337367,
+      "major_faults_delta": 219,
+      "max_rss_gib": 25.432025909423828,
+      "max_cgroup_memory_gib": 46.929542541503906,
+      "io_delta": {
+        "rchar": 34279939662,
+        "wchar": 8140577,
+        "syscr": 30744,
+        "syscw": 32652,
+        "read_bytes": 17522688,
+        "write_bytes": 8331264,
+        "cancelled_write_bytes": 4096
+      },
+      "cgroup_cpu_pressure_delta_seconds": {
+        "some": 0.385573,
+        "full": 0.104529
+      },
+      "system_proc_cpu_pressure_delta_seconds": {
+        "some": 0.387789,
+        "full": 0.0
+      },
+      "native_worker_schedstat": {
+        "runtime_seconds": 40.923401661,
+        "runqueue_wait_seconds": 0.666269089,
+        "timeslices_delta": 3243
+      },
+      "process_schedstat": {
+        "runtime_seconds": 4.051162491,
+        "runqueue_wait_seconds": 0.000487851,
+        "timeslices_delta": 3466
+      }
+    },
+    "sampling": {
+      "rows": 305,
+      "median_interval_seconds": 2.0007574445,
+      "max_interval_seconds": 2.001041438,
+      "max_collection_seconds": 0.0007374510169029236
+    },
+    "tensor_equal_across_nine_fetches": true,
+    "causal_limit": "Host, CPU visibility/quota/thread defaults, driver, GPU power, RAM limit and observer changed together. No causal attribution to NVML polling, thread count, CPU model, driver or power limit."
+  },
+  "selected_image": {
+    "artifact": "final-remote-2026-11-15.png",
+    "bytes": 6020865,
+    "width": 2048,
+    "height": 2048,
+    "sha256": "6675c33d1112d1d29128c58436b7626d5d8b415fa7157739723f1470d0ba70f1",
+    "seed": 426490,
+    "float_tensor_sha256": "b2ce3b6031da346d69ef65b9abf27af5854af3af5ac5dd4392c5a563e1e8b577"
+  },
+  "sources": {
+    "clean_host": {
+      "acceptance-summary.json": "9003b85bd27975b6af48a2a860917ef8522aad22e89a1f0e3f6f4f86f78a5671",
+      "h3-result.json": "2f6e7735c9012c795295af50913847f54a59d68995622497c0200f256fa72104",
+      "transfer-result.json": "16d923433ea4d308b7929cb2461a15e6af3333c4950274ddccfaa2bed5167e49",
+      "post-run-validation.json": "4d4d0705f81e8ac9e7cb4f6a943436a77410c229099217d8ba8a5c54e98d8c85",
+      "candidate-identity.json": "6fcb04148f538b8e3f30b71fa7988e51716aae33095bf6915302e9a1e68987b8",
+      "model-verification.json": "b3d69a909a465db339ee842ac8b319a3ec1d7d98aa9d1151567c8688a0f58c11",
+      "core-wan-result.json": "14bc02ffa853ff3abe506b27fedbca342d647cefd849dcce6ddfaf86e114d6b8",
+      "cleanup.json": "fc6f02bbd2067a6e42289514a9f9510871f1a4f9472460f4d59a25bd024d280b",
+      "performance-analysis.md": "7bf39ffbe8420f6a9f6f3118594c36bb564f5dd11a4cfac4350d434fd01bd8f8",
+      "performance-summary.json": "7a9d7dc4ea9a7ddced872b9f5405fee1e8153168d27487e3c0dd71445c0b4be4",
+      "server-evidence/native-trace.jsonl": "7c267d930a97189b6a37476188b081ac881005e690386a1a69ead4f970003710",
+      "server-evidence/resources.jsonl": "a9a48ccf592f3a23708fd29ec065ecd68a5c95eb9ba00a4289c9537342346b7c",
+      "server-evidence/runtime-system.json": "dc3d9b0f9775e2157edd6cb74ee5834ea7ef7438e6198627c87d8dbe6c3c706d",
+      "server-evidence/template-freeze-before.txt": "1756e39101e0097aced4404f2fe39c5322bfcb8adbc72927fc8d3a29f8700005",
+      "server-evidence/template-freeze-after.txt": "d0abb128aa56055f96b712a41f3a94b8e06653e4d51db3455e8d606ded823c73"
+    },
+    "prior_slow_host": {
+      "acceptance-summary.json": "e98739ad958aedfcfb0f50d645c2a249d202ccc6e8041e2bf114b6ed3aee04fd",
+      "h3-result.json": "6ef272f9279cbdc9bd4470abb16cd674af85d680cd88659f26d1721c6bac1990",
+      "transfer-result.json": "b4b8afc91e1665e60f8efa67cacb3b5a07637731149c02b9b5a547a59342ef0f",
+      "files-result.json": "08c386d2f701699cc3d92a110a9d86d738f9428b3b64d75b28007a4228c29fc5",
+      "models-files-result.json": "03911eee73f162dfd48d8d254795d32dbbe0db64b148d9a3f409ab3a96683c01",
+      "long-task-result.json": "52e424cae7bed96a3e1b1cb2b12ed6541f57427930c3e7986f12c7f26874f626",
+      "core-wan-result.json": "ce62e39f02ed70294ee767ffb3a08ed325330af859171a53d456b281e61cb362",
+      "cleanup.json": "9744ce2daecc6dd83ccfaffcd976e97217ab41d19bb2edbe27b0be251779e9cc",
+      "teardown-status-once.json": "473d7bbdba84c10fa2abea46d63e0d8841e48e0ae141b4a62059e21d90a6555b",
+      "server-evidence/native-trace.jsonl": "e3f227a8df4d12980b43d7edadf2aa73a1515706726ee7ed177fbf36e0f346c9",
+      "server-evidence/resources.jsonl": "1f7d8cafbb2d9a316e56b4df7986a32e60b7a69b53c5cd9c2e1b84069b347ed6",
+      "server-evidence/initial-system.json": "ff73e59b9b22b9738376467ac496888c626265f6ffd0c206f7f85dc16b7bfd7b",
+      "server-evidence/runtime-system.json": "9b91a410e1db76b810680986263b2962e93df3dbdf900ea01d52bc5be4b6029d",
+      "thread-settings-first.json": "52f59fab47e0030899603ac027980e8ab5c6c729203bd2e135ad8a6bcf8d0314"
+    }
+  }
+}

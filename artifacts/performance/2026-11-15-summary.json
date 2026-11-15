@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-11-15",
-  "status": "local_accepted_candidate_remote_gpu_wan_pending",
+  "status": "local_and_remote_feature_acceptance_complete_no_stable_performance_gain_demonstrated",
   "scope": "Selected scalar evidence only; no raw tensors, pickle payloads, logs, remote endpoints, credentials or execution identifiers.",
   "sources": {
     "gpu_profile": {
@@ -614,7 +614,7 @@
     },
     "binary": "Local correctness and compatibility passed; actual remote validation and final combined package identity remain pending.",
     "recipe": "Local CPU/native orchestration passed; real H3 GPU throughput remains unverified.",
-    "note": "Historical pre-LZ4/files local binary/recipe snapshot only; the final combined acceptance is recorded in local-acceptance.json."
+    "note": "Historical snapshot before final remote acceptance on 2026-11-15; pending/unverified statements in this section describe that earlier stage only. Final combined local acceptance is in local-acceptance.json and final remote status is in remote-2026-11-15.json."
   },
   "production_lz4": {
     "source": "production_lz4",
@@ -755,7 +755,14 @@
     "freeze_files": 78,
     "production_manifest_sha256": "26d2ca637b98f3b03fd6f7e491d569d5630cbde302c57d896d74f257619e8e49",
     "local_acceptance_artifact": "local-acceptance.json",
-    "remote_gpu_wan_acceptance": "pending",
-    "recipe": "Local CPU/native orchestration passed; real H3 GPU throughput remains unverified."
+    "remote_gpu_wan_acceptance": "Completed; full scope, all small samples and host/observer limits in remote-2026-11-15.json.",
+    "recipe": "Both hosts used the frozen public setup/run_images recipe; clean host produced warmup plus eight new seeds, six forwards each. ABBA does not demonstrate reliable overlap improvement."
+  },
+  "final_remote": {
+    "artifact": "remote-2026-11-15.json",
+    "sha256": "82813a8a49c3db66a6b18db07770bad546edd9bb1d19e2c810222b23008f8d8d",
+    "selected_image": "final-remote-2026-11-15.png",
+    "selected_image_sha256": "6675c33d1112d1d29128c58436b7626d5d8b415fa7157739723f1470d0ba70f1",
+    "both_rented_instances_destroyed_and_official_list_empty": true
   }
 }

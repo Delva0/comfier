@@ -22,6 +22,8 @@ runtime 使用配置的解释器启动 Comani 内存桥接入口；`comfy launch
 
 命名为候选，统一沿用 `remote.comfyui`；不并存 `comfy` 别名。查询返回本地 metadata，变更提供短写和高级 Operation 两种入口：
 
+推荐公开入口契约：连接或进入 `Client` 上下文时先只连接管理面，ComfyUI 未安装、停止或启动失败也能使用 info/install/bash。连接本身不隐式安装或启动 runtime；脚本显式启动 runtime 后，首个计算操作再惰性附着计算 session。普通用户不需要另建管理 Client 或手工管理 session 票据。
+
 | 通道 | 候选入口 | 结果 |
 | --- | --- | --- |
 | `bash` | `run(script, cwd=..., env=..., timeout=..., check=...)`；`begin(...)` | `CommandResult`：退出码、stdout/stderr、时长、截断标记、operation ID |
@@ -29,9 +31,11 @@ runtime 使用配置的解释器启动 Comani 内存桥接入口；`comfy launch
 | `plugins` | `backend/list/versions`、指定包 `install/update/enable/disable/uninstall`；`begin_install(...)` 等 | 逐包源码版本、启用状态、依赖步骤、`restart_required` 与 partial 状态 |
 | `models` | `categories/list/resolve`、`download(...)`；`begin_download(...)` | 来源候选及明确文件；完成后返回 `RemoteFile` |
 
+推荐失败契约：comfyui/plugins/models 的专用管理便捷方法仅在完整成功时正常返回；failed/partial 抛出含逐项结果与已发生变更的 `OperationError`，使顺序 Python 脚本自然停止，不带着部分失败继续启动或出图。高级 `Operation.status()` 可读原始状态，`result()` 的失败规则与便捷方法一致。失败、显式取消、操作 timeout 与未知接纳结果分别报告；抛错不承诺回滚已执行步骤。
+
 `.bash.run` 是普通 async 方法：await 或调度 coroutine 时才提交，不采用 `remote.node/python` 调用即 eager 提交的语义。不接收 RemoteRef/Future，不返回 Call/Output。与 files 一样，graph scope 内 await 会立即执行真实 I/O，不被捕获；重放 graph 不重跑这些准备动作。
 
-每次 bash 使用独立非交互 `bash --noprofile --norc -c`，首版仅 Linux/bash、无 PTY/stdin。cwd 默认实例 workspace，`cd/export` 不跨调用持久化；env 只覆盖该子进程，不自动继承管理凭证。shell 中 `python` 由 PATH 决定，进入 Comfy 目录不等于激活 venv。stdout/stderr 并发读取、分别限额并标截断，不承诺跨流全序。`check` 默认值待定；非零、操作超时和显式取消均须可区分。取消/超时按进程组 TERM→限时 KILL→reap，避免留下 pip/git 子进程。
+每次 bash 使用独立非交互 `bash --noprofile --norc -c`，首版仅 Linux/bash、无 PTY/stdin。cwd 默认实例 workspace，`cd/export` 不跨调用持久化；env 只覆盖该子进程，不自动继承管理凭证。shell 中 `python` 由 PATH 决定，进入 Comfy 目录不等于激活 venv。stdout/stderr 并发读取、分别限额并标截断，不承诺跨流全序。bash 非零退出由 `check` 控制：`True` 抛带 `CommandResult` 的命令错误，`False` 正常返回退出事实；默认值待定，示例显式 `check=True`。操作超时和显式取消另行报告；按进程组 TERM→限时 KILL→reap，避免留下 pip/git 子进程。shell 脚本不是事务，先前成功步骤不会因后一步失败而回滚。
 
 下例全部为未来 API 示意，规格和环境是调用方明确选择的普通 Python 值；不是当前可运行示例。为避免预先决定离线 roots 方案，先启动 runtime 发现真实模型根，再做 create-only 模型准备。
 
