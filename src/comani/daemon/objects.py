@@ -42,20 +42,29 @@ class Entry:
 
 
 class ObjectStore:
-    def __init__(self, epoch: str):
+    def __init__(self, epoch: str, *, max_entries=None):
         self.epoch = epoch
+        self.max_entries = max_entries
         self.entries: dict[str, Entry] = {}
         self.lock = threading.RLock()
+
+    def _capacity(self, count=1):
+        if self.max_entries is not None and len(self.entries) + count > self.max_entries:
+            error = CallFailed("The runtime object recovery capacity is full; release unused references")
+            error.code = "RecoveryCapacity"
+            raise error
 
     def own(self, session: str, data: list, *, leases: int = 0, is_list=False) -> dict:
         token = uuid.uuid4().hex
         with self.lock:
+            self._capacity()
             self.entries[token] = Entry(session, "owned", data=data, leases=leases, is_list=is_list)
         return {"id": token, "epoch": self.epoch, "owner": "owned"}
 
     def borrow(self, session: str, cache: Any, key: Any, entry: Any, slot: int, *, is_list=False, leases=0) -> dict:
         token = uuid.uuid4().hex
         with self.lock:
+            self._capacity()
             version = cache._comani_entry_versions.get(key, "")
             self.entries[token] = Entry(session, "borrowed", data=entry.outputs[slot] if leases else None, cache=weakref.ref(cache), key=key, identity=id(entry), version=version, slot=slot, is_list=is_list, leases=leases)
         return {"id": token, "epoch": self.epoch, "owner": "borrowed"}

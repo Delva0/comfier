@@ -1,6 +1,6 @@
 # Python 代码与目录包
 
-实现：[code.py](../../src/comani/code.py)、[参数 layout](../../src/comani/protocol.py)、[原生 Python 节点](../../src/comani/_runtime/python_node.py)。
+实现：[code.py](../../src/comani/code.py)、[参数 layout](../../src/comani/protocol.py)、[原生 Python 节点](../../src/comani/daemon/python_node.py)。
 
 `.python()` 准备代码 artifact 和参数端口，然后调用 driver 注册的 `ComaniPython` 原生节点。它复用 node 的 Call/输出/所有权规则，但包含代码准备与参数适配，并不只是改一个节点名称。
 

@@ -1,6 +1,6 @@
 # 原生文件与模型 I/O
 
-实现：[客户端文件代理](../../src/comani/files.py)、[文件存储](../../src/comani/_runtime/files.py)、[HTTP 流](../../src/comani/_runtime/file_http.py)。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。
+实现：[客户端文件代理](../../src/comani/files.py)、[文件存储](../../src/comani/daemon/files.py)、[HTTP 流](../../src/comani/daemon/file_http.py)。管理 daemon 独立持有文件存储，计算未启动或重启时仍可用。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。
 
 ## 上传后交给原生节点
 
@@ -25,8 +25,8 @@ async with Client(url, token=token) as remote:
 
 | 方法 | 选择与返回值 |
 | --- | --- |
-| `await files.upload(local_path, *, directory=None, root=None, path=None)` | 从本地常规文件上传，返回 `RemoteFile`；默认 input 根和 UUID 文件名，保留合法后缀 |
-| `await files.download(remote_file, local_path, *, directory=None, root=None, overwrite=False)` | 下载并校验后发布到本地，返回 `DownloadedFile`；覆盖现有本地目标必须显式 `overwrite=True` |
+| `await files.upload(local_path, *, directory=None, root=None, path=None, recovery_timeout=None)` | 从本地常规文件上传，返回 `RemoteFile`；默认 input 根和 UUID 文件名，保留合法后缀 |
+| `await files.download(remote_file, local_path, *, directory=None, root=None, overwrite=False, recovery_timeout=None)` | 下载并校验后发布到本地，返回 `DownloadedFile`；覆盖现有本地目标必须显式 `overwrite=True` |
 | `await files.stat(remote_file, *, directory=None, root=None, checksum=False)` | 返回 `RemoteFile`；默认只读元数据，`checksum=True` 才完整扫描文件计算 SHA256 |
 | `await files.remove(remote_file, *, directory=None, root=None, missing_ok=False)` | 显式删除一个文件，返回 `None` |
 | `await files.roots(*, directory=None, category=None)` | 返回 `tuple[FileRoot, ...]`；无筛选时列出 input、temp、output 三根 |
@@ -39,12 +39,15 @@ async with Client(url, token=token) as remote:
 
 ## 模型多根与命名
 
-模型类别和路径来自当前 ComfyUI `folder_paths` 配置，包括额外模型路径。上传到模型类别时，先取根并显式选择：
+模型类别和路径来自实际 ComfyUI `folder_paths` 配置，包括额外模型路径。运行中取得 live snapshot，停止后使用 last-observed；冷实例通过只加载原生路径配置的 helper 发现，既不导入 Torch，也不导入插件，不能凭空发现插件运行时新增类别。原生路径源码/YAML 变化触发重新发现，发布前核对 generation；路径/category/directory tuple 未变的 root 保持稳定 ID。上传到模型类别时，先取根并显式选择：
 
 ```python
 roots = await remote.files.roots(category="diffusion_models")
+selected = [root for root in roots if root.path == SERVER_MODEL_ROOT]
+if len(selected) != 1:
+    raise ValueError("Select one remote model root")
 model_file = await remote.files.upload(
-    "model.safetensors", root=roots[0], path="my-model.safetensors",
+    "model.safetensors", root=selected[0], path="my-model.safetensors",
 )
 model = remote.node("UNETLoader", unet_name=model_file.native_name, weight_dtype="default")
 ```
@@ -55,13 +58,25 @@ model = remote.node("UNETLoader", unet_name=model_file.native_name, weight_dtype
 
 ## 流式传输与提交点
 
-HTTP 上传和下载按 1 MiB chunk 读取文件；磁盘操作放到 I/O executor。上传在同一遍读取中计算 SHA256，以尾部校验信息验证大小与内容，再将同目录 `.part` 文件原子发布。create-only 发布需要文件系统支持同文件系统 hard link，否则报 `UnsupportedFileSystem`。已存在文件不会因上传失败被覆盖。
+HTTP 上传和下载按 1 MiB chunk 读取文件；磁盘操作放到 I/O executor。正常成功路径单遍读取并计算 SHA256，不无条件预哈希、不整文件缓冲。上传验证大小与内容后，将同目录 `.part` 原子发布。create-only 发布需要同文件系统 hard link，否则报 `UnsupportedFileSystem`。已存在文件不会因上传失败被覆盖。
 
-下载在服务端单遍读取并计算尾部 SHA256，客户端验证长度、SHA256 和完整帧后才发布本地目标。默认以 hard link create-only 发布；`overwrite=True` 用原子 replace。源文件的 revision 在打开和读取结束时检查；传入已有 `RemoteFile` 还检查其 revision，以及已知的 SHA256。`revision` 是 device/inode/size/mtime/ctime 的乐观变化检测，不是强文件快照或针对并发外部写入的锁。
+下载在服务端单遍读取并计算 SHA256，客户端验证长度、SHA256 和完整结束事实后才发布本地目标。默认 hard link create-only；`overwrite=True` 用原子 replace。源文件 revision 在打开和读取结束时检查；传入已有 RemoteFile 还核对其 revision 和已知 SHA256。revision 是 device/inode/size/mtime/ctime 的乐观变化检测，不是强快照或对具有同等文件权限的并发写入者的隔离。
 
-`NativeRuntime(..., max_file_bytes=None)` 默认不添加任意文件大小限额。部署者可在 runtime 构造时设非负上限，握手通过 `file_limits` 公布上限与 chunk 大小；这不是新增 CLI 参数。文件传输不把整文件塞进 JSON/RPC 请求上限，但仍受磁盘、网络和实际部署约束。
+`RuntimeConfig.max_file_bytes=None` 默认不添加任意大小限额，可通过显式 config/CLI/API 设置；握手 file_limits 公布有效 policy。模型 snapshot 的 max_total_bytes 是独立总 staging 限额，见 [模型设计](models.md)。实际磁盘和网络约束仍适用。
 
-当前没有断点续传或自动重试。错误或取消会收尾活动 I/O 并清理属于本次传输的 `.part` 文件；为上传创建的目录可能保留。若取消/断连晚于远端发布点，文件可能已经提交，调用方不能把未收到成功响应当作文件不存在。标准 multipart epilogue 可接受，额外文件 part 被拒绝。非 HTTP 自定义 transport 的流式 upload/download 会明确报 `UnsupportedTransport`；roots/stat/remove 仍取决于它是否支持相应 RPC。
+## 自动字节续传
+
+声明 files_resume=1 的 daemon 上，await upload/download 在可恢复网络故障后自动接续同一个传输，无需用户保存 key/票据。身份绑定 daemon file epoch、签名 admission window、稳定 transfer ID、原选择与源 revision。上传只按 daemon 确认 offset 接续，commit 丢回复返回原 receipt；下载核对 exact 206/Content-Range/epoch 后才 append。未知 receipt、过期 window 或 daemon 换代明确失败，不重建一个新身份补跑。
+
+正常 upload 单遍读；恢复时仅重读已确认前缀以重建本地滚动 SHA，并检查原路径和打开文件 revision。恢复下载可重读服务端前缀；最后校验/EOF 回复丢失时可能需要一次恢复专用全文件扫描。最终大小、whole SHA 与原子发布仍必需；不盲 append，不仅凭 length 认成功。
+
+recovery_timeout 默认使用服务器 transfer_idle_timeout=3600 秒，从观察到连接故障开始计时，健康进展重置。它不是整个成功传输的总 deadline；底层 HTTP timeout 仍控制一次请求和故障检测。证书/TLS 校验、路径、revision/hash、未知/过期身份错误不作为可恢复故障反复重试。
+
+默认 active transfer 全局128、每认证owner8，满额以 FileTransferBusy 背压，SDK在原窗口内重试接纳。无活跃 partial 被静默驱逐；retained metadata 上限为 max(1024,8×transfer_limit)，receipt不消耗active slot但仍受总metadata限额。idle清理独立于计算session宽限；可显式配置 transfer_idle_timeout/transfer_limit/transfer_owner_limit。
+
+显式取消本地 task 或 Client.close 停止文件 I/O，等待活动磁盘工作收尾并尝试有界清理自己的未发布 partial；不可达时由 daemon idle TTL 清理。取消若晚于发布点，完整文件可能已存在，不能声称回滚。目录可能保留。续传只覆盖活动 await 与活着的 daemon registry，不是跨客户端进程/daemon崩溃的持久传输数据库。
+
+无 resume capability 的旧服务器保留单次 multipart/framed 路径和失败清理语义。非 HTTP 自定义 transport 流式 upload/download 明确 UnsupportedTransport；roots/stat/remove 仍取决于对应 RPC。目录上传可用普通 Path.rglob 和有界 asyncio.gather 调度文件，不提供虚构的 sync API。
 
 ## 持久性与会话
 

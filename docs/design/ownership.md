@@ -1,6 +1,6 @@
 # 远端对象、GC 与会话
 
-实现：[SDK refs](../../src/comani/refs.py)、[client 控制消息](../../src/comani/client.py)、[ObjectStore](../../src/comani/_runtime/objects.py)、[runtime reservations](../../src/comani/_runtime/service.py)。
+实现：[SDK refs](../../src/comani/refs.py)、[client 控制消息](../../src/comani/client.py)、[ObjectStore](../../src/comani/daemon/objects.py)、[runtime reservations](../../src/comani/daemon/service.py)。
 
 ## 两种所有权
 
@@ -61,13 +61,15 @@ daemon 仅在调用终态、非 inflight、无依赖 reservation 时回收调用
 
 ## 会话续约与业务 loop 暂停
 
-当前默认 session TTL 为 120 秒，续约间隔最长 20 秒；正在进行的 HTTP 等待也计入活跃请求。HTTP transport 为每个有效会话启动专用 keeper 线程，使用自己的 event loop 和 aiohttp 连接续约，不依赖业务 asyncio loop 的调度。独立 CPU 验证在 0.6 秒 TTL 下阻塞业务 loop 2.4 秒，期间收到 12 次 heartbeat；原 Call/ownedRef 恢复后仍能 fetch 并继续作为输入使用。
+当前默认 offline_grace 为3600秒，可配置。HTTP transport 为有效计算会话启动独立keeper线程，使用自己的event loop/连接续约，不依赖业务asyncio loop。只有已认证客户端流量推进session_seen；worker执行、内部admission或只保持打开的TCP不续约。历史0.6秒TTL/2.4秒业务loop暂停等保活测量仍按其报告版本解释，不是当前默认值。
 
-临时心跳连接错误只表示续约暂不可达，不会在本地抢先拒绝正常业务 RPC；真实 fetch/submit 的网络错误和服务器返回的失效错误仍向调用方传播。确认的终态 lease 错误会停止使用原会话，不重新握手复活或重提任务。v2 的 transient 误拦反例及 v3 的确定性修复复验保存在 [验收记录](../../tests/acceptance/HEARTBEAT_REPORT.md)。InProcessTransport 和其他 custom transport 的 fallback heartbeat 仍共享业务 loop。
+支持同代恢复的HTTP连接遇暂态故障会用原session、不透明recovery授权及runtime epoch恢复，继续原wait/fetch；提交重用原call ID/摘要/签名窗口，不新建会话补跑副作用。离线release/forget恢复后幂等补发。keeper独立于业务loop仍不能让阻塞中的业务协程提交/取回。InProcessTransport和其他custom transport的fallback heartbeat仍共享业务loop。
 
-独立续约也依赖客户端进程能够运行及真实网络可达。进程/整机冻结、网络中断或 daemon 重启仍可能导致 lease expiry；它不是任意 GIL/GC 停顿、OS 暂停或业务继续提交的保证。真正已过期的 session 不重新握手复活，引用不补算，副作用不重提。
+独立续约仍依赖客户端进程与网络。断网宽限内owned对象继续持有，borrowed仍可能被原生cache驱逐。宽限到期拒绝resume，取消尚未开工的排队/依赖调用；已经进入原生用户函数的调用自然完成后释放，不全局中断其他session。真正计算重启产生新epoch，旧refs失效，不补算/重提。管理daemon崩溃没有跨进程恢复保证。
 
 显式 `async with Client(...)` 退出或 `await client.close()` 主动撤销整个会话，存活的 Call/Ref/Graph 不能阻止关闭。关闭后的包装对象可保留本地已完成 metadata，但不能继续成功进行远端操作。应在业务 loop 关闭前完成显式关闭；owner loop 已关闭时 keeper 会退出，但该 loop 上的普通 transport 异步清理无法再执行。
+
+离线显式关闭仍优先停止本地计算使用；远端撤销未确认时报告不确定，资源可能保留至宽限到期。它不取消已接纳管理Operation。files则主动停止本地传输并清理自己的partial，已发布文件保留。
 
 `close(wait=False)` 先使逻辑等待失败，原生任务可能仍在执行；临时 reservations 在原生结束后才完成清理。目录包的标准 Python 模块及其 globals 是进程级状态，不属于 session close 卸载的范围，见 [Python artifacts](python-artifacts.md)。
 

@@ -2,7 +2,7 @@ import asyncio
 
 from aiohttp import ClientSession, web
 
-from comani._runtime.http import create_app
+from comani.daemon.http import create_app
 
 
 class Runtime:

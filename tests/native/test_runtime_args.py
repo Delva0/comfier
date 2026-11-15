@@ -16,7 +16,7 @@ def test_native_arguments_set_import_time_memory_policy_in_fresh_process(reserve
         [sys.executable, "-c", """
 import asyncio
 import sys
-from comani._runtime import NativeRuntime
+from comani.daemon import NativeRuntime
 
 async def main():
     original_argv = sys.argv
@@ -52,7 +52,7 @@ def test_native_parser_rejects_invalid_arguments_before_nodes_import(native_args
     result = subprocess.run(
         [sys.executable, "-c", """
 import sys
-from comani._runtime.adapter import NativeAdapter
+from comani.daemon.adapter import NativeAdapter
 
 original_argv = sys.argv
 try:

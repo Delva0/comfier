@@ -1,105 +1,106 @@
 # Comani
 
-Comani 是面向 ComfyUI 的 Python SDK 与 daemon。把 **ComfyUI 看作执行设备，daemon 看作下发驱动**：本地调用节点、运行 Python 或提交原生工作流，结果以远端对象引用继续传递，需要时才取回本地。
+Comani 是管理并使用远端 ComfyUI 实例的 Python 库。一个普通 Python 脚本可以明确准备环境、固定版本、安装插件、获取模型、传输文件和运行 bash，再调用原生节点或 Python 代码出图。Tensor、模型和中间对象留在远端，按引用继续传递，需要时才取回本地。
 
-当前版本为 `0.3.0`，源码位于 [`src/comani/`](src/comani/)。当前 daemon 入口使用部署者已配置的 ComfyUI 环境，直接启动 driver；Python、PyTorch、模型和机器部署由部署方准备。
+一个带外 daemon 管理一个 ComfyUI 计算子进程。ComfyUI 未安装、已停止或启动失败时，管理接口仍可用；计算和原生对象留在 ComfyUI 进程里。客户端与管理环境只需轻量 Comani 包，管理 Python 和计算 Python 可以分开。
 
-## 能做什么
+## 开始使用
 
-- **Eager 为主**：`remote.node("原始节点名", ...)` 调用立即进入发送流程，返回 `Call`；无需生成节点包装代码。
-- **远端对象传递**：`OutputFuture` 可以直接作为后续输入；`await` 同步，`fetch()` 显式取回数据。
-- **原生工作流**：`with remote.graph()` 捕获同一套调用，`remote.submit()` 一次提交；支持输入端口、组合及中间结果。
-- **Python 代码执行**：支持匹配环境的 callable、自包含源码文件和目录包；目录包使用正常 Python imports。
-- **显式文件 I/O**：`remote.files` 异步上传、下载、校验及删除原生文件，支持 input/temp/output 和模型多根。
-
-一个 daemon 承载一个原生 ComfyUI runtime。当前原生执行使用单 worker；daemon 接收和依赖等待独立进行。工作流内部能否重叠计算，取决于 ComfyUI 和节点本身。
-
-## 快速开始
-
-先进入已能运行 ComfyUI 的 Python 3.11+ 环境，在同一解释器中安装轻量包并启动 daemon：
+当前版本为 `0.3.0`，尚未发布 PyPI 包。把本仓库构建的 wheel 安装到管理环境和客户端；也可从 Git 安装，部署时固定所需 revision：
 
 ```sh
-python -m pip install "git+https://github.com/Delva0/comani.git"
-comani daemon --comfy-root /path/to/ComfyUI
+python -m pip install /path/to/comani-0.3.0-py3-none-any.whl
+comani daemon --comfy-root /srv/ComfyUI --workspace /srv --no-start
 ```
 
-`python -m comani daemon ...` 是同一入口。命令在前台运行，默认监听 `127.0.0.1:8190`；`--comfy-root` 选择已有 backend 源码。按硬件选择的原生参数放在 `--` 后，具体支持范围见 [启动与原生参数](docs/design/development.md)。
+这会启动默认监听 `127.0.0.1:8190` 的管理服务，`/srv/ComfyUI` 可以尚不存在。为兼容已有启动命令，不加 `--no-start` 的 CLI 会尝试启动计算；**连接 Client 本身始终只做管理握手**，不会安装或启动 ComfyUI。远端入口使用 `COMANI_TOKEN` 和部署方提供的 SSH 转发或鉴权 HTTPS。
 
-尚未发布 PyPI 版本，使用上面的 Git URL 或 `pip install /path/to/comani.whl`。安装不会 clone ComfyUI、创建 runtime venv 或下载模型。独立客户端只需同一轻量包，无需本地 Torch/ComfyUI；取回 Tensor 等对象时仍需对应库。
+从空白实例准备 CPU 环境并生成 PNG，可直接运行 [basic.py](examples/basic.py)：
 
-fetch 默认协商二进制 pickle，保留完整对象语义。需要允许可选 LZ4 压缩时，两端安装 `"comani[lz4] @ git+https://github.com/Delva0/comani.git"`；`Client(url, fetch_compression="identity")` 可关闭压缩，默认 `"auto"` 在双方支持时启用。压缩有 CPU/内存成本，配置和协议见 [结果取回](docs/design/protocol.md#二进制结果取回)。
+```sh
+python examples/basic.py \
+  --new-environment /srv/comfy-env \
+  --comfy-root /srv/ComfyUI \
+  --runtime-package /srv/packages/comani-0.3.0-py3-none-any.whl \
+  --output artifacts/basic.png
+```
 
-## 一段 Python
+前三个路径在 **daemon 所在机器**；`--output` 是客户端本地路径。`--runtime-package` 必须指向服务器已有的当前 wheel，或明确固定的 requirement。新环境目录必须不存在。脚本显式创建隔离 venv、配置 CPU、安装固定版本工具与 ComfyUI、准备计算依赖，然后启动计算；再次使用已有环境时省略三个准备参数。GPU 的 Torch/CUDA 版本由调用方明确选择，见 [环境准备](docs/design/remote-management-plan.md) 与 [H3 入口](docs/design/development.md#h3-完整脚本)。
 
-以下 callable 示例要求客户端与 daemon 的 Python/cloudpickle 版本匹配；跨环境代码可显式选择 [源码文件或包](docs/design/python-artifacts.md)。
+## 普通 Python 调用
+
+已配置的实例可以直接表达依赖与结果文件：
 
 ```python
 import asyncio
+import os
+from pathlib import PurePosixPath
+
 from comani import Client
 
+
 async def main():
-    async with Client("http://127.0.0.1:8190") as remote:
-        image = remote.node(
-            "EmptyImage", width=64, height=64, batch_size=1, color=0x123456,
-        )
-        adjusted = remote.python(
-            lambda image: image * 0.5, inputs={"image": image.output(0)},
-        )
-        inverted = remote.node("ImageInvert", image=adjusted.output(0))
-        ref, = await inverted
-        local_image = await ref.fetch()
-        print(local_image.shape)
+    async with Client(
+        os.environ.get("COMANI_URL", "http://127.0.0.1:8190"),
+        token=os.environ.get("COMANI_TOKEN"),
+    ) as remote:
+        info = await remote.comfyui.info()
+        if info.state != "running":
+            await remote.comfyui.start()
+
+        image = remote.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
+        inverted = remote.node("ImageInvert", image=image.output(0))
+        saved = remote.node("SaveImage", images=inverted.output(0), filename_prefix="comani/demo")
+        await saved
+        metadata = await saved.metadata()
+        item = metadata.ui["result"]["images"][0]
+        path = str(PurePosixPath(item["subfolder"]) / item["filename"])
+        file = await remote.files.stat(path, directory=item["type"])
+        await remote.files.download(file, "result.png")
+
 
 asyncio.run(main())
 ```
 
-`await call` 返回按槽排列的 ready refs；`await call.output(i)` 返回其中一个。`RemoteRef` 本身不可 await。无关调用不会因一次本地 await 获得额外的远端顺序依赖。
+`node/python/submit` 调用立即进入发送流程，返回 Call；`await call` 返回输出槽的 ready refs tuple，`await call.output(i)` 返回一个 ready ref。ready ref 本身不可 await，`await ref.fetch()` 才把精确对象取回本地。SaveImage 明确生成 8-bit PNG；fetch 不默认把浮点 Tensor 转成图片。
 
-本地图片先显式上传，再把原生文件名交给节点：
+`with remote.graph()` 只捕获 node/Python 计算调用，交给 ComfyUI 原生执行器；管理和 files 的 async 方法仍立即执行真实远端 I/O。无需节点包装代码、DSL 或另一个图编译器。
 
-```python
-staged = await remote.files.upload("local.png")
-loaded = remote.node("LoadImage", image=staged.native_name)
-image, mask = await loaded
-# 在最后一次原生读取结束后：await remote.files.remove(staged)
-```
+## 远端管理
 
-文件元数据是本地值，不是远端对象引用；GC/关闭 Client 不会删除已完成文件。目录、模型根与下载用法见 [文件 I/O](docs/design/files.md)。
+| 接口 | 用途 |
+| --- | --- |
+| `remote.comfyui` | 查询实际配置/环境/源码版本，创建目标环境，显式安装、更新、准备和启停 |
+| `remote.plugins` | 查询后端/插件/版本，安装指定 registry 包或 Git commit，启用、禁用与卸载 |
+| `remote.models` | 在远端解析 HF/Civitai/直链、选择具体文件，校验下载或发布 HF snapshot |
+| `remote.files` | 上传/下载、根目录、stat、校验和显式删除 |
+| `remote.bash` | 远端非交互 bash；明确 cwd/env/timeout，默认非零退出抛错 |
 
-实际例程见 [本地 checkpoint](examples/local_checkpoint.py) 和 [H3 source-file 远端脚本](examples/minimax_h3_source_remote.py) / [source ops](examples/minimax_h3_source_ops.py)。公开 cd6 代码已在官方 ComfyUI 模板的 RTX 4090、Python 3.12.15 环境完成指定 INT8 模型三路 2048×2048 出图，完整 Tensor 逐位一致；环境、资源、清理及历史结果见 [独立远端报告](docs/remote_acceptance.md)。
+这些查询都请求远端，不使用客户端目录或缓存冒充实例状态。返回的配置、版本、文件等 metadata 是普通本地值。
 
-连续 H3 生成可用 [refs 复用例程](examples/minimax_h3_reuse.py)，以 `--serial` 对照有界计算/fetch/save 重叠；计算、缓存与数据面测量见 [性能记录](docs/performance.md)。
+管理任务独立于 Client 和计算会话：已接纳的安装、下载或 bash 不因客户端断连或关闭而取消。普通 await 自动恢复原操作的观察；高级 `begin_*`、日志、取消和新 Client 附着见 [管理设计](docs/design/remote-management-plan.md)。失败与部分失败会抛错，不继续执行后续安装/启动步骤，也不声称回滚。
 
-![指定 Minimax H3 INT8 模型生成的 2048×2048 实际样图](artifacts/remote/60741609-20261115/eager.png)
+`comfyui.stop()` / `restart()` 默认 `wait=True`，等待计算和受管安装完成；显式 `wait=False` 紧急中断相关工作后停止或尝试重启，不保证安装回滚或重启成功。Python await 仍等待控制结果。bash 可与 runtime 并行，长命令不阻挡这些控制动作。
 
-## 适用边界
+计算连接默认支持一小时的可配置断网宽限，恢复原 session、调用和对象；SDK 不重跑整段脚本。真正重启计算会使旧 refs 失效，borrowed refs 仍受原生缓存驱逐约束。文件传输自动续传同一个活动传输，完整校验后原子发布；已完成文件不随 GC 或 Client.close 删除。
 
-本项目提供 ComfyUI **后端**执行能力：原生 API prompt graph、节点与对象。前端 canvas JSON、WebUI 行为及所有第三方自定义 HTTP route 不在统一兼容承诺内；driver 仅实现少量辅助路由。
-
-Eager 输出由有效会话持有，最后一个本地别名消失后通知释放；workflow 输出借用原生缓存，失效会报 `Expired`，不会自动重算。本地持有引用与原生 cache、模型 offload 是不同层，详见 [所有权与会话保活](docs/design/ownership.md)。目录包同名不同内容会报 `PackageConflict`，不会覆盖已安装模块。
-
-公开 Call、未 release 的输出句柄与 Graph 共享保留所属 Client；删除局部 Client 变量不会单独关闭会话。显式 close/context 退出仍优先关闭整个会话。
-
-HTTP 会话通过独立后台 keeper 续约；业务 loop 暂停后可继续使用仍有效的 owned refs，提交、读取和 GC 控制消息仍需要业务 loop 可运行。已验的 CPU 范围见 [启动与保活验收](tests/acceptance/HEARTBEAT_REPORT.md) 和 [压力报告](tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)，官方模板 GPU 结果及资源边界见 [远端报告](docs/remote_acceptance.md)。原生 CLI 的 parser 接受某个参数，不等于 headless driver 已实现对应服务；支持项和明确拒绝项见 [Runtime 边界](docs/design/runtime.md)。
-
-## 文档
+## 示例与文档
 
 | 内容 | 入口 |
-|---|---|
-| 总体架构与组件地图 | [设计索引](docs/design/README.md) |
-| 调用、await、graph 与中间量 | [SDK 契约](docs/design/sdk.md) |
-| daemon 与原生执行器边界 | [Runtime 设计](docs/design/runtime.md) |
-| GC、所有权、缓存与会话 | [对象生命周期](docs/design/ownership.md) |
-| RPC、引用编码、错误和事件 | [协议](docs/design/protocol.md) |
-| callable、文件和目录包 | [Python artifacts](docs/design/python-artifacts.md) |
-| 原生文件上传、下载与模型根 | [文件 I/O](docs/design/files.md) |
-| 计算、结果取回与持续生成 | [性能记录](docs/performance.md) |
-| 环境、运行、扩展节点与测试 | [开发指南](docs/design/development.md) |
-| 环境与验收记录 | [文档目录](docs/README.md) |
-| 已发布薄 CLI、metadata 与 CPU 基线 | [独立 0.3.0 报告](tests/acceptance/THIN_CLI_REPORT.md) |
+| --- | --- |
+| CPU 环境准备、bash、本地文件、eager/graph 与 PNG | [basic.py](examples/basic.py) |
+| 远端 checkpoint 或显式上传本地 checkpoint | [local_checkpoint.py](examples/local_checkpoint.py) |
+| H3 环境、插件、三模型准备与三模式生成 | [minimax_h3_remote.py](examples/minimax_h3_remote.py) |
+| 同一 H3 流程的跨版本 source-file 计算 | [minimax_h3_source_remote.py](examples/minimax_h3_source_remote.py) |
+| 有界复用与精确 Tensor 性能对照，保留 --serial | [minimax_h3_reuse.py](examples/minimax_h3_reuse.py) |
+| 架构、SDK、管理、模型、文件与恢复 | [设计索引](docs/design/README.md) |
+| 运行、开发、固定版本和 H3 参数 | [开发指南](docs/design/development.md) |
+| 历史环境、性能与验收身份 | [文档目录](docs/README.md) |
 
-历史环境与交付测量保存在 [`docs/`](docs/)，按报告中的源码版本和硬件范围解读；当前 API 以 `docs/design/` 和 `src/comani/` 为准。
+Comani 提供 ComfyUI 后端的节点、对象和原生 prompt graph。WebUI、前端 canvas JSON、所有第三方 HTTP route、机器租用与多实例调度不在统一兼容范围。代码、插件和模型依赖仍须适合所选硬件与 backend revision。
 
-## 开发
+历史 GPU/H3 图片与性能报告对应各自记录的源码、wheel 和硬件，不是本轮管理架构及改写示例的 GPU 验收。当前代码的独立验收与最终 wheel 身份应按新报告核对。
 
-扩展节点、测试及 wheel 发布工具见 [开发指南](docs/design/development.md)，它们不是使用 daemon 的部署前提。
+![历史 H3 INT8 2048×2048 实际样图](artifacts/remote/60741609-20261115/eager.png)
+
+开发与打包见 [开发指南](docs/design/development.md)。可选 `comani[lz4]` 支持双方协商无损压缩，具体成本见 [协议](docs/design/protocol.md#二进制结果取回)。

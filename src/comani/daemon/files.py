@@ -121,14 +121,24 @@ class FileStore:
     still constrain each transfer. Completed files have no session owner.
     """
 
-    def __init__(self, folder_paths, *, max_file_size, chunk_size=1024 * 1024):
+    def __init__(self, folder_paths, *, max_file_size, chunk_size=1024 * 1024,
+                 transfer_idle_timeout=3600.0, transfer_limit=128, transfer_owner_limit=8):
         if max_file_size is not None and (type(max_file_size) is not int or max_file_size < 0):
             raise ValueError("max_file_size must be None or a nonnegative integer")
         if type(chunk_size) is not int or not 0 < chunk_size <= 8 * 1024 * 1024:
             raise ValueError("chunk_size must be between 1 byte and 8 MiB")
+        if (not isinstance(transfer_idle_timeout, (int, float))
+                or not 0 < transfer_idle_timeout < float("inf")):
+            raise ValueError("transfer_idle_timeout must be positive and finite")
+        if any(type(value) is not int or value < 1
+               for value in (transfer_limit, transfer_owner_limit)):
+            raise ValueError("Transfer limits must be positive integers")
         self.folder_paths = folder_paths
         self.max_file_size = max_file_size
         self.chunk_size = chunk_size
+        self.transfer_idle_timeout = float(transfer_idle_timeout)
+        self.transfer_limit = transfer_limit
+        self.transfer_owner_limit = transfer_owner_limit
         self._roots = {}
         self._uploads = set()
         self._lock = threading.RLock()
@@ -309,9 +319,10 @@ class Upload:
         value = parent.stat()
         self._parent_identity = (value.st_dev, value.st_ino)
         self._partial = parent / (".comani-" + uuid.uuid4().hex + ".part")
-        self._stream = self._partial.open("xb")
+        self._stream = self._partial.open("xb", buffering=0)
         value = os.fstat(self._stream.fileno())
         self._identity = (value.st_dev, value.st_ino)
+        self._revision = Revision.of(value)
         self._hash = hashlib.sha256()
         self._closed = False
         self._lock = threading.RLock()
@@ -330,6 +341,7 @@ class Upload:
         try:
             if self._closed:
                 raise ValueError("Upload is already closed")
+            self._check_partial()
             if not isinstance(chunk, (bytes, bytearray, memoryview)):
                 raise TypeError("Upload chunks must be bytes-like")
             chunk = memoryview(chunk).cast("B")
@@ -339,6 +351,7 @@ class Upload:
                 raise OSError("Incomplete write to upload staging file")
             self._hash.update(chunk)
             self.written += len(chunk)
+            self._revision = Revision.of(os.fstat(self._stream.fileno()))
         except BaseException:
             self.abort()
             raise
@@ -355,6 +368,7 @@ class Upload:
             if self.written != self.size or digest != sha256:
                 raise ValueError("Upload size or SHA256 does not match")
             self._stream.flush()
+            self._check_partial()
             os.fsync(self._stream.fileno())
             expected = Revision.of(os.fstat(self._stream.fileno()))
             self._stream.close()
@@ -396,6 +410,11 @@ class Upload:
             self.abort()
             raise
 
+    def _check_partial(self):
+        if (Revision.of(os.fstat(self._stream.fileno())) != self._revision
+                or Revision.of(_regular(self._partial)) != self._revision):
+            raise FileChangedError("Upload staging file changed")
+
     def abort(self):
         with self._lock:
             self._abort()
@@ -424,7 +443,9 @@ class Download:
     def __exit__(self, *_):
         self.close()
 
-    def chunks(self):
+    def chunks(self, offset=0):
+        if type(offset) is not int or not 0 <= offset <= self.metadata.size:
+            raise ValueError("Invalid download offset")
         digest, size = hashlib.sha256(), 0
         try:
             while chunk := self._stream.read(self.store.chunk_size):
@@ -432,7 +453,8 @@ class Download:
                 if size > self.metadata.size:
                     raise FileChangedError("File grew during download")
                 digest.update(chunk)
-                yield chunk
+                if size > offset:
+                    yield chunk[max(0, offset - (size - len(chunk))):]
             try:
                 current = Revision.of(_regular(self._target))
             except (FileNotFoundError, ValueError):

@@ -5,42 +5,46 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani._runtime import NativeRuntime
-from comani._runtime import __main__ as launcher
-from comani._runtime.adapter import NativeAdapter
-from comani._runtime.startup import initialize
+from comani.cli import daemon as launcher
+from comani.daemon import NativeRuntime
+from comani.daemon.adapter import NativeAdapter
+from comani.daemon.service import RecoveryPolicy
+from comani.daemon.startup import initialize
 
 
 @pytest.mark.parametrize("native_args", [[], ["--reserve-vram", "4", "--disable-smart-memory"]])
-def test_launcher_forwards_native_arguments_after_separator(monkeypatch, tmp_path, native_args):
+def test_private_worker_receives_native_arguments_without_a_second_cli(monkeypatch, tmp_path, native_args):
+    import importlib.util
+
+    from aiohttp import web
+
+    from comani.daemon import _worker, http, service
+
     captured = {}
-    runtime = object()
-    app = object()
+    runtime, app = object(), object()
 
     def make_runtime(root, **kwargs):
         captured.update(root=root, **kwargs)
         return runtime
 
     def make_app(value, **kwargs):
-        assert value is runtime
-        assert kwargs == {"token": "test-token"}
+        assert value is runtime and kwargs == {"token": "test-token"}
         return app
 
     def run_app(value, **kwargs):
-        assert value is app
-        assert kwargs == {"host": "127.0.0.1", "port": 8190}
+        assert value is app and kwargs == {"host": "127.0.0.1", "port": 8190}
 
-    monkeypatch.setattr(launcher, "NativeRuntime", make_runtime)
-    monkeypatch.setattr(launcher, "create_app", make_app)
-    monkeypatch.setattr(launcher.web, "run_app", run_app)
-    monkeypatch.setattr(launcher.importlib.util, "find_spec", lambda _: object())
+    monkeypatch.setattr(service, "NativeRuntime", make_runtime)
+    monkeypatch.setattr(http, "create_app", make_app)
+    monkeypatch.setattr(web, "run_app", run_app)
+    monkeypatch.setattr(importlib.util, "find_spec", lambda _: object())
     (tmp_path / "execution.py").touch()
-    launcher.main([
-        "--comfy-root", str(tmp_path), "--cpu", "--no-custom-nodes", "--token", "test-token",
-        *(["--", *native_args] if native_args else []),
-    ])
+    _worker.run({"comfy_root": str(tmp_path), "cpu": True,
+                 "custom_nodes": False, "comfy_args": native_args},
+                port=8190, token="test-token")
     assert captured == {
         "root": tmp_path, "cpu": True, "custom_nodes": False, "comfy_args": native_args,
+        "max_file_bytes": None, "recovery_policy": RecoveryPolicy(),
     }
 
 
@@ -102,7 +106,7 @@ def startup_parser(monkeypatch, tmp_path):
         assert name == "main"
         return native
 
-    monkeypatch.setattr("comani._runtime.startup.importlib.import_module", import_native)
+    monkeypatch.setattr("comani.daemon.startup.importlib.import_module", import_native)
     args.temp_directory = None
     return parser, args, imports, tmp_path
 

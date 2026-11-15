@@ -9,7 +9,7 @@ import weakref
 import pytest
 from aiohttp import ClientSession
 
-from comani import Client, Expired, PackageConflict, RemoteError, RemoteRef
+from comani import Client, Expired, PackageConflict, RemoteError, RemoteRef, SessionClosed
 from comani.code import prepare_code
 
 pytestmark = pytest.mark.native
@@ -77,19 +77,20 @@ async def test_sync_native_work_does_not_block_submit_or_heartbeat(native_http):
 
 
 @pytest.mark.parametrize("native_http", [{"session_ttl": 0.15}], indirect=True)
-async def test_active_http_wait_renews_session_then_disconnect_expires(native_http):
+async def test_open_http_wait_without_authenticated_heartbeat_does_not_extend_recovery_grace(native_http):
     runtime, url = native_http
     remote = await Client(url).start()
     try:
-        # Isolate the active HTTP request guard from the SDK heartbeat.
+        # An open/stale TCP long poll cannot keep resources alive indefinitely.
+        # Only new authenticated traffic advances the offline grace deadline.
         await remote._lease.close()
         call = remote.python(blocked, args=(31, 0.5))
-        ref = await call.output()
-        assert await ref.fetch() == 31
+        with pytest.raises(SessionClosed):
+            await call.output()
         session = remote.session_id
-        assert session not in runtime.closed_sessions
-        await remote.transport.close()  # abrupt disconnect, no close_session RPC
         await eventually(lambda: session in runtime.closed_sessions, timeout=2)
+        # Native work finishes naturally, then expired-session objects disappear.
+        await runtime.queue.join()
         assert not any(key[0] == session for key in runtime.calls)
         assert not any(entry.session == session for entry in runtime.store.entries.values())
     finally:

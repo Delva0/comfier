@@ -5,8 +5,8 @@ import os
 import cloudpickle
 import pytest
 
-from comani._runtime import NativeRuntime
-from comani._runtime.objects import NodeSkipped, RefExpired
+from comani.daemon import NativeRuntime
+from comani.daemon.objects import NodeSkipped, RefExpired
 
 COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(not os.path.isfile(COMFY + "/execution.py"), reason="real ComfyUI checkout required")
@@ -249,7 +249,7 @@ async def test_python_one_slot_values(value):
     try:
         import hashlib
 
-        from comani._runtime.python_node import PYTHON_NODE
+        from comani.daemon.python_node import PYTHON_NODE
 
         raw = cloudpickle.dumps(lambda: value)
         artifact = hashlib.sha256(raw).hexdigest()

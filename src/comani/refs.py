@@ -5,11 +5,22 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import weakref
+from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
-from .errors import InvalidReference, Released, SessionClosed, error_from_wire
+from .errors import Expired, InvalidReference, Released, SessionClosed, error_from_wire
 
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class CallMetadata:
+    """Local native UI facts, without the submitted prompt or hidden extra_data."""
+
+    call_id: str
+    prompt_id: str | None = None
+    executed: tuple[str, ...] = ()
+    ui: dict = field(default_factory=dict)
 
 
 def _drop_owner(client_ref, record):
@@ -58,6 +69,9 @@ class _CallState:
                  lifetime=None):
         self.client_ref = weakref.ref(client)
         self.call_id = call_id
+        self.epoch = ""
+        self.invalidated = None
+        self.metadata = None
         self.node_id = node_id
         self.lifetime = lifetime if lifetime is not None else _InvocationLifetime(client, call_id)
         self.output_count = output_count
@@ -76,6 +90,10 @@ class _CallState:
         client = self.client_ref()
         if client is None or client.closed:
             raise SessionClosed("The client session is closed")
+        if self.invalidated is not None:
+            raise type(self.invalidated)(str(self.invalidated), details=self.invalidated.details)
+        if self.epoch and client.epoch and self.epoch != client.epoch:
+            raise Expired("This reference belongs to a previous runtime epoch")
         return client
 
     def slot(self, selector):
@@ -114,6 +132,9 @@ class _CallState:
             self.fail(error_from_wire(payload["error"]))
             return
         outputs = payload.get("outputs", [])
+        metadata = payload.get("metadata", {})
+        self.metadata = CallMetadata(self.call_id, metadata.get("prompt_id"),
+                                     tuple(metadata.get("executed", ())), metadata.get("ui", {}))
         self.output_count = len(outputs)
         self.names.update(payload.get("names", {}))
         call = self.call_ref()
@@ -139,7 +160,7 @@ class _CallState:
 
     def wire_ref(self, slot):
         client = self.client()
-        return {"$ref": {"session": client.session_id, "epoch": client.epoch,
+        return {"$ref": {"session": client.session_id, "epoch": self.epoch or client.epoch,
                          "call_id": self.call_id, "slot": slot,
                          **({"node_id": self.node_id} if self.node_id is not None else {})}}
 
@@ -227,6 +248,11 @@ class Call(Generic[T]):
     @property
     def status(self):
         return self._state.status
+
+    async def metadata(self) -> CallMetadata:
+        """Wait for this producer and return local JSON UI/execution metadata."""
+        await asyncio.shield(self._state.done)
+        return self._state.metadata
 
     def _hold_outputs(self):
         if self._state.output_count is not None:

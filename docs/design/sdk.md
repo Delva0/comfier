@@ -2,6 +2,14 @@
 
 实现：[client.py](../../src/comani/client.py)、[refs.py](../../src/comani/refs.py)、[graph.py](../../src/comani/graph.py)。
 
+## 管理连接与计算附着
+
+`async with Client(url, token=...)` 只做管理握手，ComfyUI 未安装/停止时也可查询、准备环境和使用 bash/files。显式 `await remote.comfyui.start()` 后首个计算调用才惰性附着计算 session。连接从不自动安装或启动。旧 direct native/in-process transport 保持其原有计算入口语义。
+
+`remote.comfyui/plugins/models/bash` 是静态 namespace，其查询和变更都是真实远端 I/O；返回 DTO/metadata 是本地值。与 files 一样，普通 async 方法在 await/调度时执行，即使位于 graph scope 内也不被捕获。准备、管理 Operation 和恢复见 [管理设计](remote-management-plan.md)。
+
+`comfyui.stop()` / `restart()` 默认 `wait=True`，等待计算和相关受管安装完成。显式 `wait=False` 中断计算及本实例受管维护后停止或尝试重启；不保证安装回滚，结果保留被中断 Operation，重启失败也明确报告。`wait=True` 与 `force=True` 不能同时使用。Python `await restart(wait=False)` 仍等待重启结果；`begin_restart` 才先返回观察句柄。实际计算代际结束后旧调用与引用失效。bash 可在 runtime 运行时执行，长 shell 不阻挡生命周期控制。
+
 ## Eager 调用
 
 ```python
@@ -36,6 +44,8 @@ HTTP fetch 保留 cloudpickle 对象语义，默认协商二进制响应。可�
 
 取消某个本地 waiter 不取消底层远端调用。`close(wait=False)` 关闭会话并令待处理 SDK 等待失败；原生正在执行的同步工作不保证立即停止，见 [Runtime](runtime.md)。
 
+支持恢复的 HTTP daemon 上，临时传输错误自动恢复原 session/epoch 与原 call ID，不重跑脚本。默认断网宽限一小时，可配置；真实重启或已过期会话明确失败。离线 release/forget 在恢复后幂等补发，显式 close 撤销计算优先；管理任务与计算 session 独立。网络恢复不把 borrowed cache view 变成 owned，见 [生命周期](ownership.md)。
+
 ## 可选执行 metadata
 
 普通 `node(name, **inputs)` 的所有 kwargs 都是节点端口，名为 `inputs`、`node_inputs` 或 `extra_data` 的真实输入也保持原意。需要额外执行 metadata 时，才把输入 Mapping 放在第二个位置：
@@ -49,6 +59,18 @@ run = remote.submit(workflow, inputs=bindings, extra_data=metadata)
 第二位置 Mapping 形式的 kwargs 只允许执行选项 `extra_data`，其他选项会报 `TypeError`。metadata 必须是 JSON 兼容 Mapping，在调用时生成快照；不能放 RemoteRef、Future 或任意 Python 对象。它传给原生执行上下文，不会变成节点端口。`submit` 的选项同时适用于 captured graph 与 raw API prompt。
 
 构图时，单个节点或嵌套 `submit` 的非空执行 metadata 会立即报 `ValueError`；统一放到构图结束后的最外层 `remote.submit(..., extra_data=...)`。普通 capture 不增加步骤。这里的 API 节点是调用外部服务的原生后端节点类别，不是 SDK 新增的固定节点名。
+
+完成后 `await call.metadata()` 返回普通本地 `CallMetadata(call_id, prompt_id, executed, ui)`，不需 fetch，不拥有远端对象。它只投影必要的原生 UI/history outputs，排除原 prompt、extra_data 和 history.meta；不序列化 opaque 对象/Tensor。单节点 UI key 为 `result`，workflow UI key 为实际 graph node ID。
+
+```python
+saved = remote.node("SaveImage", images=image, filename_prefix="comani/result")
+await saved
+metadata = await saved.metadata()
+item = metadata.ui["result"]["images"][0]
+# filename/subfolder/type 定位原生文件，随后 files.stat/download/remove。
+```
+
+SaveImage 的 PNG 是明确的 8-bit 文件输出；`fetch()` 保持完整浮点 Tensor，不隐式压成 PNG。直接取图片不需要 source wrapper 来读取 UI 或写临时文件。
 
 ## Graph receiver
 
@@ -64,7 +86,7 @@ early = await run[middle]
 final = await run.output("image")
 ```
 
-`with` 通过 ContextVar 切换当前任务的 receiver；嵌套退出和异常退出会恢复先前 receiver。scope 内调用只记录节点，`await call` 不挂起，立即返回符号 GraphRefs。普通 Python 此时仍在本地执行；符号值不能用于本地 bool 判断、迭代运行时数据或 fetch。
+`with` 通过 ContextVar 切换当前任务的 receiver；嵌套退出和异常退出会恢复先前 receiver。scope 内调用只记录节点，`await call` 返回符号 GraphRefs，不执行节点或提交图。若管理连接尚未取得该节点schema，首次await会异步附着已运行的计算进程取真实schema；它不会隐式安装或启动计算，停止的runtime仍明确报错。schema已知时不需要这一步I/O。普通Python此时仍在本地执行；符号值不能用于本地bool判断、迭代运行时数据或fetch。
 
 退出 scope 只封图，不提交。GraphRef 不冒充 RemoteRef，且本身不可 await；图外通过 `run[GraphRef]` 将它绑定到某一次运行。一个 sealed graph 可以重复提交，每个 run 有独立调用 ID，端口不会隐式绑定到“最后一次运行”。
 

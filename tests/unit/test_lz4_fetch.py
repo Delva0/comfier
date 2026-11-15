@@ -9,7 +9,7 @@ from aiohttp import ClientPayloadError, ClientSession, web
 
 from comani import Client, RemoteError
 from comani._codec import LZ4_MIN_BYTES, decompress_pickle
-from comani._runtime.http import create_app
+from comani.daemon.http import create_app
 from comani.protocol import (
     LZ4_ACCEPT_HEADER,
     LZ4_CODEC,

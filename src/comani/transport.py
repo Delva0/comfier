@@ -29,13 +29,24 @@ def _retryable_heartbeat_status(status):
     return status in {408, 429} or 500 <= status < 600
 
 
-async def _post(session, url, method, params, *, retry_http=False, binary=False, lz4=False):
+def retryable_transport_error(error):
+    """Only retry transport uncertainty, never a remote application failure."""
+    if isinstance(error, aiohttp.ClientResponseError):
+        return _retryable_heartbeat_status(error.status)
+    return isinstance(error, (aiohttp.ClientConnectionError, aiohttp.ClientPayloadError,
+                              TimeoutError, ConnectionError, OSError))
+
+
+async def _post(session, url, method, params, *, retry_http=False, binary=False, lz4=False,
+                unsupported_404=False):
     options = {"json": {"method": method, "params": params}}
     if binary:
         options["headers"] = {"Accept": PICKLE_CONTENT_TYPE}
         if lz4:
             options["headers"][LZ4_ACCEPT_HEADER] = LZ4_CODEC
     async with session.post(url, **options) as response:
+        if unsupported_404 and getattr(response, "status", 200) == 404:
+            response.raise_for_status()
         if binary and response.content_type in {PICKLE_CONTENT_TYPE, LZ4_PICKLE_CONTENT_TYPE}:
             response.raise_for_status()
             compressed = response.content_type == LZ4_PICKLE_CONTENT_TYPE
@@ -49,7 +60,7 @@ async def _post(session, url, method, params, *, retry_http=False, binary=False,
         except (aiohttp.ContentTypeError, ValueError):
             response.raise_for_status()
             raise RemoteError("Daemon returned an invalid JSON response") from None
-        if retry_http and _retryable_heartbeat_status(response.status):
+        if retry_http and _retryable_heartbeat_status(getattr(response, "status", 200)):
             error = payload.get("error") if isinstance(payload, dict) else None
             code = error.get("code") if isinstance(error, dict) else None
             if code not in {"SessionClosed", "Unauthorized", "ForbiddenOrigin"}:
@@ -196,6 +207,7 @@ class HTTPTransport:
         self._data_session = None
         self._binary_fetch = False
         self._binary_fetch_lz4 = False
+        self._management_mode = False
 
     async def open(self):
         if self._session is None:
@@ -211,17 +223,26 @@ class HTTPTransport:
     async def request(self, method: str, **params) -> Any:
         if self._session is None:
             raise SessionClosed("Transport is not open")
+        if self._management_mode and method in {"file_roots", "file_stat", "file_remove"}:
+            return await self.management_request(method, **params)
         # Result long polls and bulk transfers must not consume the connections
         # needed to admit calls, renew leases, release objects, or close a session.
         session = self._session
-        if method == "wait_result":
+        if method in {"wait_result", "management:management_result", "management:management_logs"}:
             session = self._wait_session
         elif method in {"fetch", "artifact_put", "file_stat"}:
             session = self._data_session
-        result = await _post(session, self.url, method, params,
+        management = method.startswith("management:")
+        if management:
+            method = method.partition(":")[2]
+        result = await _post(session, self.url[:-4] + "/manage" if management else self.url, method, params,
+                             retry_http=True,
+                             unsupported_404=management and method == "handshake",
                              binary=method == "fetch" and self._binary_fetch,
                              lz4=method == "fetch" and self._binary_fetch_lz4)
-        if method == "handshake":
+        if management and method == "handshake":
+            self._management_mode = True
+        if method in {"handshake", "resume"} and not management:
             capabilities = result.get("capabilities", {})
             version = capabilities.get("binary_fetch") if isinstance(capabilities, dict) else None
             self._binary_fetch = type(version) is int and version == BINARY_FETCH_VERSION
@@ -230,6 +251,12 @@ class HTTPTransport:
                                      and version == BINARY_FETCH_LZ4_VERSION and has_lz4()
                                      and self._fetch_compression == "auto")
         return result
+
+    async def management_request(self, method: str, **params):
+        return await self.request("management:" + method, **params)
+
+    def _reset_runtime_capabilities(self):
+        self._binary_fetch = self._binary_fetch_lz4 = False
 
     def _start_heartbeat(self, session_id, interval, owner_loop, notify):
         return _HTTPHeartbeat(self.url, self._headers, session_id, interval, owner_loop, notify)
@@ -253,6 +280,21 @@ class InProcessTransport:
 
     async def open(self):
         pass
+
+    @property
+    def supports_management(self):
+        return callable(getattr(self.runtime, "management_request", None))
+
+    async def management_request(self, method: str, **params):
+        function = getattr(self.runtime, "management_request", None)
+        if function is None:
+            raise RemoteError("This transport does not support management",
+                              details={"code": "UnsupportedTransport"})
+        try:
+            result = function(method, **params)
+            return await result if inspect.isawaitable(result) else result
+        except Exception as error:
+            raise error_from_wire(error_to_wire(error)) from None
 
     async def request(self, method: str, **params):
         function = getattr(self.runtime, method, None)

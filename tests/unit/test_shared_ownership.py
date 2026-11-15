@@ -274,7 +274,8 @@ async def test_internal_start_isolates_context_without_changing_user_context(
     client_ref, lease = weakref.ref(client), client._lease
     del graph, client
     try:
-        assert observed[0] == ("handshake", False, False)
+        assert observed[0] == ("management:handshake", False, False)
+        assert ("handshake", False, False) in observed
         gc.collect()
         await until(lambda: client_ref() is None and lease.done.done() and transport._session is None)
         assert owner_server.closes == 1

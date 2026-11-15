@@ -139,13 +139,13 @@ await remote.files.download(file, "result.png")
 
 [复用例程](../examples/minimax_h3_reuse.py)一次准备稳定 refs，随后逐 seed 采样；默认最多一张正在计算、上一张正在 fetch/save，`--serial` 可关闭重叠。它保留原生模型管理和单 native worker，通过小窗口限制未物化结果的数量。改变 prompt、尺寸或模型时，应重新准备相应 refs，并显式释放不用的 refs。
 
-环境与模型由部署者准备，沿用[已有启动入口](design/development.md)。例如在具备依赖的远端解释器中：
+当前例程已迁入显式管理 API。下面入口用于已配置实例，完整环境/模型准备参数见[H3 主流程](design/development.md#h3-完整脚本)。历史测量使用各报告记录的旧脚本 hash，不因示例改写成为本轮管理架构的性能证据。例如：
 
 ```sh
-comani daemon --comfy-root /path/to/ComfyUI -- --reserve-vram 4
+comani daemon --comfy-root /path/to/ComfyUI --runtime-python /path/to/runtime/bin/python --no-start -- --reserve-vram 4
 ```
 
-客户端配置已有 daemon 的 `COMANI_URL`、`COMANI_TOKEN`，并准备[已校验的 H3 模型](../tests/fixtures/minimax_h3_models.json)和远端 model-verification 记录后，在项目目录运行：
+客户端配置 `COMANI_URL`、`COMANI_TOKEN`，在项目目录运行。脚本通过远端 models.resolve/download 校验并复用指定三模型，不再读取私有 model-verification 文件：
 
 ```sh
 python -B examples/minimax_h3_reuse.py \
@@ -154,7 +154,7 @@ python -B examples/minimax_h3_reuse.py \
   --serial --output artifacts/h3-serial --seeds 426390 426391 426392
 ```
 
-若验证记录位置不同，用 `--verification-path` 指定其**远端**路径。例程写出每张的 fetch/save/latency 和整个运行的吞吐；热运行不等于省略 setup 或 provenance 成本。实际 GPU 测量与未证稳定收益的结论见前面的最终远端章节。重叠是吞吐候选，不代表 GPU 节点并行或单张延迟必然降低。
+原 --verification-path 已移除；环境/源码事实来自 comfyui.info，模型校验来自 daemon 管理接口。--serial、原 seed 默认值和逐张精确 Tensor fetch/save 路径保留，新增 preparation_seconds 单列模型/环境检查成本。例程写出 fetch/save/latency 与整个运行吞吐；其本地依赖仍为 Torch/NumPy/Pillow。上述历史 GPU 结果没有自动覆盖这次改写，需以新代码重新验收。重叠是吞吐候选，不代表 GPU 节点并行或单张延迟必然降低。
 
 合理顺序是先复用、再测小窗口流水、再改善显式数据面。当前证据不要求新调度器、隐式 Python memoization 或替换原生显存管理；compiler/offload flags 应在可复现瓶颈上单独做 A/B。
 
@@ -200,4 +200,4 @@ binary fetch 直接返回原有 cloudpickle bytes，去掉 JSON/base64 包装；
 
 ## 尚未建立的保证
 
-没有最大吞吐/最低资源保证、真实 Windows/NTFS 认证、跨 host 单因素因果结论或所有网络上的压缩收益。H3 只测 batch 1；模型/节点/入口变化需各自验证。新的带外管理、Operation 与计算连接恢复仍是[待实施提案](design/remote-management-plan.md)，本轮 files 的断线失败清理、无 resume 语义没有改变。
+没有最大吞吐/最低资源保证、真实 Windows/NTFS 认证、跨 host 单因素因果结论或所有网络上的压缩收益。历史 H3 只测 batch 1，模型/节点/入口变化需各自验证。带外管理、Operation、同代计算恢复和 files 字节续传已实现，见[管理设计](design/remote-management-plan.md)与[文件 I/O](design/files.md)；本文历史测量仍绑定其原构建，不充当新架构的GPU/WAN验收。

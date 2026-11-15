@@ -27,8 +27,8 @@ from types import SimpleNamespace
 
 from aiohttp import ClientSession, web
 
-from comani._runtime import NativeRuntime
-from comani._runtime.http import create_app
+from comani.daemon import NativeRuntime
+from comani.daemon.http import create_app
 
 PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT / 'tests/stress'))

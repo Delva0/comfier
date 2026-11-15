@@ -4,7 +4,7 @@ import threading
 
 import pytest
 
-from comani._runtime import NativeRuntime
+from comani.daemon import NativeRuntime
 from comani.errors import Expired, RemoteError, SessionClosed, Skipped
 
 COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")

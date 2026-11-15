@@ -39,7 +39,7 @@ async def _binary_response(request, payload, content_type, *, headers=None):
 
 
 def create_app(runtime, *, token=None, close_runtime=True):
-    methods = {"handshake", "submit", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat", "file_roots", "file_stat", "file_remove"}
+    methods = {"handshake", "resume", "submission_window", "runtime_info", "file_invalidate", "submit", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat", "file_roots", "file_stat", "file_remove"}
 
     @web.middleware
     async def authenticate(request, handler):
@@ -62,6 +62,8 @@ def create_app(runtime, *, token=None, close_runtime=True):
                 return web.json_response({"error": {"code": "ForbiddenOrigin", "message": "Unauthenticated loopback requests require a local Host and same-origin browser access"}}, status=403)
         try:
             return await handler(request)
+        except web.HTTPException:
+            raise
         except Exception as error:
             return web.json_response({"error": {"code": getattr(error, "code", type(error).__name__), "message": str(error)}}, status=400)
 
@@ -92,6 +94,18 @@ def create_app(runtime, *, token=None, close_runtime=True):
                             headers={PICKLE_LENGTH_HEADER: str(len(payload))})
                 return await _binary_response(request, payload, PICKLE_CONTENT_TYPE)
             result = await getattr(runtime, method)(**params)
+            if (method in {"handshake", "resume"} and result.get("capabilities", {}).get("files") == 1
+                    and callable(getattr(runtime, "_file_store", None))):
+                # Advertising wire support must not initialize native paths.
+                # SDK-only/binary probes may expose the protocol before any
+                # FileStore exists; real stores use these same defaults.
+                store = getattr(runtime, "_files", None)
+                result["capabilities"]["files_resume"] = 1
+                result["file_transfer_epoch"] = app["file_transfers"].epoch
+                result.setdefault("file_limits", {}).update({
+                    "transfer_idle_timeout": getattr(store, "transfer_idle_timeout", 3600),
+                    "transfer_limit": getattr(store, "transfer_limit", 128),
+                    "transfer_owner_limit": getattr(store, "transfer_owner_limit", 8)})
         finally:
             if tracked:
                 requests = runtime.requests.get(session)

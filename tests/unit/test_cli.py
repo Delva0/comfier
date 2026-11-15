@@ -3,12 +3,12 @@ import os
 import pytest
 
 from comani import __main__ as cli
-from comani._runtime import __main__ as runtime
+from comani.cli import daemon as launcher
 
 
 def test_public_cli_dispatches_in_current_process(monkeypatch):
     captured = []
-    monkeypatch.setattr(runtime, "main", lambda argv: captured.append((os.getpid(), argv)))
+    monkeypatch.setattr(launcher, "main", lambda argv: captured.append((os.getpid(), argv)))
     arguments = ["--comfy-root", "/configured/ComfyUI", "--cpu", "--", "--reserve-vram", "4"]
     cli.main(["daemon", *arguments])
     assert captured == [(os.getpid(), arguments)]

@@ -64,12 +64,21 @@ class _GraphCall(Call):
         return self.refs[selector] if self.refs is not None else GraphRef(self.graph, self.node_id, selector)
 
     def __await__(self):
+        return self._ready().__await__()
+
+    async def _ready(self):
         if _receiver.get() is not self.graph:
             raise NotSubmitted("A captured call only unwraps inside its graph; use run[graph_ref] after submit")
+        # Declared layouts, including Python's single output, unwrap offline.
+        # An unknown native layout requires the actual runtime's schema.
+        if self.output_count is None and self.node_id is not None:
+            node_type = self.graph.nodes[self.node_id]["class_type"]
+            self.output_count, schema = await self.graph.client._node_layout(node_type)
+            if (schema.get("output_node", schema.get("is_output_node", False))
+                    and self.node_id not in self.graph._automatic_targets):
+                self.graph._automatic_targets.append(self.node_id)
         if self.output_count is None:
             raise UnknownOutputLayout("This node has no static output layout; use call.output(slot)")
-        if False:
-            yield
         return tuple(self.output(i) for i in range(self.output_count))
 
 

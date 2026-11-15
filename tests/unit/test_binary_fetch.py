@@ -13,8 +13,8 @@ from aiohttp import ClientPayloadError, ClientResponseError, ClientSession, web
 from aiohttp.test_utils import TestServer
 
 from comani import Client, Expired, HTTPTransport, InProcessTransport, RemoteError, SessionClosed
-from comani._runtime.http import create_app
-from comani._runtime.service import NativeRuntime
+from comani.daemon.http import create_app
+from comani.daemon.service import NativeRuntime
 from comani.protocol import BINARY_FETCH_VERSION, PICKLE_CONTENT_TYPE, pack_pickle, unpack_pickle
 
 
@@ -260,7 +260,7 @@ async def test_serialization_holds_source_locally_and_does_not_add_a_cache(monke
             return original(value)
 
         with monkeypatch.context() as patch:
-            patch.setattr("comani._runtime.service.cloudpickle.dumps", serialize)
+            patch.setattr("comani.daemon.service.cloudpickle.dumps", serialize)
             payload = await runtime.fetch_bytes(session, ref["id"], runtime.epoch)
         assert unpack_pickle(payload).value == "still alive while serializing"
         gc.collect()

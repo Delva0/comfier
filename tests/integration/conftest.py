@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from aiohttp import web
 
-from comani._runtime import NativeRuntime
-from comani._runtime.http import create_app
+from comani.daemon import NativeRuntime
+from comani.daemon.http import create_app
 
 PROJECT = Path(__file__).resolve().parents[2]
 COMFY_ROOT = Path(os.environ.get("COMANI_COMFY_ROOT", PROJECT.parent / "ComfyUI"))

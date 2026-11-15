@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from comani._runtime.python_node import Artifacts
+from comani.daemon.python_node import Artifacts
 from comani.errors import PackageConflict
 
 

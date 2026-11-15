@@ -1,8 +1,9 @@
 """Reuse H3 setup refs, with at most one generation and one fetch/save in flight.
 
-Set COMANI_URL and COMANI_TOKEN. The authenticated daemon must already have the
-verified model files used by minimax_h3_source_remote.py. Nothing is installed.
-Use --serial for the same eager calls without compute/fetch overlap.
+Uses the same explicit environment/model preparation arguments as
+minimax_h3_remote.py. Tensor fetch/save is intentional in this benchmark and
+requires local Torch/NumPy/Pillow. --serial keeps the original eager seed path
+without compute/fetch overlap. Historical measurements retain their old hashes.
 """
 
 import argparse
@@ -176,20 +177,10 @@ async def main(args):
               'width': h3.WIDTH, 'height': h3.HEIGHT, 'steps': h3.STEPS,
               'cfg': 1.0, 'sampler': 'euler', 'scheduler': 'simple', 'images': []}
     try:
-        async with Client(os.environ['COMANI_URL'], token=os.environ.get('COMANI_TOKEN')) as remote:
+        async with Client(args.url, token=os.environ.get('COMANI_TOKEN')) as remote:
             started = time.monotonic()
-            call = remote.python(source=OPS, entry='provenance',
-                                 inputs={'verification_path': args.verification_path})
-            provenance_ref = await call.output()
-            try:
-                record['remote'] = await provenance_ref.fetch()
-            finally:
-                provenance_ref.release()
-            record['provenance_seconds'] = time.monotonic() - started
-            models = record['remote']['model_verification']['models']
-            if not all(model['verified'] for model in models) or not any(
-                    model['sha256'] == h3.MODEL_SHA256 for model in models):
-                raise RuntimeError('The required H3 model verification did not pass')
+            record['remote'] = await h3.prepare(remote, args)
+            record['preparation_seconds'] = time.monotonic() - started
             started = time.monotonic()
             reused = await setup(remote)
             record['setup_seconds'] = time.monotonic() - started
@@ -219,11 +210,9 @@ async def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--output', required=True, type=Path)
+    h3.add_arguments(parser)
     parser.add_argument('--seeds', type=int, nargs='+', default=[426390, 426391, 426392])
     parser.add_argument('--serial', action='store_true', help='disable compute/fetch overlap')
-    parser.add_argument('--verification-path',
-                        default='/workspace/comani-acceptance/model-verification.json')
     args = parser.parse_args()
     if len(set(args.seeds)) != len(args.seeds) or any(not 0 <= seed < 2**64 for seed in args.seeds):
         parser.error('seeds must be distinct integers in [0, 2**64)')

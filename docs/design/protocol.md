@@ -1,6 +1,12 @@
 # RPC、值与事件协议
 
-实现：[protocol.py](../../src/comani/protocol.py)、[transport.py](../../src/comani/transport.py)、[HTTP app](../../src/comani/_runtime/http.py)、[errors.py](../../src/comani/errors.py)。当前协议版本常量为 `1`。
+实现：[protocol.py](../../src/comani/protocol.py)、[transport.py](../../src/comani/transport.py)、[管理 HTTP](../../src/comani/daemon/management_http.py)、[计算 HTTP](../../src/comani/daemon/http.py)、[errors.py](../../src/comani/errors.py)。基础协议版本常量为 `1`，新增能力以精确 capability 版本协商。
+
+## 管理与计算通道
+
+Client先用`POST /manage`管理握手，获得daemon epoch、管理身份、文件epoch与有效policy，不启动ComfyUI。`management_read`执行真实远端查询；`management_window/begin/status/result/logs/cancel`管理独立Operation。首个计算调用才通过公开`/rpc`惰性附着已经启动的runtime；计算session/runtime epoch与管理身份/daemon epoch分开。
+
+管理daemon将计算RPC、binary/LZ4、辅助HTTP和WS按有界原始字节流代理到loopback子进程，不解码Tensor。文件流由父进程自身处理；计算重启后Files继续使用management_handshake的file epoch，不误用新计算epoch。认证和公网绑定规则在所有入口保持一致。
 
 ## RPC
 
@@ -8,10 +14,11 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 
 | Method | 作用 |
 |---|---|
-| `handshake` | 服务器新签发 session ID、runtime epoch、Python/cloudpickle 版本、原始节点 metadata、session TTL 与 capabilities |
+| `handshake` | 计算服务器签发 session ID、runtime epoch、恢复授权、Python/cloudpickle/节点 metadata、宽限和 capabilities |
+| `resume` | 验证原 session、恢复授权及同 runtime epoch，恢复仍有效的原会话 |
 | `artifact_put` | 按 SHA256 上传代码 artifact |
-| `submit` | 登记 `session_id/call_id/spec` 与输入 reservations，返回接受状态 |
-| `wait_result` | 等整个 invocation；可指定 `node_id` 等 workflow 中一个 producer |
+| `submit` | 登记原 session/call ID、spec digest、签名窗口和输入 reservations，返回接受状态 |
+| `wait_result` | 等整个 invocation，并带必要 JSON metadata；可指定 `node_id` 等 workflow 中一个 producer |
 | `fetch` | 按 ref ID/epoch 取回显式请求的 Python 值 |
 | `file_roots` / `file_stat` / `file_remove` | 显式文件根、元数据和删除；不产生远端对象引用 |
 | `release` | 幂等释放 owned lease/view 记录 |
@@ -21,13 +28,13 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 
 当前 HTTP transport 使用三个有界连接池：控制请求 32、结果长轮询 100、artifact/fetch/file 数据传输 4。长轮询和大数据请求不占用提交、heartbeat、release、close 的连接额度。连接池界限是 transport 的资源边界，不代表 native worker 的并行计算数。
 
-这些是业务 RPC 的连接池。HTTP keeper 另外使用自己线程/event loop 中的一条专用连接，使业务 loop 暂停时仍能续约，见 [会话续约](ownership.md#会话续约与业务-loop-暂停)。暂态 HTTP 状态、连接错误或截断响应不等于 lease 已关闭，不会抢先拒绝真实业务 RPC；明确终态和完整协议错误仍拒绝复用，业务 RPC 自身的错误照常传播；`heartbeat` 只更新有效 session，不重新握手或重新提交任务来恢复已过期会话。
+这些是业务RPC连接池。HTTP keeper另用独立线程/event loop中的专用连接保活。支持恢复时暂态故障触发同session/epoch恢复；终态协议错误明确失败。heartbeat只更新有效session，不能恢复已过期会话。只有认证客户端接触更新seen，内部worker/排队或僵死TCP不续约。默认宽限3600秒，见[会话语义](ownership.md#会话续约与业务-loop-暂停)。
 
 ### 经过反向代理的等待
 
 服务器通过 `capabilities.bounded_wait=true` 声明有界长轮询。SDK 随后为 `wait_result` 发送 `wait_seconds=20`；在这段时间内尚未终态时，服务器返回 `{"pending": true}`，SDK 用相同 session/call/node ID 继续读取。超时只结束本次读取，不取消 producer，也不会重提计算。终态仍返回 outputs 或原有错误。服务器接受大于 0、不超过 60 的有限秒数；未指定时保留旧的无限等待语义。
 
-旧服务器没有声明能力时，SDK 不发送新参数，仍使用单次等待。这个兼容机制避免一般反代的单请求读取超时；连接中断、代理拒绝或其他传输错误仍会正常暴露，不能被当成 `pending` 无限重试。
+旧服务器没有声明能力时不发送新参数，仍使用单次等待。bounded-wait避免一般反代的单请求读取超时；真正断线由独立的恢复协议处理，不把任意错误当pending。恢复只重用原身份观察，不重提另一计算。
 
 临时 Cloudflare Quick Tunnel 另有 200 个并发在途请求限制。结果等待会占用其中的额度，即使每轮只有 20 秒；客户端连接池分离不能突破代理总限额。需要按实际部署控制并发等待量，或选用具备合适容量的入口；核心 RPC 不依赖某个代理产品。
 
@@ -49,7 +56,7 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 
 upload 为按顺序的 `metadata` JSON、`file` 二进制、`verified` JSON 三个 multipart part；尾部带实际 size/SHA256，单份元数据最多 64 KiB。download 返回 `application/vnd.comani.file-v1`：4 字节大端元数据长度、JSON 元数据、声明大小的文件 bytes、4 字节大端 footer 长度、含 size/SHA256 的 JSON footer。客户端拒绝 footer 后的额外数据，校验成功后才发布文件。
 
-流中断可能发生在发布前后，不会自动重试。文件根与路径、revision、原子发布及取消语义统一见 [文件 I/O](files.md)。
+以上multipart/framed为旧无resume能力的单次兼容路由，保持失败清理。声明整数files_resume=1时使用独立transfer registry：window/start/status/append/commit/data/verify/cancel，SDK自动维护原daemon epoch/稳定ID/签名窗口、确认offset、源revision、whole SHA和原子发布。已完成commit失去回复返回原receipt；未知/过期身份和daemon换代不重新创建。下载Range必须精确206/Content-Range；普通成功路径单遍读，恢复才可能重读prefix或全文件verify。资源、取消和持久性见[文件I/O](files.md#自动字节续传)。
 
 ## 调用与引用
 
@@ -77,7 +84,9 @@ Python args/kwargs 的容器结构保存在 layout 中，叶值提升为 `v0/v1/
 
 标准错误包括 `NotSubmitted`、`InvalidReference`、`Released`、`Expired`、`Skipped`、`SessionClosed`、`CodeCompatibilityError`、`PackageConflict`。其他远端错误映射为 `RemoteError`，原 code/message 留在 details 中。
 
-同 session 的 call ID 用于在仍保留记录时识别重复提交；本实现不提供持久化任务日志，也不承诺跨进程崩溃 exactly-once。丢失响应不能被解释为副作用未发生。
+每次计算提交在首次发送前固定call ID、规范化请求摘要和原签名窗口。同ID/同摘要回原调用，改参数冲突；forget后仍保留覆盖窗口的轻量墓碑，过期未知请求不执行。恢复原wait/fetch与离线release/forget，不重跑SaveImage/Python副作用。实际runtime重启使旧refs过期；borrowed仍依赖cache。
+
+管理Operation另有daemon epoch/key/digest/submission window，接纳前登记身份。默认300秒限制未知首次接纳，已知key在retained结果期仍附着原操作；receipt或结果过期明确失败。容量满拒绝新接纳，不逐出窗口内去重事实，见[管理Operation](remote-management-plan.md#operation-执行与观察)。两种机制都不是持久化数据库或跨进程崩溃exactly-once。
 
 ## 辅助 HTTP 与事件
 

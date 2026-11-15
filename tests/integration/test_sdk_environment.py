@@ -63,7 +63,7 @@ def test_built_wheel_import_and_daemon_entrypoint(tmp_path):
                  for path in package.rglob("*.py")}
     assert installed == expected, "Wheel test environment is stale; run scripts/refresh_wheel.py"
     help_result = subprocess.run(
-        [str(python), "-B", "-m", "comani._runtime", "--help"], cwd=tmp_path,
+        [str(python), "-B", "-m", "comani", "daemon", "--help"], cwd=tmp_path,
         env=env, text=True, capture_output=True, check=True,
     )
     assert "--comfy-root" in help_result.stdout

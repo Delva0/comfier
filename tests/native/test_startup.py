@@ -28,7 +28,7 @@ def test_native_cache_options_run_eager_and_borrowed_graph(arguments, kind, cach
     probe("""
 import asyncio, json, sys
 from comani import Client, InProcessTransport
-from comani._runtime import NativeRuntime
+from comani.daemon import NativeRuntime
 
 async def main():
     runtime = NativeRuntime(sys.argv[1], cpu=True, custom_nodes=False,
@@ -71,7 +71,7 @@ def test_native_paths_apply_before_registry_initialization(tmp_path):
     probe("""
 import json, sys
 from pathlib import Path
-from comani._runtime.adapter import NativeAdapter
+from comani.daemon.adapter import NativeAdapter
 root = Path(sys.argv[2])
 adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False,
                         comfy_args=['--disable-partner-nodes', *json.loads(sys.argv[3])])
@@ -93,7 +93,7 @@ def test_sequential_default_runtimes_do_not_treat_native_auto_detection_as_new_o
     probe("""
 import asyncio, sys
 from comani import Client, InProcessTransport
-from comani._runtime import NativeRuntime
+from comani.daemon import NativeRuntime
 
 async def main():
     for expected in (17, 23, 29):
@@ -132,7 +132,7 @@ class ObserveTorch(importlib.abc.MetaPathFinder):
             return spec
 sys.meta_path.insert(0, ObserveTorch())
 os.environ.pop('CUBLAS_WORKSPACE_CONFIG', None)
-from comani._runtime.adapter import NativeAdapter
+from comani.daemon.adapter import NativeAdapter
 adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False, comfy_args=[
     '--disable-partner-nodes', '--cuda-device', '3',
     '--oneapi-device-selector', 'level_zero:gpu', '--deterministic',
@@ -155,7 +155,7 @@ import socket, sys
 def denied(*args, **kwargs):
     raise AssertionError('Registry initialization attempted an outbound connection')
 socket.socket.connect = denied
-from comani._runtime.adapter import NativeAdapter
+from comani.daemon.adapter import NativeAdapter
 disabled = sys.argv[2] == 'True'
 adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False,
                         comfy_args=['--disable-partner-nodes'] if disabled else [])
@@ -175,7 +175,7 @@ finally:
 def test_unsupported_native_services_fail_before_torch_import(arguments):
     result = subprocess.run([sys.executable, "-B", "-c", """
 import sys
-from comani._runtime.adapter import NativeAdapter
+from comani.daemon.adapter import NativeAdapter
 try:
     NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False, comfy_args=sys.argv[2:]).boot()
 except SystemExit as error:

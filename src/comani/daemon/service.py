@@ -3,9 +3,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import copy
+import hashlib
+import heapq
+import hmac
 import io
 import json
 import math
+import secrets
 import sys
 import time
 import uuid
@@ -54,17 +58,48 @@ class CallState:
     captured: set[str] = field(default_factory=set)
     inflight: bool = False
     forgotten: bool = False
+    digest: str = ""
+
+
+@dataclass(frozen=True)
+class RecoveryPolicy:
+    """Deployment limits; the deadline advances only on authenticated traffic."""
+
+    offline_grace: float = 3600
+    max_sessions: int = 256
+    max_call_records: int = 1000000
+    max_objects: int = 100000
+    submission_seconds: float = 3600
+    expiry_running: str = "finish_and_discard"
+
+    def __post_init__(self):
+        if not math.isfinite(self.offline_grace) or self.offline_grace <= 0:
+            raise ValueError("offline_grace must be a positive finite duration")
+        if not math.isfinite(self.submission_seconds) or self.submission_seconds <= 0:
+            raise ValueError("submission_seconds must be positive and finite")
+        if any(type(value) is not int or value < 1 for value in (self.max_sessions, self.max_call_records, self.max_objects)):
+            raise ValueError("Recovery capacities must be positive")
+        if self.expiry_running != "finish_and_discard":
+            raise ValueError("Supported expiry_running policy: finish_and_discard")
+
+
+class RecoveryError(ValueError):
+    def __init__(self, code, message):
+        self.code = code
+        super().__init__(message)
 
 
 class NativeRuntime:
-    def __init__(self, comfy_root, *, cpu=False, custom_nodes=True, session_ttl=120, comfy_args=(),
-                 max_file_bytes=None):
+    def __init__(self, comfy_root, *, cpu=False, custom_nodes=True, session_ttl=None, comfy_args=(),
+                 max_file_bytes=None, recovery_policy=None):
         if max_file_bytes is not None and (type(max_file_bytes) is not int or max_file_bytes < 0):
             raise ValueError("max_file_bytes must be None or a nonnegative integer")
         self.max_file_bytes = max_file_bytes
+        self.recovery_policy = recovery_policy or RecoveryPolicy(
+            offline_grace=3600 if session_ttl is None else session_ttl)
         self._files = None
         self.epoch = uuid.uuid4().hex
-        self.store = ObjectStore(self.epoch)
+        self.store = ObjectStore(self.epoch, max_entries=self.recovery_policy.max_objects)
         self.calls: dict[tuple[str, str], CallState] = {}
         # Recent diagnostic history only. Authorization never relies on retained
         # tombstones: only server-issued sessions in session_seen are active.
@@ -78,7 +113,13 @@ class NativeRuntime:
         self.worker = None
         self.active: CallState | None = None
         self.closing = False
-        self.session_ttl = session_ttl
+        self.session_ttl = self.recovery_policy.offline_grace
+        self.session_tokens: dict[str, str] = {}
+        # Retain hashes independently of CallState: forget must not make a
+        # possibly accepted side effect eligible for a second execution.
+        self.submissions: dict[tuple[str, str], tuple[str, float | None]] = {}
+        self._submission_secret = secrets.token_bytes(32)
+        self._submission_deadlines = []
         self.session_seen: dict[str, float] = {}
         self.requests: dict[str, set] = {}
         self.sweeper = None
@@ -101,13 +142,88 @@ class NativeRuntime:
         await self.start()
         if self.closing:
             raise SessionClosed("This runtime is closing")
+        if len(self.session_seen) >= self.recovery_policy.max_sessions:
+            raise RecoveryError("RecoveryCapacity", "The runtime session capacity is full")
         session = uuid.uuid4().hex
         self.session_seen[session] = time.monotonic()
+        self.session_tokens[session] = secrets.token_urlsafe(32)
+        return self._handshake(session)
+
+    def _handshake(self, session):
         capabilities = {"bounded_wait": True, "binary_fetch": BINARY_FETCH_VERSION,
-                        "files": FILE_VERSION}
+                        "files": FILE_VERSION, "session_resume": 1}
         if has_lz4():
             capabilities["binary_fetch_lz4"] = BINARY_FETCH_LZ4_VERSION
-        return {"session_id": session, "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}
+        return {"session_id": session, "resume_token": self.session_tokens.get(session), "submission_window": self._submission_window(session), "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "recovery_limits": {"max_sessions": self.recovery_policy.max_sessions, "max_objects": self.recovery_policy.max_objects, "max_call_records": self.recovery_policy.max_call_records, "submission_seconds": self.recovery_policy.submission_seconds, "expiry_running": self.recovery_policy.expiry_running}, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}
+
+    async def resume(self, session_id, resume_token, epoch, **_):
+        if epoch != self.epoch:
+            raise RefExpired("The runtime restarted; this session has expired")
+        expected = self.session_tokens.get(session_id)
+        if (not isinstance(resume_token, str) or expected is None
+                or not hmac.compare_digest(expected, resume_token)):
+            raise SessionClosed("Invalid or expired session recovery identity")
+        self._session(session_id)
+        return self._handshake(session_id)
+
+    def _submission_window(self, session):
+        expires_at = time.time() + self.recovery_policy.submission_seconds
+        deadline = str(expires_at)
+        signature = hmac.new(self._submission_secret, f"{session}:{deadline}".encode(), hashlib.sha256).hexdigest()
+        return {"token": deadline + "." + signature, "expires_at": expires_at}
+
+    async def submission_window(self, session_id, epoch, **_):
+        if epoch != self.epoch:
+            raise RefExpired("The runtime restarted; this submission window expired")
+        self._session(session_id)
+        return self._submission_window(session_id)
+
+    def _validate_window(self, session, window):
+        # Legacy in-process/direct clients have no signed window. Their hashes
+        # remain until explicit session close, subject to the same hard quota.
+        if window is None:
+            return None
+        try:
+            deadline, signature = window["token"].rsplit(".", 1)
+            expires_at = float(deadline)
+            expected = hmac.new(self._submission_secret, f"{session}:{deadline}".encode(), hashlib.sha256).hexdigest()
+            if not math.isfinite(expires_at) or not hmac.compare_digest(signature, expected):
+                raise ValueError
+        except (TypeError, ValueError, KeyError, AttributeError):
+            raise RecoveryError("CallExpired", "Invalid submission window") from None
+        return expires_at
+
+    def _prune_submissions(self):
+        now = time.time()
+        while self._submission_deadlines and self._submission_deadlines[0][0] <= now:
+            deadline, key = heapq.heappop(self._submission_deadlines)
+            current = self.submissions.get(key)
+            if current is not None and current[1] == deadline:
+                self.submissions.pop(key, None)
+
+    async def runtime_info(self, **_):
+        await self.start()
+        import folder_paths
+
+        directories = {name: getattr(folder_paths, f"get_{name}_directory")()
+                       for name in ("input", "output", "temp")}
+        categories = {name: list(folder_paths.get_folder_paths(name))
+                      for name in folder_paths.folder_names_and_paths
+                      if name not in {"custom_nodes", "datasets"}}
+        return {"epoch": self.epoch, "active": self.active is not None,
+                "pending": sum(state.status in {"accepted", "queued", "running"}
+                               for state in self.calls.values()),
+                "sessions": len(self.session_seen),
+                "roots": {"directories": directories, "categories": categories,
+                          "custom_nodes": list(folder_paths.get_folder_paths("custom_nodes")),
+                          "aliases": {name: folder_paths.map_legacy(name) for name in ("clip", "unet")}}}
+
+    async def file_invalidate(self, category=None, **_):
+        import folder_paths
+
+        if category is not None:
+            folder_paths.filename_list_cache.pop(category, None)
+        return {"invalidated": True}
 
     def _file_store(self):
         if self._files is None:
@@ -130,10 +246,14 @@ class NativeRuntime:
         self._session(session_id)
         return self.adapter.artifacts.put(artifact_id, data, kind)
 
-    def _session(self, session):
+    def _session(self, session, *, touch=True):
         if self.closing or session not in self.session_seen:
             raise SessionClosed("This runtime session is unknown or closed; open a new client session")
-        self.session_seen[session] = time.monotonic()
+        if session != "raw" and time.monotonic() - self.session_seen[session] >= self.session_ttl:
+            asyncio.create_task(self.close_session(session))
+            raise SessionClosed("The disconnected session recovery grace has expired")
+        if touch:
+            self.session_seen[session] = time.monotonic()
 
     def _open_raw_session(self):
         # The native /prompt endpoint owns one fixed history channel. It never
@@ -149,14 +269,12 @@ class NativeRuntime:
     async def _expire_sessions(self):
         while True:
             await asyncio.sleep(min(10, max(0.02, self.session_ttl / 3)))
+            self._prune_submissions()
             now = time.monotonic()
             for session, seen in list(self.session_seen.items()):
                 if session == "raw" or now - seen < self.session_ttl:
                     continue
-                if any(not transport.is_closing() for transport in self.requests.get(session, ())):
-                    self.session_seen[session] = now
-                else:
-                    await self.close_session(session)
+                await self.close_session(session)
 
     @staticmethod
     def _result(result):
@@ -248,6 +366,8 @@ class NativeRuntime:
         self.calls.pop((state.session, state.call_id), None)
 
     async def forget_calls(self, session_id, call_ids, epoch, **_):
+        if session_id in self.session_seen:
+            self._session(session_id)
         if epoch == self.epoch:
             for call_id in call_ids:
                 state = self.calls.get((session_id, call_id))
@@ -256,15 +376,34 @@ class NativeRuntime:
                     self._collect_call(state)
         return {"forgotten": True}
 
-    async def submit(self, session_id, call_id, spec, **_):
+    async def submit(self, session_id, call_id, spec, submission_window=None, **_):
         await self.start()
         self._session(session_id)
+        if not isinstance(call_id, str) or not call_id:
+            raise ValueError("call_id must be a nonempty string")
         key = (session_id, call_id)
+        digest = hashlib.sha256(json.dumps(spec, sort_keys=True, separators=(",", ":"),
+                                           allow_nan=False).encode()).hexdigest()
+        deadline = self._validate_window(session_id, submission_window)
+        self._prune_submissions()
         if key in self.calls:
+            if not hmac.compare_digest(self.calls[key].digest, digest):
+                raise RecoveryError("SubmissionKeyConflict", "call_id was already used for another request")
             return {"call_id": call_id, "status": self.calls[key].status}
+        if key in self.submissions:
+            if not hmac.compare_digest(self.submissions[key][0], digest):
+                raise RecoveryError("SubmissionKeyConflict", "call_id was already used for another request")
+            raise RecoveryError("CallExpired", "The call was forgotten; it cannot be executed again")
+        if deadline is not None and deadline <= time.time():
+            raise RecoveryError("CallExpired", "The original submission window expired; execution is unknown")
+        if max(len(self.submissions), len(self.calls)) >= self.recovery_policy.max_call_records:
+            raise RecoveryError("RecoveryCapacity", "The call recovery capacity is full; close unused sessions")
+        self.submissions[key] = (digest, deadline)
+        if deadline is not None:
+            heapq.heappush(self._submission_deadlines, (deadline, key))
         spec = copy.deepcopy(spec)
         done = self.loop.create_future()
-        state = CallState(session_id, call_id, spec, done)
+        state = CallState(session_id, call_id, spec, done, digest=digest)
         if spec.get("kind") == "workflow":
             state.nodes = {name: self.loop.create_future() for name in spec["graph"]["nodes"]}
         else:
@@ -285,6 +424,7 @@ class NativeRuntime:
         except BaseException:
             self._release_dependencies(state)
             self.calls.pop(key)
+            self.submissions.pop(key, None)
             raise
         self._emit("accepted", state)
         return {"call_id": call_id, "status": "accepted"}
@@ -303,7 +443,7 @@ class NativeRuntime:
                 key = json.dumps(locator, sort_keys=True)
                 if key not in resolved:
                     resolved[key] = await self._locator_data(state, locator)
-            self._session(state.session)
+            self._session(state.session, touch=False)
             state.status = "queued"
             await self.queue.put((state, resolved))
             self._emit("queued", state)
@@ -324,6 +464,7 @@ class NativeRuntime:
         node_type = state.spec.get("node_type") if state.spec.get("kind") != "workflow" else state.spec["graph"]["nodes"][node_id]["class_type"]
         definition = self.adapter.nodes.NODE_CLASS_MAPPINGS[node_type]
         list_flags = getattr(definition, "OUTPUT_IS_LIST", ())
+        self.store._capacity(len(entry.outputs))
         outputs = []
         for slot, data in enumerate(entry.outputs):
             is_list = slot < len(list_flags) and list_flags[slot]
@@ -424,7 +565,7 @@ class NativeRuntime:
             graph = {}
             state.inflight = True
             try:
-                self._session(state.session)
+                self._session(state.session, touch=False)
                 graph, targets, bindings = self._graph(state, resolved)
                 state.status = "running"
                 self.active = state
@@ -460,6 +601,51 @@ class NativeRuntime:
         else:
             state.spec = {"kind": "node", "node_type": state.spec.get("node_type")}
 
+    @staticmethod
+    def _metadata(native_result):
+        omitted = object()
+        ancestors = set()
+        remaining = 100000
+
+        def project(value, depth=0):
+            nonlocal remaining
+            remaining -= 1
+            if remaining < 0 or depth > 64:
+                return omitted
+            if value is None or type(value) in (str, bool, int):
+                return value
+            if type(value) is float:
+                return value if math.isfinite(value) else omitted
+            if type(value) not in (dict, list) or id(value) in ancestors:
+                return omitted
+            ancestors.add(id(value))
+            try:
+                if type(value) is list:
+                    result = []
+                    for child in value:
+                        if remaining <= 0:
+                            break
+                        if (item := project(child, depth + 1)) is not omitted:
+                            result.append(item)
+                    return result
+                result = {}
+                for key, child in value.items():
+                    if remaining <= 0:
+                        break
+                    if type(key) is str and (item := project(child, depth + 1)) is not omitted:
+                        result[key] = item
+                return result
+            finally:
+                ancestors.remove(id(value))
+
+        outputs = native_result.get("history", {}).get("outputs", {})
+        prompt = project(native_result.get("prompt_id"))
+        executed = project(native_result.get("executed", []))
+        ui = project(outputs) if type(outputs) is dict else {}
+        return {"prompt_id": prompt if type(prompt) is str else None,
+                "executed": executed if type(executed) is list else [],
+                "ui": ui if type(ui) is dict else {}}
+
     def _finish(self, state, native_result):
         for name, future in state.nodes.items():
             if not future.done():
@@ -473,9 +659,13 @@ class NativeRuntime:
                 result = self._result(state.nodes[node_id].result())
                 names[item["name"]] = len(outputs)
                 outputs.append(result["outputs"][slot])
-            final = {"outputs": outputs, "names": names, "native": native_result}
+            metadata = self._metadata(native_result)
+            native = {"prompt_id": metadata["prompt_id"], "executed": metadata["executed"],
+                      "history": {"outputs": metadata["ui"]}}
+            final = {"outputs": outputs, "names": names, "native": native}
         else:
-            final = self._result(state.nodes["result"].result())
+            final = dict(self._result(state.nodes["result"].result()))
+        final["metadata"] = self._metadata(native_result)
         if not state.done.done():
             state.done.set_result(final)
         state.status = "succeeded"
@@ -534,6 +724,8 @@ class NativeRuntime:
         return cloudpickle.dumps(value)
 
     async def release(self, session_id, refs, epoch=None, **_):
+        if session_id in self.session_seen:
+            self._session(session_id)
         if epoch is None or epoch == self.epoch:
             self.store.release(session_id, refs)
         return {"released": True}
@@ -541,6 +733,15 @@ class NativeRuntime:
     async def close_session(self, session_id, **_):
         if self.session_seen.pop(session_id, None) is not None:
             self.closed_sessions.append(session_id)
+        self.session_tokens.pop(session_id, None)
+        for key in [key for key in self.submissions if key[0] == session_id]:
+            self.submissions.pop(key, None)
+        # Bound stale heap entries when short-lived sessions close well before
+        # their signed windows expire; this also keeps churn independent of TTL.
+        if len(self._submission_deadlines) > max(256, 2 * len(self.submissions)):
+            self._submission_deadlines = [(deadline, key) for key, (_, deadline) in self.submissions.items()
+                                          if deadline is not None]
+            heapq.heapify(self._submission_deadlines)
         for (session, _), state in list(self.calls.items()):
             if session == session_id:
                 state.forgotten = True
@@ -561,6 +762,9 @@ class NativeRuntime:
         for session in set(self.session_seen) | {session for session, _ in self.calls}:
             await self.close_session(session)
         self.closing = True
+        self.submissions.clear()
+        self._submission_deadlines.clear()
+        self.session_tokens.clear()
         if self.sweeper:
             self.sweeper.cancel()
             await asyncio.gather(self.sweeper, return_exceptions=True)

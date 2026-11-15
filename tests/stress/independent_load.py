@@ -26,9 +26,9 @@ import aiohttp
 from aiohttp import web
 
 from comani import Client, Expired, InvalidReference, PackageConflict, RemoteError, Skipped
-from comani._runtime import NativeRuntime
-from comani._runtime.http import create_app
 from comani.code import prepare_code
+from comani.daemon import NativeRuntime
+from comani.daemon.http import create_app
 from comani.transport import HTTPTransport
 
 
@@ -457,7 +457,7 @@ async def raw_ws_ttl_phase(url, runtime, meter):
         request.cancel()
         await asyncio.gather(request, return_exceptions=True)
         await abandoned.close()
-        deadline = time.monotonic() + runtime.session_ttl + 3
+        deadline = time.monotonic() + runtime.session_ttl + min(10, max(.02, runtime.session_ttl / 3)) + 3
         while transient not in runtime.closed_sessions and time.monotonic() < deadline:
             await asyncio.sleep(.05)
         assert transient in runtime.closed_sessions
@@ -583,7 +583,7 @@ async def main(args):
     with socket.socket() as probe:
         assert probe.connect_ex(("127.0.0.1", args.port)), "port already occupied; no service touched"
     url = f"http://127.0.0.1:{args.port}"
-    runtime = NativeRuntime(args.comfy_root, cpu=True, custom_nodes=False, session_ttl=1.5)
+    runtime = NativeRuntime(args.comfy_root, cpu=True, custom_nodes=False, session_ttl=args.session_ttl)
     await runtime.start()
     runtime.adapter.nodes.NODE_CLASS_MAPPINGS.update({"Independent" + cls.__name__: cls for cls in (Echo, Add, Slow, Fail, Lazy, Expand, Output, Pair)})
     meter = Meter(runtime)
@@ -596,6 +596,7 @@ async def main(args):
               "url": url, "python": sys.version, "comfy_commit": subprocess.check_output(["git", "-C", args.comfy_root, "rev-parse", "HEAD"], text=True).strip(),
               "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               "mode": "CPU; real native ComfyUI single worker; SDK requests over loopback HTTP",
+              "session_ttl": runtime.session_ttl,
               "phases": [], "initial": meter.snapshot()}
     print(json.dumps({"live": {"pid": os.getpid(), "url": url, "report": str(args.output)}}), flush=True)
     try:
@@ -659,6 +660,7 @@ if __name__ == "__main__":
     parser.add_argument("--comfy-root", default="/home/delva/projects/ComfyUI")
     parser.add_argument("--port", type=int, default=8190)
     parser.add_argument("--sessions", type=int, nargs="+", default=[1, 8, 32])
+    parser.add_argument("--session-ttl", type=float, default=1.5)
     parser.add_argument("--rounds", type=int, default=32)
     parser.add_argument("--output", type=Path, default=Path("tests/stress/independent_load_results.json"))
     sys.exit(asyncio.run(main(parser.parse_args())))

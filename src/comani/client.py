@@ -6,19 +6,23 @@ import asyncio
 import base64
 import contextvars
 import json
+import time
 import uuid
 import weakref
 from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import partial
 
+import aiohttp
+
 from .code import prepare_code
 from .errors import InvalidReference, NotSubmitted, RemoteError, SessionClosed
 from .files import Files
 from .graph import Graph, GraphInput, GraphRef, _receiver
+from .management import Bash, ComfyUI, Models, Operations, Plugins
 from .protocol import PYTHON_NODE, encode_tree, lift_arguments, unpack_pickle
 from .refs import Call, OutputFuture, RemoteRef, _CallState
-from .transport import HTTPTransport
+from .transport import HTTPTransport, retryable_transport_error
 
 _NODE_INPUTS = object()
 _FETCH_COMPRESSION = object()
@@ -37,6 +41,7 @@ class _ClientCleanup:
         self.transport = transport
         self.loop = self.session_id = self.lease = None
         self.tasks = set()
+        self.session_close_confirmed = True
 
     def abandon(self):
         if self.lease is not None:
@@ -62,8 +67,10 @@ class _ClientCleanup:
             if self.lease is not None:
                 await self.lease.close()
             if self.session_id is not None:
+                self.session_close_confirmed = False
                 async with asyncio.timeout(2):
                     await self.transport.request("close_session", session_id=self.session_id)
+                self.session_close_confirmed = True
         except Exception:
             pass  # A disconnected server still expires the existing lease.
         finally:
@@ -79,6 +86,9 @@ def _heartbeat_notice(client_ref, error=None, terminal=False):
         error = type(error)(str(error), details=error.details)
     client._heartbeat_error = error
     if terminal and not client._closing:
+        if client._managed:
+            client._expire_compute(error)
+            return
         task = client._loop.create_task(client._abort_start(error), context=contextvars.Context())
         client._abort_task = task
         task.add_done_callback(lambda result: None if result.cancelled() else result.exception(),
@@ -98,6 +108,51 @@ class _Submission:
     artifacts: tuple
 
 
+class _ConnectionRecovery:
+    """Same-session recovery state, deliberately without a Client back-reference."""
+
+    def __init__(self, transport, handshake, session_id):
+        self.transport, self.session_id = transport, session_id
+        self.epoch = handshake.get("epoch")
+        self.token = handshake.get("resume_token")
+        self.enabled = handshake.get("capabilities", {}).get("session_resume") == 1 and bool(self.token)
+        self.lock = asyncio.Lock()
+        self.generation = 0
+        self.submission_window = handshake.get("submission_window")
+        self.reconnecting = False
+
+    async def request(self, method, **params):
+        delay = 0.05
+        while True:
+            generation = self.generation
+            try:
+                result = await self.transport.request(method, **params)
+                self.reconnecting = False
+                return result
+            except Exception as error:
+                if not self.enabled or not retryable_transport_error(error):
+                    raise
+                self.reconnecting = True
+            async with self.lock:
+                if generation != self.generation:
+                    continue
+                while True:
+                    try:
+                        handshake = await self.transport.request("resume", session_id=self.session_id,
+                            resume_token=self.token, epoch=self.epoch)
+                        if handshake.get("epoch") != self.epoch:
+                            from .errors import Expired
+                            raise Expired("The runtime restarted; old computation references expired")
+                        self.generation += 1
+                        self.reconnecting = False
+                        break
+                    except Exception as error:
+                        if not retryable_transport_error(error):
+                            raise
+                        await asyncio.sleep(delay)
+                        delay = min(2.0, delay * 2)
+
+
 class Client:
     def __init__(self, url=None, *, transport=None, token=None,
                  fetch_compression=_FETCH_COMPRESSION):
@@ -113,6 +168,10 @@ class Client:
         self.session_id = uuid.uuid4().hex
         self.epoch = ""
         self.handshake = {}
+        self.management_handshake = {}
+        self._managed = False
+        self._compute_opening = None
+        self._recovery = None
         self._nodes = {PYTHON_NODE: {"outputs": ["*"]}}
         self._states = weakref.WeakValueDictionary()
         self._queue = asyncio.Queue()
@@ -142,8 +201,33 @@ class Client:
         return self._closed
 
     @property
+    def close_confirmed(self):
+        """False after an offline close whose remote revocation was unconfirmed."""
+        return self._cleanup.session_close_confirmed
+
+    @property
     def files(self) -> Files:
         return Files(self)
+
+    @property
+    def bash(self) -> Bash:
+        return Bash(self)
+
+    @property
+    def comfyui(self) -> ComfyUI:
+        return ComfyUI(self)
+
+    @property
+    def plugins(self) -> Plugins:
+        return Plugins(self)
+
+    @property
+    def models(self) -> Models:
+        return Models(self)
+
+    @property
+    def operations(self) -> Operations:
+        return Operations(self)
 
     async def __aenter__(self):
         await self.start()
@@ -157,7 +241,8 @@ class Client:
             if isinstance(self._heartbeat_error, SessionClosed):
                 raise SessionClosed(str(self._heartbeat_error), details=self._heartbeat_error.details)
             raise SessionClosed("The client session is closed")
-        self._check_heartbeat()
+        if not self._managed:
+            self._check_heartbeat()
         loop = asyncio.get_running_loop()
         if self._loop is not None and self._loop is not loop:
             raise RuntimeError("Use a client within one event loop")
@@ -187,6 +272,68 @@ class Client:
     async def _open(self):
         try:
             await self.transport.open()
+            if isinstance(self.transport, HTTPTransport) or getattr(self.transport, "supports_management", False):
+                try:
+                    self.management_handshake = await self.transport.management_request("handshake")
+                except aiohttp.ClientResponseError as error:
+                    if error.status != 404:
+                        raise
+                else:
+                    self._managed = True
+                    self.handshake = self.management_handshake
+                    self.session_id = self.handshake.get("session_id", self.session_id)
+                    return
+            await self._open_compute()
+        except BaseException as error:
+            await self._abort_start(error)
+            raise
+
+    async def _attach(self):
+        await asyncio.shield(self._opening)
+        if self._managed:
+            opening = self._compute_opening
+            # A failed attachment accepted no computation. A later call may
+            # retry against a runtime explicitly started by another client.
+            if opening is None or (opening.done() and
+                    (opening.cancelled() or opening.exception() is not None)):
+                self._compute_opening = self._task(self._open_compute())
+                self._compute_opening.add_done_callback(
+                    lambda task: None if task.cancelled() else task.exception(),
+                    context=contextvars.Context())
+            await asyncio.shield(self._compute_opening)
+
+    def _expire_compute(self, error):
+        for state in list(self._states.values()):
+            state.invalidated = error
+            state.fail(error)
+
+    async def _reset_compute(self):
+        """An explicit lifecycle change permits a fresh compute epoch on next use."""
+        from .errors import Expired
+        if self._cleanup.session_id is not None:
+            self._expire_compute(Expired("The runtime lifecycle changed; old references expired"))
+        if self._lease is not None:
+            await self._lease.close()
+        if self._heartbeat_task is not None:
+            self._heartbeat_task.cancel()
+            await asyncio.gather(self._heartbeat_task, return_exceptions=True)
+        self._lease = self._cleanup.lease = None
+        self._heartbeat_task = None
+        self._heartbeat_error = None
+        self._compute_opening = None
+        self._recovery = None
+        self._uploaded.clear()
+        self._nodes = {PYTHON_NODE: {"outputs": ["*"]}}
+        self.session_id = self.management_handshake.get("session_id", self.session_id)
+        self.handshake = self.management_handshake
+        self.epoch = ""
+        self._cleanup.session_id = None
+        self._cleanup.session_close_confirmed = True
+        if isinstance(self.transport, HTTPTransport):
+            self.transport._reset_runtime_capabilities()
+
+    async def _open_compute(self):
+        try:
             self.handshake = await self.transport.request("handshake", session_id=self.session_id)
             if isinstance(self.transport, HTTPTransport) and not (
                     isinstance(self.handshake.get("session_id"), str) and self.handshake["session_id"]):
@@ -194,6 +341,7 @@ class Client:
             self.session_id = self.handshake.get("session_id", self.session_id)
             self._cleanup.session_id = self.session_id
             self.epoch = self.handshake["epoch"]
+            self._recovery = _ConnectionRecovery(self.transport, self.handshake, self.session_id)
             self._nodes.update(self.handshake.get("nodes", {}))
             interval = min(20.0, max(0.01, self.handshake.get("session_ttl", 120) / 3))
             if isinstance(self.transport, HTTPTransport) and self.handshake.get("session_id"):
@@ -205,7 +353,8 @@ class Client:
                 self._heartbeat_task = self._task(self._heartbeat(
                     weakref.ref(self), self.transport, self.session_id, interval))
         except BaseException as error:
-            await self._abort_start(error)
+            if not self._managed:
+                await self._abort_start(error)
             raise
 
     async def _abort_start(self, error):
@@ -237,8 +386,14 @@ class Client:
         try:
             while True:
                 await asyncio.sleep(interval)
-                await transport.request("heartbeat", session_id=session_id)
-                _heartbeat_notice(client_ref)
+                try:
+                    await transport.request("heartbeat", session_id=session_id)
+                except Exception as error:
+                    if not retryable_transport_error(error):
+                        raise
+                    _heartbeat_notice(client_ref, RemoteError(f"Session heartbeat unavailable: {error}"))
+                else:
+                    _heartbeat_notice(client_ref)
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -257,6 +412,13 @@ class Client:
         schema = self._nodes.get(node_type, {})
         outputs = schema.get("outputs", schema.get("output"))
         return len(outputs) if isinstance(outputs, (list, tuple)) else schema.get("output_count")
+
+    async def _node_layout(self, node_type):
+        """Read one node's layout from the attached runtime, without submitting it."""
+        self._activate()
+        await self._attach()
+        self._check_heartbeat()
+        return self._output_count(node_type), self._nodes.get(node_type, {})
 
     def _capture(self):
         graph = _receiver.get()
@@ -391,7 +553,9 @@ class Client:
                 if client is None:
                     return
                 client._check_heartbeat()
-                transport, handshake, uploaded = client.transport, client.handshake, client._uploaded
+                await client._attach()
+                handshake, uploaded = client.handshake, client._uploaded
+                recovery = client._recovery
                 session_id = client.session_id
                 if item.kind == "node":
                     spec = {"kind": "node", "node_type": item.payload["node_type"],
@@ -402,11 +566,21 @@ class Client:
                             "bindings": {k: encode_tree(v, client._encode_special)
                                          for k, v in item.payload["bindings"].items()}}
                 del client
-                await Client._upload(transport, handshake, uploaded, session_id, item.artifacts)
+                await Client._upload(recovery, handshake, uploaded, session_id, item.artifacts)
                 if item.payload.get("extra_data") is not None:
                     spec["extra_data"] = item.payload["extra_data"]
                 item.state.status = "submitting"
-                await transport.request("submit", session_id=session_id, call_id=item.state.call_id, spec=spec)
+                item.state.epoch = recovery.epoch
+                submission = {"session_id": session_id, "call_id": item.state.call_id, "spec": spec}
+                if recovery.submission_window is not None:
+                    window = recovery.submission_window
+                    if window.get("expires_at", 0) <= time.time() + 5:
+                        value = await recovery.request("submission_window", session_id=session_id,
+                                                       epoch=recovery.epoch)
+                        window = value.get("submission_window", value.get("window", value))
+                        recovery.submission_window = window
+                    submission["submission_window"] = dict(window)
+                await recovery.request("submit", **submission)
                 item.state.status = "accepted"
                 if not item.state.accepted.done():
                     item.state.accepted.set_result(None)
@@ -429,16 +603,20 @@ class Client:
                 del item  # transfer input ownership at ACK; do not retain the last request
 
     def _watch(self, state):
-        capabilities = self.handshake.get("capabilities", {})
-        bounded = isinstance(capabilities, dict) and capabilities.get("bounded_wait") is True
-        task = self._task(self._wait_result(state, self.transport, self.session_id, bounded))
+        task = self._task(self._wait_result(state))
         self._watchers.add(task)
         task.add_done_callback(self._watchers.discard, context=contextvars.Context())
 
     @staticmethod
-    async def _wait_result(state, transport, session_id, bounded):
+    async def _wait_result(state):
         try:
             await asyncio.shield(state.accepted)
+            client = state.client()
+            transport, session_id = client._recovery, client.session_id
+            capabilities = client.handshake.get("capabilities", {})
+            bounded = isinstance(capabilities, dict) and capabilities.get("bounded_wait") is True
+            state.epoch = client.epoch
+            del client
             params = {"session_id": session_id, "call_id": state.call_id, "node_id": state.node_id}
             if bounded:
                 params["wait_seconds"] = 20.0
@@ -479,7 +657,7 @@ class Client:
         if self.closed:
             raise SessionClosed("The client session is closed")
         self._check_heartbeat()
-        payload = await self.transport.request("fetch", session_id=self.session_id,
+        payload = await self._recovery.request("fetch", session_id=self.session_id,
                                              ref_id=info["id"], epoch=info.get("epoch", self.epoch))
         return unpack_pickle(payload)
 
@@ -502,7 +680,7 @@ class Client:
         try:
             while client is not None and client._pending_releases:
                 items, client._pending_releases = client._pending_releases, []
-                transport, session_id, current_epoch = client.transport, client.session_id, client.epoch
+                transport, session_id, current_epoch = client._recovery, client.session_id, client.epoch
                 del client
                 epochs = {i.get("epoch", current_epoch) for i in items}
                 for epoch in epochs:
@@ -537,7 +715,7 @@ class Client:
         try:
             while client is not None and client._pending_forgets:
                 call_ids, client._pending_forgets = client._pending_forgets, set()
-                transport, session_id, epoch = client.transport, client.session_id, client.epoch
+                transport, session_id, epoch = client._recovery, client.session_id, client.epoch
                 del client
                 await transport.request("forget_calls", session_id=session_id,
                                         call_ids=sorted(call_ids), epoch=epoch)
@@ -569,6 +747,8 @@ class Client:
 
     async def _close(self, *, wait):
         self._closing = True
+        if self._recovery is not None and self._recovery.reconnecting:
+            wait = False
         try:
             if self._opening is not None:
                 if wait:

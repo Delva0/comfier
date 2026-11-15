@@ -10,8 +10,8 @@ from aiohttp import web
 from independent_load import Echo, rss_mib
 
 from comani import Client
-from comani._runtime import NativeRuntime
-from comani._runtime.http import create_app
+from comani.daemon import NativeRuntime
+from comani.daemon.http import create_app
 
 
 async def main(args):

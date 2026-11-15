@@ -1,16 +1,22 @@
 # Comani 文档
 
-当前项目入口是 [README](../README.md)，设计文档和环境记录均位于本项目内。
+使用入口见 [README](../README.md)，组件实现以 [设计索引](design/README.md) 为准。
 
-- [组件设计索引](design/README.md)：SDK、native driver、对象生命周期、协议、Python artifacts 与[文件 I/O](design/files.md)。
-- [性能与持续生成](performance.md)：H3 冷热/缓存测量、显式 refs 复用、二进制与可选 LZ4 fetch；远端收益按页面内的实际验收状态解读。
-- [启动、部署、测试和节点扩展](design/development.md)：已有环境中安装包，再用 `comani daemon` 启动。
-- [Python 3.12 与 HTTP 后台保活验收](../tests/acceptance/HEARTBEAT_REPORT.md)：冻结构建、独立跨版本 CPU 与生命周期证据。
-- [当前压力报告](../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)：v3 的 32 会话、1,000 会话 churn、阻塞 loop 与关闭边界；保留基线和 v2 的失败。
-- [历史压力记录](../tests/stress/INDEPENDENT_LOAD_REPORT.md)：原构建的 CPU/native、GC/会话与代理等待测量。
-- [就绪与网络入口](design/development.md#就绪与网络入口)：部署者提供环境、模型与网络；Comani 提供 driver。
-- [远端验收报告](remote_acceptance.md) 与 [H3 source-file 脚本](../examples/minimax_h3_source_remote.py)：cd6 官方模板三路 GPU、130 秒 HTTPS 与清理已验证，旧 0.2.0 成功/失败另节保留。
-- [原始交付测量](delivery.md)、[环境快照](environment.json)、[wheel 清单](wheel_manifest.json)。
+- [远程管理与 Operation](design/remote-management-plan.md)：独立daemon、环境/工具/core/插件准备、bash、生命周期、接纳去重和任务恢复。
+- [模型](design/models.md) 与 [文件 I/O](design/files.md)：远端解析、HF/Civitai/HTTP获取、snapshot发布、本地文件流和自动字节续传。
+- [SDK/graph](design/sdk.md)、[runtime](design/runtime.md)、[所有权](design/ownership.md)、[协议](design/protocol.md) 和 [Python artifacts](design/python-artifacts.md)。
+- [运行与开发](design/development.md)：管理启动、完整CPU示例和单一H3主入口，路径/版本/本地依赖明确选择。
 
-测量和验收记录只代表对应环境及范围，不能替代其他硬件、节点或部署的验证。
-薄 CLI 的 [113 项 CPU 验收](../tests/acceptance/THIN_CLI_REPORT.md) 属于 885b8cd 基线。v4-r2 的工程 CPU 回归为 184 passed、2 deselected，Python 3.12、后台续约和受影响压力/生命周期已独立复验；公开 cd6 的官方模板 GPU/H3 后续实测已通过，旧 GPU 数据仍保留其原构建身份。本轮 files/binary/LZ4 的构建身份见 [性能记录](performance.md)，历史证据见 [设计索引](design/README.md#当前边界与证据)。
+本轮管理/恢复/示例已在源码中实现，最终独立验收与wheel身份须使用对应的新证据。旧报告保留其实际成功/失败和构建身份：
+
+| 历史资料 | 范围 |
+| --- | --- |
+| [性能记录](performance.md) | H3冷热/缓存、refs复用、binary/LZ4、WAN及资源边界 |
+| [远端报告](remote_acceptance.md) | 旧cd6/0.2.0官方模板GPU、三路H3、130秒HTTPS与销毁证据 |
+| [后台保活报告](../tests/acceptance/HEARTBEAT_REPORT.md) | v4-r2冻结构建、独立跨版本CPU与生命周期 |
+| [压力报告](../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md) | 对应v3会话/churn/阻塞loop/关闭，含基线和失败 |
+| [早期压力](../tests/stress/INDEPENDENT_LOAD_REPORT.md) | 原构建CPU/native/GC/代理等待 |
+| [薄CLI报告](../tests/acceptance/THIN_CLI_REPORT.md) | 885b8cd的113项CPU验收，不是旧39候选扩展计划 |
+| [原始交付](delivery.md)、[环境](environment.json)、[wheel清单](wheel_manifest.json) | 对应时点的历史快照 |
+
+改写后的examples不自动继承历史脚本的GPU数值认证；历史artifacts不会被覆盖成新运行。源码实现、作者回归、独立验收和发布构建是分别核对的事实。

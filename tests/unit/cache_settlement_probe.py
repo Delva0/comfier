@@ -9,7 +9,7 @@ import time
 
 async def probe():
     from comani import Client, InProcessTransport
-    from comani._runtime import NativeRuntime
+    from comani.daemon import NativeRuntime
 
     runtime = await NativeRuntime(
         os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI"),

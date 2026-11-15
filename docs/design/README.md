@@ -1,61 +1,47 @@
-# Comani 设计文档
+# Comani 组件设计
 
-本文档对应 [本仓库](../../) 的当前实现。ComfyUI 是执行设备，daemon 是该设备的下发入口；本地 SDK 负责描述调用和处理引用，不接管原生模型加载、显存管理或图控制语义。
+Comani 用一个 Python 入口管理远端实例并调用原生 ComfyUI。管理 daemon 独立存活，计算进程持有 ComfyUI、模型与所有远端 Python 对象；SDK 负责参数、传输、引用与本地值。
 
 ```text
-本地 Python
-  Client / Call / OutputFuture / RemoteRef
-                 │ RPC、二进制 fetch、code artifacts、文件流
-                 ▼
-daemon 主事件循环：接收、依赖等待、会话与对象记录
-                 │ 就绪调用
-                 ▼
-一个 native worker → 原生 ComfyUI 执行器与缓存
+客户端 Python
+  Client / 管理 namespace / Files / Call / Graph / refs
+                  │ 一个公开 HTTP endpoint
+                  ▼
+带外 daemon：配置、生命周期、Operation、bash、插件、模型、文件 I/O
+                  │ bounded 原始 HTTP/二进制/WS 字节流代理
+                  ▼
+带内 ComfyUI 子进程：一个 native worker、执行器、cache、计算 session、对象
 ```
 
 ## 组件地图
 
 | 设计 | 实现 | 职责 |
-|---|---|---|
-| [SDK 与 graph](sdk.md) | [client.py](../../src/comani/client.py)、[refs.py](../../src/comani/refs.py)、[graph.py](../../src/comani/graph.py) | Eager 提交、局部等待、符号捕获与 run 绑定 |
-| [Runtime](runtime.md) | [service.py](../../src/comani/_runtime/service.py)、[adapter.py](../../src/comani/_runtime/adapter.py) | 每调用依赖、就绪队列、原生执行与结果观察 |
-| [所有权](ownership.md) | [refs.py](../../src/comani/refs.py)、[objects.py](../../src/comani/_runtime/objects.py) | Owned/borrowed、GC、ACK 接管与失效 |
-| [协议](protocol.md) | [protocol.py](../../src/comani/protocol.py)、[transport.py](../../src/comani/transport.py)、[http.py](../../src/comani/_runtime/http.py) | RPC、值编码、错误与辅助事件流 |
-| [Python artifacts](python-artifacts.md) | [code.py](../../src/comani/code.py)、[python_node.py](../../src/comani/_runtime/python_node.py) | 代码打包、通用 Python 节点、正常包 imports |
-| [文件 I/O](files.md) | [files.py](../../src/comani/files.py)、[文件存储](../../src/comani/_runtime/files.py)、[文件 HTTP](../../src/comani/_runtime/file_http.py) | 显式 async 上传/下载、原生目录与模型根、文件校验和持久性 |
-| [启动与开发](development.md) | [CLI](../../src/comani/__main__.py)、[runtime 入口](../../src/comani/_runtime/__main__.py)、[pyproject.toml](../../pyproject.toml) | 当前解释器内启动 driver、节点接入与开发测试 |
+| --- | --- | --- |
+| [SDK 与 graph](sdk.md) | [client.py](../../src/comani/client.py)、[refs.py](../../src/comani/refs.py)、[graph.py](../../src/comani/graph.py) | Eager 发送、await、图捕获、metadata、同代计算恢复 |
+| [远程管理与 Operation](remote-management-plan.md) | [SDK management](../../src/comani/management.py)、[管理服务](../../src/comani/daemon/management/)、[supervisor](../../src/comani/daemon/supervisor.py) | 环境、版本、工具、插件、bash、生命周期与独立任务 |
+| [模型来源与发布](models.md) | [providers](../../src/comani/daemon/management/providers.py)、[models](../../src/comani/daemon/management/models.py)、[transports](../../src/comani/daemon/management/transports.py) | HF/Civitai/HTTP 解析、固定选择、获取、验证和发布 |
+| [Runtime](runtime.md) | [service](../../src/comani/daemon/service.py)、[adapter](../../src/comani/daemon/adapter.py) | 依赖 admission、原生计算、cache 与观察 |
+| [所有权与恢复](ownership.md) | [refs](../../src/comani/refs.py)、[objects](../../src/comani/daemon/objects.py) | Owned/borrowed、GC、会话恢复与失效 |
+| [协议](protocol.md) | [transport](../../src/comani/transport.py)、[管理 HTTP](../../src/comani/daemon/management_http.py)、[计算 HTTP](../../src/comani/daemon/http.py) | 分层握手、RPC、二进制、去重与续传 |
+| [Python artifacts](python-artifacts.md) | [code](../../src/comani/code.py)、[python_node](../../src/comani/daemon/python_node.py) | callable/source/package 传输与正常 imports |
+| [文件 I/O](files.md) | [客户端 files](../../src/comani/files.py)、[FileStore](../../src/comani/daemon/files.py)、[file_http](../../src/comani/daemon/file_http.py) | 原生 roots、显式流、自动字节续传与持久文件 |
+| [运行与开发](development.md) | [CLI](../../src/comani/cli/)、[pyproject](../../pyproject.toml) | 必要启动入口、示例、开发和冻结验证 |
 
-待实施设计另见 [远程管理与连接恢复提案](remote-management-plan.md)：独立带外管理 daemon、bash/comfyui/plugins/models、共同 Operation 和计算 session resume；不属于当前已交付 API。
+文件名 `remote-management-plan.md` 保留旧链接，其内容现为当前实现设计，不再是未来 API 提案。实现位于 `daemon/` 与 `cli/`；公开命令统一进入 `cli/`，再调用 `daemon/`；daemon 不依赖 CLI。
 
-## 设计约束
+## 核心约束
 
-1. `.node/.python/.submit` 返回的 Call 已进入活动发送流程；await 不是启动开关。
-2. 本地 await 约束当前协程的后续执行，不是 daemon 全局屏障。
-3. 数据依赖来自显式传入的引用；独立调用没有人为添加的完成顺序边。
-4. Graph 是显式的原生工作流描述，构图时不执行计算，不捕获任意 Python 控制流。
-5. Lazy、loop、动态展开、list mapping 等交给原生执行器。
-6. 读取引用不触发重新执行；失效、跳过与失败必须明确结束等待。
+1. node/Python/submit 调用即进入发送流程；await 只约束当前协程，不是整个设备的全局屏障。
+2. graph 只收集明确的计算调用；bash/files/管理方法仍是实际 I/O，重放 graph 不重跑它们。
+3. 所有管理查询都 RPC 到 daemon；SDK 不在本机解析来源、查询目标版本或伪造 roots。
+4. Tensor/模型与计算 session 留在计算子进程；daemon 的代理不解码 Tensor。
+5. 连接不安装、不启动；环境变更和生命周期由脚本显式执行，失败自然中断顺序流程。
+6. 网络恢复观察原调用/操作，不重跑脚本、副作用或已失效的 refs。
 
 ## 当前边界与证据
 
-当前 Git checkpoint 保留版本号 `0.3.0`。本轮新增显式文件 I/O、协商二进制/可选 LZ4 fetch 和 H3 refs 复用例程，其冻结构建与验收状态集中在 [性能记录](../performance.md)；下表保留启动、保活与原 GPU 证据各自的构建身份。native/headless 支持范围见 [Runtime](runtime.md)，metadata 用法见 [SDK](sdk.md#可选执行-metadata)。
+管理、恢复、模型与文件续传已在源码中实现；源码实现、作者回归、独立验收和最终 wheel 身份是不同事实。当前未提交整合版不能借用旧 wheel 的认证。新独立 CPU/故障及 GPU/WAN 验收应明确记录自身代码和构建身份。
 
-| 范围 | 构建与证据 |
-|---|---|
-| v4-r2 / `64a73a6e…` wheel | [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md)：工程 CPU 184 passed、2 deselected；独立 Python 3.12 定向回归和跨版本 source 三路 CPU 链通过。 |
-| HTTP 独立保活与回收 | [独立压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)：32 会话/4,096 calls、1,000 会话短 TTL churn、业务 loop 阻塞超过 TTL 后 ownedRef 可用，GC 在 close 前完成；无活跃会话意外失效。关闭中的空会话允许 TTL 兜底回收，不承诺所有历史运行零 expiry。 |
-| 885b8cd、被否决 v2/v3 与旧 v4 | 保留业务 loop 心跳失活、暂态错误/HTTP 503 误拦及 queued/context 隐藏拥有者的反例；早期候选的部分通过不改记为最终通过。 |
-| 官方模板 GPU/H3 旅程 | 公开 cd6 的 17 个生产源码身份核对通过，source-file 三路真实 GPU 2048×2048 Tensor 逐位一致、130 秒 HTTPS 一次提交通过，实例已销毁；[新远端报告](../remote_acceptance.md) 分列资源与历史结果。 |
+历史资料保持原有结果：`64a73a6e…` 的 [启动与保活报告](../../tests/acceptance/HEARTBEAT_REPORT.md)、[压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)、[GPU/H3 远端报告](../remote_acceptance.md) 及 [files/binary/LZ4 性能记录](../performance.md)。原来的失败与资源限制仍按各报告解读；改写后的示例尚未因此获得新的 GPU 数值证明。
 
-专用 keeper 只负责 HTTP lease 续约；业务 RPC、GC 控制消息仍需要业务 loop。进程/OS 冻结、任意长 GIL 占用和网络中断不在保活保证内，详见 [会话语义](ownership.md#会话续约与业务-loop-暂停)。
-
-下面保留历史执行证据。[delivery.md](../delivery.md) 中的环境和旧 GPU 结果是对应时点的测量；历史压力记录的源文件 hash 与当前发布安装不完全相同，不能直接转作最终合并版的逐字节认证。
-
-| 历史验收 | 保留记录 |
-|---|---|
-| 本地 CPU/native、持续提交、GC 与 session churn | [独立压力报告](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)：通过；标准非 GPU suite 81 passed、2 deselected，32 sessions/4,096 calls 和 224 节点组合图通过 |
-| 长调用经过读取超时代理 | 同一[独立报告](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)：本地 140 秒调用经过 125 秒读取超时代理通过，调用仅提交一次；不是实际远端 HTTPS 验证 |
-| 真正远端 HTTPS 基础执行 | [10 项 smoke](../../artifacts/remote/60662518-20261114/smoke/acceptance.json)、[130 秒单次提交](../../artifacts/remote/60662518-20261114/long-wait.json) 与小型 NVFP4 诊断通过；当前入口见 [启动指南](development.md) |
-| 指定 GPU 模型、图片与资源清理 | 指定 INT8 模型三路 2048×2048 出图逐位一致，租用实例已销毁；[远端报告](../remote_acceptance.md)、[实际脚本](../../examples/minimax_h3_remote.py) 与 [样图](../../artifacts/remote/60662518-20261114/eager.png) |
-
-32 sessions 是实测容量点，不是最大容量或延迟保证。CPU 压力测试不加载模型，模型资源需求须由对应远端实测确定；报价中的 RAM 数字不能当作实际 cgroup 限额或最低配置。
+本轮不扩充旧的 39 项 CLI 候选，不建立通用调度器/DSL、历史任务数据库、跨 daemon 崩溃 exactly-once 或隐式环境修复。必要 CLI 仅用于启动管理 daemon 与计算桥接；使用管理 API 完成实例内的工作。

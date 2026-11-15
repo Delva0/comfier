@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = ["aiohttp>=3.11", "cloudpickle>=3.1"]
 
 [project.scripts]
-comani = "comani.__main__:main"
+comani = "comani.cli:main"
 
 [project.optional-dependencies]
 lz4 = ["lz4>=4.3"]

@@ -15,9 +15,9 @@ import pytest
 from aiohttp import ClientPayloadError, ClientSession, FormData
 
 from comani import Client, DownloadedFile, RemoteError, RemoteFile, SessionClosed
-from comani._runtime.files import FileStore
-from comani._runtime.http import create_app
-from comani._runtime.service import NativeRuntime
+from comani.daemon.files import FileStore
+from comani.daemon.http import create_app
+from comani.daemon.service import NativeRuntime
 from comani.files import _io
 
 from .test_binary_fetch import serve

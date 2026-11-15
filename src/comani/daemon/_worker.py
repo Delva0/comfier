@@ -1,0 +1,31 @@
+"""Private native-worker bootstrap; this is not a command-line application."""
+
+from pathlib import Path
+
+
+def run(config, *, socket_fd=None, port=None, token=None):
+    """Run the one child selected by RuntimeSupervisor from an explicit config."""
+    import importlib.util
+    import socket
+
+    from aiohttp import web
+
+    from .http import create_app
+    from .service import NativeRuntime, RecoveryPolicy
+
+    root = Path(config["comfy_root"]).expanduser()
+    if not (root / "execution.py").is_file():
+        raise ValueError("comfy_root must point to the configured ComfyUI source directory")
+    missing = [name for name in ("torch", "yaml") if importlib.util.find_spec(name) is None]
+    if missing:
+        raise RuntimeError("The selected runtime environment lacks native dependencies: " + ", ".join(missing))
+    runtime = NativeRuntime(
+        root, cpu=config.get("cpu", False), custom_nodes=config.get("custom_nodes", True),
+        comfy_args=config.get("comfy_args", ()), max_file_bytes=config.get("max_file_bytes"),
+        recovery_policy=RecoveryPolicy(offline_grace=config.get("offline_grace", 3600),
+                                       max_sessions=config.get("max_sessions", 256),
+                                       max_objects=config.get("max_objects", 100000),
+                                       max_call_records=config.get("max_call_records", 1000000)))
+    options = ({"sock": socket.socket(fileno=socket_fd)} if socket_fd is not None
+               else {"host": "127.0.0.1", "port": port})
+    web.run_app(create_app(runtime, token=token), **options)

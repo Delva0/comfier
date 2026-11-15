@@ -6,8 +6,8 @@ import pytest
 from aiohttp import ClientSession, web
 
 from comani import Client
-from comani._runtime import NativeRuntime
-from comani._runtime.http import create_app
+from comani.daemon import NativeRuntime
+from comani.daemon.http import create_app
 from comani.errors import Expired, SessionClosed
 
 COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
