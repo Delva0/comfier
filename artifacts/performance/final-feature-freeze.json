@@ -1,0 +1,432 @@
+{
+  "created_utc": "2026-11-15T10:53:08.391085+00:00",
+  "base_head": "42350b082ba29b6b5c9e82fed40858d971fccb8c",
+  "scope": "All package Python source, pyproject, all Python tests, and the reuse example. Docs/local QA artifacts are not build-code freeze inputs.",
+  "files": [
+    {
+      "path": "examples/minimax_h3_reuse.py",
+      "bytes": 10449,
+      "sha256": "cd1e1d5dbd219aed00b4d4c75218207ca13627e9f6a50e4d7477af9ab8e722ae"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 925,
+      "sha256": "9eaebad1b4eb53ef0b6dc6a090f1e802e534b0b249e28daa5371d023c3e15705"
+    },
+    {
+      "path": "src/comani/__init__.py",
+      "bytes": 953,
+      "sha256": "8bf9e4f1c192d84651296005e9721818721fc80160d4276b13ec8591651b585c"
+    },
+    {
+      "path": "src/comani/__main__.py",
+      "bytes": 580,
+      "sha256": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843"
+    },
+    {
+      "path": "src/comani/_codec.py",
+      "bytes": 1883,
+      "sha256": "b26287bdfbfc78daa113b2a6081422ebe2bba4edc8edbdb81c1eff0112884f71"
+    },
+    {
+      "path": "src/comani/_runtime/__init__.py",
+      "bytes": 149,
+      "sha256": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2"
+    },
+    {
+      "path": "src/comani/_runtime/__main__.py",
+      "bytes": 2418,
+      "sha256": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7"
+    },
+    {
+      "path": "src/comani/_runtime/adapter.py",
+      "bytes": 11551,
+      "sha256": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e"
+    },
+    {
+      "path": "src/comani/_runtime/file_http.py",
+      "bytes": 9106,
+      "sha256": "befcd2c02d66b2387904e08e378ac144d49ccecbd191605be5127ed1b300c299"
+    },
+    {
+      "path": "src/comani/_runtime/files.py",
+      "bytes": 17916,
+      "sha256": "e097fc10961902a8ad2c9754531fc02f9b6279d61b6447b8a81ae58b6a63ccab"
+    },
+    {
+      "path": "src/comani/_runtime/http.py",
+      "bytes": 8134,
+      "sha256": "004d2bbcab1ed455045d6f1497498961d70d3b24655b9c854b8b29a1b82901cf"
+    },
+    {
+      "path": "src/comani/_runtime/objects.py",
+      "bytes": 4499,
+      "sha256": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537"
+    },
+    {
+      "path": "src/comani/_runtime/python_node.py",
+      "bytes": 9026,
+      "sha256": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021"
+    },
+    {
+      "path": "src/comani/_runtime/service.py",
+      "bytes": 26177,
+      "sha256": "fbf23749fce2c5681e0c641b10310bac239b700dcac887329e9e47737c44d000"
+    },
+    {
+      "path": "src/comani/_runtime/startup.py",
+      "bytes": 5086,
+      "sha256": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a"
+    },
+    {
+      "path": "src/comani/client.py",
+      "bytes": 27051,
+      "sha256": "f007f506d5b83179f38041b5c3b7c704d5a86efcc2fca3f9d11003fd6187a1a4"
+    },
+    {
+      "path": "src/comani/code.py",
+      "bytes": 5024,
+      "sha256": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153"
+    },
+    {
+      "path": "src/comani/errors.py",
+      "bytes": 1558,
+      "sha256": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3"
+    },
+    {
+      "path": "src/comani/files.py",
+      "bytes": 14263,
+      "sha256": "9f7f4b5a260312d62ddb71a823e5f12d48c70ee3c1e0f89cec022c0fbf5bd9dd"
+    },
+    {
+      "path": "src/comani/graph.py",
+      "bytes": 8707,
+      "sha256": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550"
+    },
+    {
+      "path": "src/comani/protocol.py",
+      "bytes": 3714,
+      "sha256": "7275cc55e535f2e37bbd93ee4c5d9cfe6487c95ebfbdd50a8e6f7a5d692b0ce9"
+    },
+    {
+      "path": "src/comani/refs.py",
+      "bytes": 8658,
+      "sha256": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db"
+    },
+    {
+      "path": "src/comani/transport.py",
+      "bytes": 11717,
+      "sha256": "3c7dcb87033b4f5e3ffbac626c1e1182f8209e5a1decbffd8f1768f8d27e1e6f"
+    },
+    {
+      "path": "tests/__init__.py",
+      "bytes": 66,
+      "sha256": "0d3bbab74b84b4762a59b62871d2068e00ab532a79b17afb91c64eedeaaeedff"
+    },
+    {
+      "path": "tests/acceptance/acceptance.py",
+      "bytes": 15029,
+      "sha256": "bb3359f55dbad8c7256f8515c64d40ed0b62a1bbce65069dace7c631bf41473d"
+    },
+    {
+      "path": "tests/acceptance/encoder_check.py",
+      "bytes": 2004,
+      "sha256": "f566a1d018d0ba91cfadd8cf5552793271361dc531614827f52e86428b71e352"
+    },
+    {
+      "path": "tests/acceptance/long_wait.py",
+      "bytes": 3028,
+      "sha256": "b3f0cb5260e455d98dd390732eba5289b77f606fac34e55acf2e7e8dca670476"
+    },
+    {
+      "path": "tests/acceptance/nvfp4_diagnostics.py",
+      "bytes": 2685,
+      "sha256": "6ec8b413fee674cd90efad76b3bd4be582a0996727e744e2aaf4387fc4811c1a"
+    },
+    {
+      "path": "tests/acceptance/probe_nvfp4.py",
+      "bytes": 2960,
+      "sha256": "d56d31385424e0a99d54e8c7da0770213b146fe77ef915473d0e0415dd3af446"
+    },
+    {
+      "path": "tests/acceptance/resource_monitor.py",
+      "bytes": 2710,
+      "sha256": "b1cc7fe44c924b0e2c8b72c290d65a359e0f2729828e8124e2d69ee21e7d65fc"
+    },
+    {
+      "path": "tests/acceptance/verify_wheel.py",
+      "bytes": 1328,
+      "sha256": "575be323072e2c90050f92a98261442e21cd872167409c6ad829e7b77c15ab18"
+    },
+    {
+      "path": "tests/integration/conftest.py",
+      "bytes": 1062,
+      "sha256": "60b310c07c508964e5ffcd461282c84607cdcfd2f29f755019af3312b8ed2b51"
+    },
+    {
+      "path": "tests/integration/test_execution_options.py",
+      "bytes": 1926,
+      "sha256": "4e8b07a25d1c9bf4771fc2a082f4a2646a296f16171d5f1ce86869b8ee863d69"
+    },
+    {
+      "path": "tests/integration/test_gpu.py",
+      "bytes": 6490,
+      "sha256": "3b2a0800c3bc45648a3207e7bfdb24b2babca0a94b52116ab325c9715ae2416e"
+    },
+    {
+      "path": "tests/integration/test_http.py",
+      "bytes": 15705,
+      "sha256": "a12f7505bdc453974cf985ce281308883ce8563ccccd4d7457c4e00a64ab9838"
+    },
+    {
+      "path": "tests/integration/test_sdk_environment.py",
+      "bytes": 4432,
+      "sha256": "d061949c0935ec89684174d9ac4fe46241ac8b90cd9e77247110a1433792ed47"
+    },
+    {
+      "path": "tests/native/test_bounded_wait.py",
+      "bytes": 5106,
+      "sha256": "a54048cd7bf8a6336b689f0cc9acf037bd50a18979dee45f384383837d2f4042"
+    },
+    {
+      "path": "tests/native/test_gate.py",
+      "bytes": 18053,
+      "sha256": "75e4814602ae481e2969671c201be8695e3562deb6164dba6391f28e84a9f60b"
+    },
+    {
+      "path": "tests/native/test_http_security.py",
+      "bytes": 3110,
+      "sha256": "eedf43cc044b3577f042b4fa0e93d08ab65557e843437f5d00c3605423cd11fb"
+    },
+    {
+      "path": "tests/native/test_packages.py",
+      "bytes": 2489,
+      "sha256": "9de42fce1f70e6dfc14aa9951f1b15a845a8e1b3aa68f38610957a5b3710d244"
+    },
+    {
+      "path": "tests/native/test_runtime_args.py",
+      "bytes": 2379,
+      "sha256": "90e800a3f6de6ade9822df5db809ff87d28976d267d9284be0181997b3cb5c5a"
+    },
+    {
+      "path": "tests/native/test_sessions.py",
+      "bytes": 5548,
+      "sha256": "5cd3a669afe84948e77b450c20b543ac856295ed4ee893b4e108160f6f6d30a1"
+    },
+    {
+      "path": "tests/native/test_startup.py",
+      "bytes": 7733,
+      "sha256": "b18ebe09c5e87854785a79b85488c0a9ee2160405a6704ec173dce3348528bde"
+    },
+    {
+      "path": "tests/stress/_daemon_fixture.py",
+      "bytes": 3539,
+      "sha256": "4c720dc66681c494ccd3303625819cd9d465e06a3f64e2d56a41eb2bf1af2383"
+    },
+    {
+      "path": "tests/stress/audit_wheel.py",
+      "bytes": 1636,
+      "sha256": "edb0a2680f8ceed163f1379917367ed909d94d145ddd6c8a9530ca3a64f3752d"
+    },
+    {
+      "path": "tests/stress/blocked_loop_probe.py",
+      "bytes": 6237,
+      "sha256": "d8cdbfcae8c781b02da2e89a2ab643125c2654b3e711f251f3a5653b7f465d64"
+    },
+    {
+      "path": "tests/stress/bounded_wait_probe.py",
+      "bytes": 9800,
+      "sha256": "2ffc037a91c08b9ae1f0f333131de86887a796c453b920c1e56e1733823247ea"
+    },
+    {
+      "path": "tests/stress/connection_pool_probe.py",
+      "bytes": 4523,
+      "sha256": "412c2111bec0d70fc6e53f4267adbf702ef25d192268950d97edff7497c75efd"
+    },
+    {
+      "path": "tests/stress/failed_open_probe.py",
+      "bytes": 1840,
+      "sha256": "de9803e1a560b10074f98c7a7ece3e238220fd49e40c59d133df57fe41634dbc"
+    },
+    {
+      "path": "tests/stress/independent_load.py",
+      "bytes": 33043,
+      "sha256": "e31de07acb97f7fa837d4deb31ce6d50252ea0b2dc21d364b65d590020d04a8f"
+    },
+    {
+      "path": "tests/stress/isolated_load_probe.py",
+      "bytes": 22420,
+      "sha256": "d16f0356a4be0745a71eca62a250ef8d3d36c0d0f2fd73541e2d5a73af725c61"
+    },
+    {
+      "path": "tests/stress/launcher_timeout_probe.py",
+      "bytes": 1795,
+      "sha256": "ba9051de52c0e9784949cd16edc7e041092a4b649bc664b483fbc5d3cf019b4b"
+    },
+    {
+      "path": "tests/stress/lease_lifecycle_probe.py",
+      "bytes": 12792,
+      "sha256": "81f911d1cc49caec1062b90b087460fda5de43efd0d2ef4d607151472303b6d3"
+    },
+    {
+      "path": "tests/stress/lease_startup_cleanup_probe.py",
+      "bytes": 3582,
+      "sha256": "80f932eb65b57911055cabed6816e023c2891091b829af7fdb6ada3c3cd76959"
+    },
+    {
+      "path": "tests/stress/queued_owner_cleanup_probe.py",
+      "bytes": 9152,
+      "sha256": "e58a6b6d80d254a1cab86f09f42c9eb817f0b0a22b173c16d8f9e3c40aa6b4d4"
+    },
+    {
+      "path": "tests/stress/readme_quickstart_probe.py",
+      "bytes": 2497,
+      "sha256": "3cc0c7a72efe40388fd536aca114d15e726b647de34913e801ce2f1015f90aac"
+    },
+    {
+      "path": "tests/stress/session_churn_probe.py",
+      "bytes": 3329,
+      "sha256": "623cd7d01564d9a4491ebb1a648a6c1d6faad47fef12d6b6fab0fbdea47a1e89"
+    },
+    {
+      "path": "tests/stress/session_lifecycle_probe.py",
+      "bytes": 7615,
+      "sha256": "db09e7aace14397c0123ecf388a93c54927395d96ec195e432f93cfd4e6df098"
+    },
+    {
+      "path": "tests/stress/shared_owner_probe.py",
+      "bytes": 16511,
+      "sha256": "083d46cdb0d05fd38c5d08320504c84f43c55cd79f2130456c981dffa3274394"
+    },
+    {
+      "path": "tests/stress/startup_cancel_probe.py",
+      "bytes": 2242,
+      "sha256": "7c8ed862f94954466cc3aadc134cb38cf61119529c785f2e6117d7f4c0b6e40f"
+    },
+    {
+      "path": "tests/unit/__init__.py",
+      "bytes": 52,
+      "sha256": "3f59b4fd95b8087f8ebbbc7625c1122b035ae3431c3515326f961ad30ec38d47"
+    },
+    {
+      "path": "tests/unit/_helpers.py",
+      "bytes": 176,
+      "sha256": "b70b269a955258124bbe974599bccb857e6ff00b34ab461cfc81152b16c3fd7e"
+    },
+    {
+      "path": "tests/unit/cache_settlement_probe.py",
+      "bytes": 4584,
+      "sha256": "cdd8812c39845c45e5a03f353b0fa5f3f8a562f5bf1e969ceace3d25d2d352ea"
+    },
+    {
+      "path": "tests/unit/conftest.py",
+      "bytes": 4615,
+      "sha256": "455baee075fef925fb74048b1960d3e74dd1ec0240d7fc3912987968dd198bcb"
+    },
+    {
+      "path": "tests/unit/test_binary_fetch.py",
+      "bytes": 11658,
+      "sha256": "6ca4fb21d72a15288d86aff22794f22c2cab8ad83a37afdb02d5d7dbf62ba392"
+    },
+    {
+      "path": "tests/unit/test_cli.py",
+      "bytes": 1134,
+      "sha256": "8da001c7077c61eebb3fb11f54a3e5a208f834b99dc6e061dd0f27b1869f763e"
+    },
+    {
+      "path": "tests/unit/test_execution_options.py",
+      "bytes": 2318,
+      "sha256": "e910871d4af0cd20a45b39fffea3b8f9a8e5a0493c7134ba3cabd0f47ad8b666"
+    },
+    {
+      "path": "tests/unit/test_fetch_options.py",
+      "bytes": 1970,
+      "sha256": "ca76c463c7a6ac641785024b18316985fac66a908fad1aee16b04a7f04b57426"
+    },
+    {
+      "path": "tests/unit/test_files_api.py",
+      "bytes": 18878,
+      "sha256": "ee1002f5dfbf7196a68f6dc32e5b86ebe792a2fb7af4b8ae907b2d2f4ec25a50"
+    },
+    {
+      "path": "tests/unit/test_heartbeat.py",
+      "bytes": 15388,
+      "sha256": "bc5e61e851719fb01049598f30952d68255b868cb3ddd10fc806fdcf20d5df27"
+    },
+    {
+      "path": "tests/unit/test_lz4_fetch.py",
+      "bytes": 10122,
+      "sha256": "bba50eec9f19edb3599f1f1d87a42b329dc15cea152770eff68b4f80df65104b"
+    },
+    {
+      "path": "tests/unit/test_runtime_args.py",
+      "bytes": 6415,
+      "sha256": "94dea0ae96b4fbb2332eb365c2588f716dd37139fdf623399db5ef9326520159"
+    },
+    {
+      "path": "tests/unit/test_runtime_files.py",
+      "bytes": 17526,
+      "sha256": "aeb656e0f2039931ba975ff7706c08cd96cca549f17e4d609f886446802c1f7e"
+    },
+    {
+      "path": "tests/unit/test_runtime_settlement.py",
+      "bytes": 1403,
+      "sha256": "d866f835db0be6038f84193068bc64d0606b7e333aae22beb28bcc23a37405bc"
+    },
+    {
+      "path": "tests/unit/test_sdk.py",
+      "bytes": 14930,
+      "sha256": "61f7c26738ff32baa86be59f28dc83f92b6c3a2b7b8dc00678a9fab606b72fe8"
+    },
+    {
+      "path": "tests/unit/test_shared_ownership.py",
+      "bytes": 12542,
+      "sha256": "927c59399d309ce2e55dc0d164c6a3a8267fff2672474be69835e5b6d31abb9f"
+    },
+    {
+      "path": "tests/unit/test_startup_and_wait.py",
+      "bytes": 4806,
+      "sha256": "84766269453a89d2db0ed03dd53ba0b131d26ca9f216424b99db2361a55cb025"
+    },
+    {
+      "path": "tests/unit/test_transport.py",
+      "bytes": 1755,
+      "sha256": "ab402507acba0d995bacf1354fd0086982bad261bd86ddd7a021e8c43727d66c"
+    }
+  ],
+  "features": [
+    "files v1 explicit async I/O",
+    "binary fetch v1",
+    "optional LZ4 auto/identity"
+  ],
+  "optional_extra": "comani[lz4]: lz4>=4.3; no mandatory Torch/NumPy/Pillow/LZ4",
+  "author_validation": {
+    "full_unit": "PYTHONPATH=src .venv/bin/python -m pytest tests/unit -q: 239 passed in 22.96s",
+    "lint": "ruff check src/comani and the three new files/fetch-options/runtime-files test modules: passed",
+    "whitespace": "git diff --check: passed",
+    "review": "Independent original regressions rechecked: repeated cancel drain, HTTP upload producer drain, and idle response large-body retention fixed. Review targeted 122 passed before final author full unit.",
+    "observer_test_fix": "Only test_lz4_fetch.py changed: record response types only for method=fetch, assert exact singleton media-type lists. Four affected targeted cases passed; ruff and diff check passed. Product hashes and installed wheel unchanged. Independent reproduction established fetch binary then heartbeat JSON interleaving."
+  },
+  "public_contract": {
+    "files": [
+      "roots(*, directory=None, category=None)",
+      "upload(local_path, *, directory=None, root=None, path=None)",
+      "download(remote_file, local_path, *, directory=None, root=None, overwrite=False)",
+      "stat(remote_file, *, directory=None, root=None, checksum=False)",
+      "remove(remote_file, *, directory=None, root=None, missing_ok=False)"
+    ],
+    "metadata": "RemoteFile.name=relative_path; native node inputs use native_name. stat checksum=False returns sha256=None; completed upload/download have SHA256.",
+    "ownership": "Files proxy strongly owns Client; Client never caches proxy. Metadata owns no Client. Files I/O is external to graph capture.",
+    "compression": "Client(url, fetch_compression='auto'|'identity'); same on HTTPTransport. With transport= configure that transport directly. Only object fetch is compressed."
+  },
+  "limits": [
+    "HTTPTransport implements streaming; other transports need an optional stream interface or receive UnsupportedTransport. Existing compute paths unchanged.",
+    "No default file-size quota; NativeRuntime(max_file_bytes=None) may set an explicit deployment limit. Chunk size 1 MiB; metadata frames capped at 64 KiB.",
+    "No resume, directory sync, implicit Path upload, automatic final-file GC, overwrite upload, or automatic write retries.",
+    "A completed atomic commit remains persistent after late cancellation or response loss; use explicit path when post-failure stat tracking is needed.",
+    "Files are shared under existing daemon authorization. Configured symlink roots are canonicalized; descendant symlink/reparse paths are rejected. Revision checks are optimistic, not filesystem snapshots.",
+    "Atomic create-only publication requires same-filesystem hard links; unsupported filesystems fail. Actual Linux/HTTP tests passed; Windows full runtime not yet accepted.",
+    "Standard MIME epilogue is allowed after upload's three verified parts; epilogue is not file content. Single-pass download publishes locally only after its final digest/footer succeeds."
+  ],
+  "parent_manifest_sha256": "7b3b0c94d5c01946a4a18f551838af3b73f0da4935e9280f64fc74d22b6e9a09"
+}

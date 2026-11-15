@@ -12,15 +12,38 @@ from typing import Any
 
 import aiohttp
 
+from ._codec import decompress_pickle, has_lz4
 from .errors import RemoteError, SessionClosed, error_from_wire, error_to_wire
+from .protocol import (
+    BINARY_FETCH_LZ4_VERSION,
+    BINARY_FETCH_VERSION,
+    LZ4_ACCEPT_HEADER,
+    LZ4_CODEC,
+    LZ4_PICKLE_CONTENT_TYPE,
+    PICKLE_CONTENT_TYPE,
+    PICKLE_LENGTH_HEADER,
+)
 
 
 def _retryable_heartbeat_status(status):
     return status in {408, 429} or 500 <= status < 600
 
 
-async def _post(session, url, method, params, *, retry_http=False):
-    async with session.post(url, json={"method": method, "params": params}) as response:
+async def _post(session, url, method, params, *, retry_http=False, binary=False, lz4=False):
+    options = {"json": {"method": method, "params": params}}
+    if binary:
+        options["headers"] = {"Accept": PICKLE_CONTENT_TYPE}
+        if lz4:
+            options["headers"][LZ4_ACCEPT_HEADER] = LZ4_CODEC
+    async with session.post(url, **options) as response:
+        if binary and response.content_type in {PICKLE_CONTENT_TYPE, LZ4_PICKLE_CONTENT_TYPE}:
+            response.raise_for_status()
+            compressed = response.content_type == LZ4_PICKLE_CONTENT_TYPE
+            if compressed and not lz4:
+                raise RemoteError("Daemon returned LZ4 without codec negotiation")
+            payload = await response.read()
+            return (decompress_pickle(payload, response.headers.get(PICKLE_LENGTH_HEADER))
+                    if compressed else payload)
         try:
             payload = await response.json()
         except (aiohttp.ContentTypeError, ValueError):
@@ -160,13 +183,19 @@ class _HTTPHeartbeat:
 
 
 class HTTPTransport:
-    def __init__(self, url: str, *, timeout: float = 3600, token: str | None = None):
+    def __init__(self, url: str, *, timeout: float = 3600, token: str | None = None,
+                 fetch_compression: str = "auto"):
+        if fetch_compression not in ("auto", "identity"):
+            raise ValueError("fetch_compression must be 'auto' or 'identity'")
+        self._fetch_compression = fetch_compression
         self.url = url.rstrip("/") + "/rpc"
         self.timeout = timeout
         self._headers = {"Authorization": "Bearer " + token} if token else {}
         self._session = None
         self._wait_session = None
         self._data_session = None
+        self._binary_fetch = False
+        self._binary_fetch_lz4 = False
 
     async def open(self):
         if self._session is None:
@@ -187,12 +216,28 @@ class HTTPTransport:
         session = self._session
         if method == "wait_result":
             session = self._wait_session
-        elif method in {"fetch", "artifact_put"}:
+        elif method in {"fetch", "artifact_put", "file_stat"}:
             session = self._data_session
-        return await _post(session, self.url, method, params)
+        result = await _post(session, self.url, method, params,
+                             binary=method == "fetch" and self._binary_fetch,
+                             lz4=method == "fetch" and self._binary_fetch_lz4)
+        if method == "handshake":
+            capabilities = result.get("capabilities", {})
+            version = capabilities.get("binary_fetch") if isinstance(capabilities, dict) else None
+            self._binary_fetch = type(version) is int and version == BINARY_FETCH_VERSION
+            version = capabilities.get("binary_fetch_lz4") if isinstance(capabilities, dict) else None
+            self._binary_fetch_lz4 = (self._binary_fetch and type(version) is int
+                                     and version == BINARY_FETCH_LZ4_VERSION and has_lz4()
+                                     and self._fetch_compression == "auto")
+        return result
 
     def _start_heartbeat(self, session_id, interval, owner_loop, notify):
         return _HTTPHeartbeat(self.url, self._headers, session_id, interval, owner_loop, notify)
+
+    def _file_connection(self):
+        if self._data_session is None:
+            raise SessionClosed("Transport is not open")
+        return self._data_session, self.url[:-4]
 
     async def close(self):
         for attribute in ("_session", "_wait_session", "_data_session"):

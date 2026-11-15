@@ -8,11 +8,38 @@ from urllib.parse import urlsplit
 
 from aiohttp import web
 
+from comani._codec import compress_pickle
+from comani.protocol import (
+    LZ4_ACCEPT_HEADER,
+    LZ4_CODEC,
+    LZ4_PICKLE_CONTENT_TYPE,
+    PICKLE_CONTENT_TYPE,
+    PICKLE_LENGTH_HEADER,
+)
+
+from .file_http import install_file_routes
 from .objects import SessionClosed
 
 
+async def _binary_response(request, payload, content_type, *, headers=None):
+    # aiohttp retains the last response while a keepalive connection is idle.
+    # A StreamResponse does not keep a second strong root to the large body.
+    response = web.StreamResponse(headers={"Content-Type": content_type, **(headers or {})})
+    response.content_length = len(payload)
+    await response.prepare(request)
+    try:
+        await response.write(payload)
+        await response.write_eof()
+    except BaseException as error:
+        if request.transport is not None:
+            request.transport.close()
+        if not isinstance(error, Exception):
+            raise
+    return response
+
+
 def create_app(runtime, *, token=None, close_runtime=True):
-    methods = {"handshake", "submit", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat"}
+    methods = {"handshake", "submit", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat", "file_roots", "file_stat", "file_remove"}
 
     @web.middleware
     async def authenticate(request, handler):
@@ -55,6 +82,15 @@ def create_app(runtime, *, token=None, close_runtime=True):
         if tracked:
             runtime.requests.setdefault(session, set()).add(transport)
         try:
+            if method == "fetch" and request.headers.get("Accept") == PICKLE_CONTENT_TYPE:
+                payload = await runtime.fetch_bytes(**params)
+                if request.headers.get(LZ4_ACCEPT_HEADER) == LZ4_CODEC:
+                    compressed = compress_pickle(payload)
+                    if compressed is not None:
+                        return await _binary_response(
+                            request, compressed, LZ4_PICKLE_CONTENT_TYPE,
+                            headers={PICKLE_LENGTH_HEADER: str(len(payload))})
+                return await _binary_response(request, payload, PICKLE_CONTENT_TYPE)
             result = await getattr(runtime, method)(**params)
         finally:
             if tracked:
@@ -135,6 +171,7 @@ def create_app(runtime, *, token=None, close_runtime=True):
     app.router.add_get("/history/{prompt_id}", history)
     app.router.add_get("/queue", queue)
     app.router.add_get("/ws", websocket)
+    install_file_routes(app, runtime)
     app.on_startup.append(startup)
     app.on_cleanup.append(cleanup)
     return app

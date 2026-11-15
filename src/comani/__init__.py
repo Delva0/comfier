@@ -15,6 +15,7 @@ from .errors import (
     Skipped,
     UnknownOutputLayout,
 )
+from .files import DownloadedFile, FileRoot, Files, RemoteFile
 from .graph import Graph, GraphInput, GraphRef
 from .refs import Call, OutputFuture, RemoteRef
 from .transport import HTTPTransport, InProcessTransport
@@ -24,4 +25,5 @@ __all__ = [
     "HTTPTransport", "InProcessTransport", "ComaniError", "RemoteError", "SessionClosed",
     "InvalidReference", "NotSubmitted", "Expired", "Released", "NotProduced", "Skipped",
     "UnknownOutputLayout", "CodeCompatibilityError", "PackageConflict",
+    "Files", "FileRoot", "RemoteFile", "DownloadedFile",
 ]

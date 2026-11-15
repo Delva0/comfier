@@ -16,9 +16,14 @@ from functools import partial
 
 import cloudpickle
 
+from comani._codec import has_lz4
 from comani.errors import PackageConflict
+from comani.files import FILE_CHUNK_SIZE, FILE_VERSION, _io
+from comani.protocol import BINARY_FETCH_LZ4_VERSION, BINARY_FETCH_VERSION
 
+from . import file_http
 from .adapter import NativeAdapter, native_python_inputs
+from .files import FileStore
 from .objects import (
     CallFailed,
     NodeSkipped,
@@ -52,7 +57,12 @@ class CallState:
 
 
 class NativeRuntime:
-    def __init__(self, comfy_root, *, cpu=False, custom_nodes=True, session_ttl=120, comfy_args=()):
+    def __init__(self, comfy_root, *, cpu=False, custom_nodes=True, session_ttl=120, comfy_args=(),
+                 max_file_bytes=None):
+        if max_file_bytes is not None and (type(max_file_bytes) is not int or max_file_bytes < 0):
+            raise ValueError("max_file_bytes must be None or a nonnegative integer")
+        self.max_file_bytes = max_file_bytes
+        self._files = None
         self.epoch = uuid.uuid4().hex
         self.store = ObjectStore(self.epoch)
         self.calls: dict[tuple[str, str], CallState] = {}
@@ -93,7 +103,28 @@ class NativeRuntime:
             raise SessionClosed("This runtime is closing")
         session = uuid.uuid4().hex
         self.session_seen[session] = time.monotonic()
-        return {"session_id": session, "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "capabilities": {"bounded_wait": True}}
+        capabilities = {"bounded_wait": True, "binary_fetch": BINARY_FETCH_VERSION,
+                        "files": FILE_VERSION}
+        if has_lz4():
+            capabilities["binary_fetch_lz4"] = BINARY_FETCH_LZ4_VERSION
+        return {"session_id": session, "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}
+
+    def _file_store(self):
+        if self._files is None:
+            import folder_paths
+
+            self._files = FileStore(folder_paths, max_file_size=self.max_file_bytes,
+                                    chunk_size=FILE_CHUNK_SIZE)
+        return self._files
+
+    async def file_roots(self, **params):
+        return await file_http.file_roots(self, **params)
+
+    async def file_stat(self, **params):
+        return await file_http.file_stat(self, **params)
+
+    async def file_remove(self, **params):
+        return await file_http.file_remove(self, **params)
 
     async def artifact_put(self, session_id, artifact_id, data, kind, **_):
         self._session(session_id)
@@ -494,9 +525,13 @@ class NativeRuntime:
         return self._result(result)
 
     async def fetch(self, session_id, ref_id, epoch, **_):
+        payload = await self.fetch_bytes(session_id, ref_id, epoch)
+        return {"codec": "pickle", "data": base64.b64encode(payload).decode()}
+
+    async def fetch_bytes(self, session_id, ref_id, epoch, **_):
         self._session(session_id)
         value = self.store.value(session_id, ref_id, epoch)
-        return {"codec": "pickle", "data": base64.b64encode(cloudpickle.dumps(value)).decode()}
+        return cloudpickle.dumps(value)
 
     async def release(self, session_id, refs, epoch=None, **_):
         if epoch is None or epoch == self.epoch:
@@ -534,4 +569,6 @@ class NativeRuntime:
             await self.worker
         if self.loop:
             await self.loop.run_in_executor(self.pool, self.adapter.close)
+        if self._files is not None:
+            await _io(self._files.close)
         self.pool.shutdown(wait=True)

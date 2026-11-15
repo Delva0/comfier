@@ -10,6 +10,7 @@ Comani 是面向 ComfyUI 的 Python SDK 与 daemon。把 **ComfyUI 看作执行�
 - **远端对象传递**：`OutputFuture` 可以直接作为后续输入；`await` 同步，`fetch()` 显式取回数据。
 - **原生工作流**：`with remote.graph()` 捕获同一套调用，`remote.submit()` 一次提交；支持输入端口、组合及中间结果。
 - **Python 代码执行**：支持匹配环境的 callable、自包含源码文件和目录包；目录包使用正常 Python imports。
+- **显式文件 I/O**：`remote.files` 异步上传、下载、校验及删除原生文件，支持 input/temp/output 和模型多根。
 
 一个 daemon 承载一个原生 ComfyUI runtime。当前原生执行使用单 worker；daemon 接收和依赖等待独立进行。工作流内部能否重叠计算，取决于 ComfyUI 和节点本身。
 
@@ -25,6 +26,8 @@ comani daemon --comfy-root /path/to/ComfyUI
 `python -m comani daemon ...` 是同一入口。命令在前台运行，默认监听 `127.0.0.1:8190`；`--comfy-root` 选择已有 backend 源码。按硬件选择的原生参数放在 `--` 后，具体支持范围见 [启动与原生参数](docs/design/development.md)。
 
 尚未发布 PyPI 版本，使用上面的 Git URL 或 `pip install /path/to/comani.whl`。安装不会 clone ComfyUI、创建 runtime venv 或下载模型。独立客户端只需同一轻量包，无需本地 Torch/ComfyUI；取回 Tensor 等对象时仍需对应库。
+
+fetch 默认协商二进制 pickle，保留完整对象语义。需要允许可选 LZ4 压缩时，两端安装 `"comani[lz4] @ git+https://github.com/Delva0/comani.git"`；`Client(url, fetch_compression="identity")` 可关闭压缩，默认 `"auto"` 在双方支持时启用。压缩有 CPU/内存成本，配置和协议见 [结果取回](docs/design/protocol.md#二进制结果取回)。
 
 ## 一段 Python
 
@@ -52,7 +55,20 @@ asyncio.run(main())
 
 `await call` 返回按槽排列的 ready refs；`await call.output(i)` 返回其中一个。`RemoteRef` 本身不可 await。无关调用不会因一次本地 await 获得额外的远端顺序依赖。
 
+本地图片先显式上传，再把原生文件名交给节点：
+
+```python
+staged = await remote.files.upload("local.png")
+loaded = remote.node("LoadImage", image=staged.native_name)
+image, mask = await loaded
+# 在最后一次原生读取结束后：await remote.files.remove(staged)
+```
+
+文件元数据是本地值，不是远端对象引用；GC/关闭 Client 不会删除已完成文件。目录、模型根与下载用法见 [文件 I/O](docs/design/files.md)。
+
 实际例程见 [本地 checkpoint](examples/local_checkpoint.py) 和 [H3 source-file 远端脚本](examples/minimax_h3_source_remote.py) / [source ops](examples/minimax_h3_source_ops.py)。公开 cd6 代码已在官方 ComfyUI 模板的 RTX 4090、Python 3.12.15 环境完成指定 INT8 模型三路 2048×2048 出图，完整 Tensor 逐位一致；环境、资源、清理及历史结果见 [独立远端报告](docs/remote_acceptance.md)。
+
+连续 H3 生成可用 [refs 复用例程](examples/minimax_h3_reuse.py)，以 `--serial` 对照有界计算/fetch/save 重叠；计算、缓存与数据面测量见 [性能记录](docs/performance.md)。
 
 ![指定 Minimax H3 INT8 模型生成的 2048×2048 实际样图](artifacts/remote/60741609-20261115/eager.png)
 
@@ -76,6 +92,8 @@ HTTP 会话通过独立后台 keeper 续约；业务 loop 暂停后可继续使�
 | GC、所有权、缓存与会话 | [对象生命周期](docs/design/ownership.md) |
 | RPC、引用编码、错误和事件 | [协议](docs/design/protocol.md) |
 | callable、文件和目录包 | [Python artifacts](docs/design/python-artifacts.md) |
+| 原生文件上传、下载与模型根 | [文件 I/O](docs/design/files.md) |
+| 计算、结果取回与持续生成 | [性能记录](docs/performance.md) |
 | 环境、运行、扩展节点与测试 | [开发指南](docs/design/development.md) |
 | 环境与验收记录 | [文档目录](docs/README.md) |
 | 已发布薄 CLI、metadata 与 CPU 基线 | [独立 0.3.0 报告](tests/acceptance/THIN_CLI_REPORT.md) |

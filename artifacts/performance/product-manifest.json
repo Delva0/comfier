@@ -1,0 +1,98 @@
+{
+  "README.md": {
+    "sha256": "0a1e953b461af0ee1252a9943b1da932a34da62abda5e2747fcf69acd3657fc3",
+    "bytes": 7433
+  },
+  "examples/minimax_h3_reuse.py": {
+    "sha256": "cd1e1d5dbd219aed00b4d4c75218207ca13627e9f6a50e4d7477af9ab8e722ae",
+    "bytes": 10449
+  },
+  "pyproject.toml": {
+    "sha256": "9eaebad1b4eb53ef0b6dc6a090f1e802e534b0b249e28daa5371d023c3e15705",
+    "bytes": 925
+  },
+  "src/comani/__init__.py": {
+    "sha256": "8bf9e4f1c192d84651296005e9721818721fc80160d4276b13ec8591651b585c",
+    "bytes": 953
+  },
+  "src/comani/__main__.py": {
+    "sha256": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843",
+    "bytes": 580
+  },
+  "src/comani/_codec.py": {
+    "sha256": "b26287bdfbfc78daa113b2a6081422ebe2bba4edc8edbdb81c1eff0112884f71",
+    "bytes": 1883
+  },
+  "src/comani/_runtime/__init__.py": {
+    "sha256": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+    "bytes": 149
+  },
+  "src/comani/_runtime/__main__.py": {
+    "sha256": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7",
+    "bytes": 2418
+  },
+  "src/comani/_runtime/adapter.py": {
+    "sha256": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e",
+    "bytes": 11551
+  },
+  "src/comani/_runtime/file_http.py": {
+    "sha256": "befcd2c02d66b2387904e08e378ac144d49ccecbd191605be5127ed1b300c299",
+    "bytes": 9106
+  },
+  "src/comani/_runtime/files.py": {
+    "sha256": "e097fc10961902a8ad2c9754531fc02f9b6279d61b6447b8a81ae58b6a63ccab",
+    "bytes": 17916
+  },
+  "src/comani/_runtime/http.py": {
+    "sha256": "004d2bbcab1ed455045d6f1497498961d70d3b24655b9c854b8b29a1b82901cf",
+    "bytes": 8134
+  },
+  "src/comani/_runtime/objects.py": {
+    "sha256": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+    "bytes": 4499
+  },
+  "src/comani/_runtime/python_node.py": {
+    "sha256": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+    "bytes": 9026
+  },
+  "src/comani/_runtime/service.py": {
+    "sha256": "fbf23749fce2c5681e0c641b10310bac239b700dcac887329e9e47737c44d000",
+    "bytes": 26177
+  },
+  "src/comani/_runtime/startup.py": {
+    "sha256": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+    "bytes": 5086
+  },
+  "src/comani/client.py": {
+    "sha256": "f007f506d5b83179f38041b5c3b7c704d5a86efcc2fca3f9d11003fd6187a1a4",
+    "bytes": 27051
+  },
+  "src/comani/code.py": {
+    "sha256": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+    "bytes": 5024
+  },
+  "src/comani/errors.py": {
+    "sha256": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+    "bytes": 1558
+  },
+  "src/comani/files.py": {
+    "sha256": "9f7f4b5a260312d62ddb71a823e5f12d48c70ee3c1e0f89cec022c0fbf5bd9dd",
+    "bytes": 14263
+  },
+  "src/comani/graph.py": {
+    "sha256": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+    "bytes": 8707
+  },
+  "src/comani/protocol.py": {
+    "sha256": "7275cc55e535f2e37bbd93ee4c5d9cfe6487c95ebfbdd50a8e6f7a5d692b0ce9",
+    "bytes": 3714
+  },
+  "src/comani/refs.py": {
+    "sha256": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+    "bytes": 8658
+  },
+  "src/comani/transport.py": {
+    "sha256": "3c7dcb87033b4f5e3ffbac626c1e1182f8209e5a1decbffd8f1768f8d27e1e6f",
+    "bytes": 11717
+  }
+}

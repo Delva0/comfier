@@ -19,6 +19,8 @@ daemon 默认监听 `127.0.0.1:8190`，前台运行，用 Ctrl-C/SIGTERM 或部�
 
 独立客户端安装相同轻量包即可，不需要本地 Torch/ComfyUI。显式取回 Tensor 等对象时，本地仍需其反序列化依赖；callable 传输的版本约束见 [Python artifacts](python-artifacts.md)。
 
+LZ4 是可选 extra，base 安装不依赖它。需要协商压缩时，在客户端和 daemon 环境分别安装 `"comani[lz4] @ git+https://github.com/Delva0/comani.git"`，或对本地 wheel 使用 `"/path/to/comani-0.3.0-py3-none-any.whl[lz4]"`。缺少 extra 时继续用 binary identity/兼容 JSON；`fetch_compression="identity"` 显式禁用 LZ4。配置和资源成本见 [结果取回](protocol.md#二进制结果取回)。
+
 ## 就绪与网络入口
 
 可使用 `--host`、`--port`、`--cpu` 和 `--no-custom-nodes`；token 由 `--token` 或 `COMANI_TOKEN` 提供。非 loopback 绑定要求 token。可以使用 SSH 转发或部署方提供的鉴权 HTTPS 反代；租机、隧道、模板和恢复控制面均不属于 daemon。
@@ -68,6 +70,8 @@ python -B examples/minimax_h3_remote.py \
 
 该实际脚本在 0.2.0 执行基线上完成了三路 2048×2048 PNG，原始 Tensor 和 PNG 逐位一致；本地真实来源另见 [local_checkpoint.py](../../examples/local_checkpoint.py)。[远端报告](../remote_acceptance.md) 保留其 wheel、环境、原生显存参数、资源和销毁证据，不把它改记为新 CLI 验收。
 
+[source-file 例程](../../examples/minimax_h3_source_remote.py) 提供后续官方模板验证链；[复用例程](../../examples/minimax_h3_reuse.py) 显式保留稳定 refs，默认最多两张在途，`--serial` 使用相同 eager 调用关闭重叠。其使用步骤、真实性能及待验范围集中在 [性能记录](../performance.md)。客户端本地图片和模型上传使用 [文件 I/O](files.md)，不依赖 Python helper staging。
+
 ## 测试
 
 以下是开发者命令，不是启动 daemon 的部署条件。先选择具有测试所需 ComfyUI/Torch 依赖的解释器，再安装测试 extras；SDK-only 用例本身不需要 native 依赖。
@@ -115,7 +119,7 @@ wheel 使用 `src/comani/`，发布前应在源码冻结后重建。构建工具
 
 开发者可用 `scripts/refresh_wheel.py` 刷新本地 wheel 测试环境；只更新 editable 安装不会更新已安装 wheel。仓库现存 [docs/wheel_manifest.json](../wheel_manifest.json) 是历史 **0.2.0** 快照，不能用作当前 0.3.0 证明。
 
-本次 Git checkpoint 仍使用版本号 `0.3.0`；已测 v4-r2 原始 wheel 的 SHA256 为 `64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98`。以下 [verifier](../../tests/acceptance/verify_wheel.py) 命令用于核对该原件：
+本次 Git checkpoint 仍使用版本号 `0.3.0`；本轮 files/binary/LZ4 候选构建身份见 [性能记录](../performance.md)。历史已测 v4-r2 原始 wheel 的 SHA256 为 `64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98`。以下 [verifier](../../tests/acceptance/verify_wheel.py) 命令用于核对该历史原件：
 
 ```sh
 mkdir -p .local/verification
@@ -125,6 +129,6 @@ python tests/acceptance/verify_wheel.py \
   --report .local/verification/wheel.json
 ```
 
-[当前生产清单](../../tests/acceptance/results/heartbeat-v4-r2/production-manifest.json) 包含 17 个 package Python 文件和 `pyproject.toml`；[实际安装核对](../../tests/acceptance/results/heartbeat-v4-r2/package-identity.json) 将 source/archive/独立安装绑定到同一内容。重新构建的文件应按其实际 SHA256 重新验证，不能借用已测原件的身份。
+[v4-r2 生产清单](../../tests/acceptance/results/heartbeat-v4-r2/production-manifest.json) 包含 17 个 package Python 文件和 `pyproject.toml`；[实际安装核对](../../tests/acceptance/results/heartbeat-v4-r2/package-identity.json) 将当时 source/archive/独立安装绑定到同一内容。重新构建的文件应按其实际 SHA256 重新验证，不能借用已测原件的身份。
 
 885b8cd 的 `bb117…` [基线清单](../../tests/acceptance/results/thin-cli-0.3.0/production-manifest.json) 与 [安装记录](../../tests/acceptance/results/thin-cli-0.3.0/cleanup-wheel.json) 继续作为历史证据保存。

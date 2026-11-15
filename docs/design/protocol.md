@@ -13,12 +13,13 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 | `submit` | 登记 `session_id/call_id/spec` 与输入 reservations，返回接受状态 |
 | `wait_result` | 等整个 invocation；可指定 `node_id` 等 workflow 中一个 producer |
 | `fetch` | 按 ref ID/epoch 取回显式请求的 Python 值 |
+| `file_roots` / `file_stat` / `file_remove` | 显式文件根、元数据和删除；不产生远端对象引用 |
 | `release` | 幂等释放 owned lease/view 记录 |
 | `forget_calls` | 回收不再持有的终态调用 metadata，活跃依赖会延后回收 |
 | `heartbeat` | 更新会话活跃时间 |
 | `close_session` | 结束会话并清理相应资源 |
 
-当前 HTTP transport 使用三个有界连接池：控制请求 32、结果长轮询 100、artifact/fetch 数据传输 4。长轮询和大数据请求不占用提交、heartbeat、release、close 的连接额度。连接池界限是 transport 的资源边界，不代表 native worker 的并行计算数。
+当前 HTTP transport 使用三个有界连接池：控制请求 32、结果长轮询 100、artifact/fetch/file 数据传输 4。长轮询和大数据请求不占用提交、heartbeat、release、close 的连接额度。连接池界限是 transport 的资源边界，不代表 native worker 的并行计算数。
 
 这些是业务 RPC 的连接池。HTTP keeper 另外使用自己线程/event loop 中的一条专用连接，使业务 loop 暂停时仍能续约，见 [会话续约](ownership.md#会话续约与业务-loop-暂停)。暂态 HTTP 状态、连接错误或截断响应不等于 lease 已关闭，不会抢先拒绝真实业务 RPC；明确终态和完整协议错误仍拒绝复用，业务 RPC 自身的错误照常传播；`heartbeat` 只更新有效 session，不重新握手或重新提交任务来恢复已过期会话。
 
@@ -31,6 +32,24 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 临时 Cloudflare Quick Tunnel 另有 200 个并发在途请求限制。结果等待会占用其中的额度，即使每轮只有 20 秒；客户端连接池分离不能突破代理总限额。需要按实际部署控制并发等待量，或选用具备合适容量的入口；核心 RPC 不依赖某个代理产品。
 
 [当前安装复测](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md) 记录真实 native 调用运行 140.010 秒，经过 125 秒读取超时代理，一次 submit、六次 pending、十次查询/终态复读及稳定的最终引用，并检查取消与 close 前清理。这段 140 秒测量绑定 885b8cd 基线；当前 HTTP 独立保活的压力与生命周期结果另见 [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md)。历史[真实远端 HTTPS 验证](../../artifacts/remote/60662518-20261114/long-wait.json) 的 130 秒调用及完整模型结果另见 [远端报告](../remote_acceptance.md)。
+
+### 二进制结果取回
+
+`fetch` 仍使用同一 `POST /rpc`，返回同一份 cloudpickle 对象字节。握手精确声明整数 `capabilities.binary_fetch=1` 时，新 HTTP 客户端发送 `Accept: application/vnd.comani.pickle`，服务端以该 media type 返回 pickle body。没有能力时使用原有 `{"codec":"pickle","data":"<base64>"}` JSON envelope；新服务端对旧客户端仍返回 JSON，新客户端也能读取 JSON fallback。能力版本不匹配或布尔 `true` 不算支持。
+
+可选 `comani[lz4]` 在双方都有 LZ4 且服务端声明整数 `binary_fetch_lz4=1` 时，允许默认 `fetch_compression="auto"` 发送 `X-Comani-Accept-Codec: lz4-frame-v1`。`"identity"` 禁用该协商；缺 extra 或对端能力时保留 binary identity。`auto` 只选择可用 codec，不测网络带宽，也不保证更快。
+
+服务端仅对至少 1 MiB 的完整 pickle body 尝试 fast LZ4 frame，实际节省至少 1% 才返回 `application/vnd.comani.pickle+lz4`，并以 `X-Comani-Uncompressed-Length` 声明原长度。LZ4 是独立 vendor media type，不使用 HTTP `Content-Encoding`。客户端要求一个完整、带 content checksum 的 frame，验证 frame 长度、声明长度和无尾随数据；未协商、截断、校验或长度错误直接失败，不重新请求或重做计算。
+
+二进制 fetch 仍整块序列化、读取和反序列化，不是 tensor 专用或有损 codec。压缩还会暂时分配完整候选 body，即使高熵内容最终回退 identity；开销与实测范围见 [性能记录](../performance.md#二进制与压缩的证据边界)。
+
+### 文件流
+
+握手以整数 `capabilities.files=1` 声明文件接口。roots/stat/remove 使用 RPC；upload/download 使用相同鉴权与 SDK session 的 `POST /files/upload`、`POST /files/download`，共享数据连接池。内部 raw session 不允许文件 I/O。
+
+upload 为按顺序的 `metadata` JSON、`file` 二进制、`verified` JSON 三个 multipart part；尾部带实际 size/SHA256，单份元数据最多 64 KiB。download 返回 `application/vnd.comani.file-v1`：4 字节大端元数据长度、JSON 元数据、声明大小的文件 bytes、4 字节大端 footer 长度、含 size/SHA256 的 JSON footer。客户端拒绝 footer 后的额外数据，校验成功后才发布文件。
+
+流中断可能发生在发布前后，不会自动重试。文件根与路径、revision、原子发布及取消语义统一见 [文件 I/O](files.md)。
 
 ## 调用与引用
 

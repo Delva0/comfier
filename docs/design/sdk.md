@@ -30,6 +30,10 @@ async with Client(url, token=token) as remote:
 
 `.python()` 仍是一个输出槽：函数返回 tuple/list/dict 时，整个返回值放在此槽中，不自动解包。零输出调用的整体结果是空 tuple，副作用仍需执行完成。
 
+`remote.files` 是独立的 async 文件 I/O 入口。`await remote.files.upload(...)` 直接返回本地 `RemoteFile` 元数据，download 返回 `DownloadedFile`；它们不是 Call、Future 或远端对象引用，文件操作不会被 graph capture 收集。文件与模型根选择、`native_name` 及持久性见 [文件 I/O](files.md)。
+
+HTTP fetch 保留 cloudpickle 对象语义，默认协商二进制响应。可选安装 `comani[lz4]` 后，`Client(url, fetch_compression="auto")` 在两端支持时允许 LZ4；`"identity"` 禁用该压缩。自定义 transport 的配置写在 `HTTPTransport(..., fetch_compression=...)`，再传给 Client，不能同时给 Client 该选项。协议与开销边界见 [结果取回](protocol.md#二进制结果取回)。
+
 取消某个本地 waiter 不取消底层远端调用。`close(wait=False)` 关闭会话并令待处理 SDK 等待失败；原生正在执行的同步工作不保证立即停止，见 [Runtime](runtime.md)。
 
 ## 可选执行 metadata

@@ -5,7 +5,7 @@
 ```text
 本地 Python
   Client / Call / OutputFuture / RemoteRef
-                 │ JSON RPC + code artifacts
+                 │ RPC、二进制 fetch、code artifacts、文件流
                  ▼
 daemon 主事件循环：接收、依赖等待、会话与对象记录
                  │ 就绪调用
@@ -22,6 +22,7 @@ daemon 主事件循环：接收、依赖等待、会话与对象记录
 | [所有权](ownership.md) | [refs.py](../../src/comani/refs.py)、[objects.py](../../src/comani/_runtime/objects.py) | Owned/borrowed、GC、ACK 接管与失效 |
 | [协议](protocol.md) | [protocol.py](../../src/comani/protocol.py)、[transport.py](../../src/comani/transport.py)、[http.py](../../src/comani/_runtime/http.py) | RPC、值编码、错误与辅助事件流 |
 | [Python artifacts](python-artifacts.md) | [code.py](../../src/comani/code.py)、[python_node.py](../../src/comani/_runtime/python_node.py) | 代码打包、通用 Python 节点、正常包 imports |
+| [文件 I/O](files.md) | [files.py](../../src/comani/files.py)、[文件存储](../../src/comani/_runtime/files.py)、[文件 HTTP](../../src/comani/_runtime/file_http.py) | 显式 async 上传/下载、原生目录与模型根、文件校验和持久性 |
 | [启动与开发](development.md) | [CLI](../../src/comani/__main__.py)、[runtime 入口](../../src/comani/_runtime/__main__.py)、[pyproject.toml](../../pyproject.toml) | 当前解释器内启动 driver、节点接入与开发测试 |
 
 ## 设计约束
@@ -35,11 +36,11 @@ daemon 主事件循环：接收、依赖等待、会话与对象记录
 
 ## 当前边界与证据
 
-当前 Git checkpoint 保留版本号 `0.3.0`，Python 3.12 启动、HTTP 独立保活与共享所有权已按明确构建身份验收。native/headless 支持范围见 [Runtime](runtime.md)，metadata 用法见 [SDK](sdk.md#可选执行-metadata)。
+当前 Git checkpoint 保留版本号 `0.3.0`。本轮新增显式文件 I/O、协商二进制/可选 LZ4 fetch 和 H3 refs 复用例程，其冻结构建与验收状态集中在 [性能记录](../performance.md)；下表保留启动、保活与原 GPU 证据各自的构建身份。native/headless 支持范围见 [Runtime](runtime.md)，metadata 用法见 [SDK](sdk.md#可选执行-metadata)。
 
 | 范围 | 构建与证据 |
 |---|---|
-| 当前 v4-r2 / `64a73a6e…` wheel | [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md)：工程 CPU 184 passed、2 deselected；独立 Python 3.12 定向回归和跨版本 source 三路 CPU 链通过。 |
+| v4-r2 / `64a73a6e…` wheel | [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md)：工程 CPU 184 passed、2 deselected；独立 Python 3.12 定向回归和跨版本 source 三路 CPU 链通过。 |
 | HTTP 独立保活与回收 | [独立压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)：32 会话/4,096 calls、1,000 会话短 TTL churn、业务 loop 阻塞超过 TTL 后 ownedRef 可用，GC 在 close 前完成；无活跃会话意外失效。关闭中的空会话允许 TTL 兜底回收，不承诺所有历史运行零 expiry。 |
 | 885b8cd、被否决 v2/v3 与旧 v4 | 保留业务 loop 心跳失活、暂态错误/HTTP 503 误拦及 queued/context 隐藏拥有者的反例；早期候选的部分通过不改记为最终通过。 |
 | 官方模板 GPU/H3 旅程 | 公开 cd6 的 17 个生产源码身份核对通过，source-file 三路真实 GPU 2048×2048 Tensor 逐位一致、130 秒 HTTPS 一次提交通过，实例已销毁；[新远端报告](../remote_acceptance.md) 分列资源与历史结果。 |

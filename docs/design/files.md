@@ -1,0 +1,70 @@
+# 原生文件与模型 I/O
+
+实现：[客户端文件代理](../../src/comani/files.py)、[文件存储](../../src/comani/_runtime/files.py)、[HTTP 流](../../src/comani/_runtime/file_http.py)。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。
+
+## 上传后交给原生节点
+
+```python
+async with Client(url, token=token) as remote:
+    staged = await remote.files.upload("local.png")
+    image = mask = None
+    try:
+        loaded = remote.node("LoadImage", image=staged.native_name)
+        image, mask = await loaded
+        local_image = await image.fetch()
+    finally:
+        for ref in (image, mask):
+            if ref is not None:
+                ref.release()
+        await remote.files.remove(staged)
+```
+
+`Path` 节点输入只传路径对象，字符串路径指远端文件；它们不会自动读取客户端文件。Python `source=...` 上传代码 artifact，图片和模型使用 `files.upload`。文件必须保留到最后一次原生读取完成，再显式删除。
+
+## 公共方法与本地值
+
+| 方法 | 选择与返回值 |
+| --- | --- |
+| `await files.upload(local_path, *, directory=None, root=None, path=None)` | 从本地常规文件上传，返回 `RemoteFile`；默认 input 根和 UUID 文件名，保留合法后缀 |
+| `await files.download(remote_file, local_path, *, directory=None, root=None, overwrite=False)` | 下载并校验后发布到本地，返回 `DownloadedFile`；覆盖现有本地目标必须显式 `overwrite=True` |
+| `await files.stat(remote_file, *, directory=None, root=None, checksum=False)` | 返回 `RemoteFile`；默认只读元数据，`checksum=True` 才完整扫描文件计算 SHA256 |
+| `await files.remove(remote_file, *, directory=None, root=None, missing_ok=False)` | 显式删除一个文件，返回 `None` |
+| `await files.roots(*, directory=None, category=None)` | 返回 `tuple[FileRoot, ...]`；无筛选时列出 input、temp、output 三根 |
+
+路径选择参数 `remote_file` 可以是 `RemoteFile`，或根内使用 `/` 的相对字符串。字符串默认选择 input，可显式给 `directory="input"|"temp"|"output"` 或 `root=FileRoot`；后两者互斥。`RemoteFile` 已带根与 revision，不能再附加根选择。
+
+`RemoteFile` 包含 `root`、`relative_path`、`native_name`、`size`、可为空的 `sha256` 和 `revision`。`.name` 是 `relative_path` 的别名；**交给 ComfyUI 节点使用 `.native_name`**，其中包含 temp/output 所需的原生目录标注。上传及完整下载后 SHA256 已知，普通 stat 不暗中读取大模型。
+
+`FileRoot` 包含不透明 `id`、远端 `path`、`directory`、`category` 和原生查找顺序 `priority`。这些是当前 daemon 文件配置的定位信息，不能作为跨 daemon 的持久 ID。`DownloadedFile` 包含本地绝对 `local_path`、`size`、`sha256` 和更新后的 `remote` 元数据。这些不可变本地值不保留 Client，没有 `fetch()` 或 `release()`。
+
+## 模型多根与命名
+
+模型类别和路径来自当前 ComfyUI `folder_paths` 配置，包括额外模型路径。上传到模型类别时，先取根并显式选择：
+
+```python
+roots = await remote.files.roots(category="diffusion_models")
+model_file = await remote.files.upload(
+    "model.safetensors", root=roots[0], path="my-model.safetensors",
+)
+model = remote.node("UNETLoader", unet_name=model_file.native_name, weight_dtype="default")
+```
+
+按部署者的路径策略选择根；不能把 `directory` 写成任意模型类别。上传 create-only，不覆盖现有远端文件。模型类别的任一根已有同一相对名时，上传拒绝，避免在更高优先级根中制造 shadow。模型元数据还核对原生查找实际选中该文件，并在上传/删除后失效该类别的文件名缓存。此入口不安装代码或 datasets，拒绝 `custom_nodes` 和 `datasets` 类别。
+
+远端路径拒绝绝对路径、`..`、反斜杠及跨平台非法文件名。原生配置明确指定的根先解析为 canonical 路径；其后目录及目标拒绝 symlink/reparse point，只操作常规文件。该边界不隔离具有 daemon 同等文件权限的恶意代码或外部进程。
+
+## 流式传输与提交点
+
+HTTP 上传和下载按 1 MiB chunk 读取文件；磁盘操作放到 I/O executor。上传在同一遍读取中计算 SHA256，以尾部校验信息验证大小与内容，再将同目录 `.part` 文件原子发布。create-only 发布需要文件系统支持同文件系统 hard link，否则报 `UnsupportedFileSystem`。已存在文件不会因上传失败被覆盖。
+
+下载在服务端单遍读取并计算尾部 SHA256，客户端验证长度、SHA256 和完整帧后才发布本地目标。默认以 hard link create-only 发布；`overwrite=True` 用原子 replace。源文件的 revision 在打开和读取结束时检查；传入已有 `RemoteFile` 还检查其 revision，以及已知的 SHA256。`revision` 是 device/inode/size/mtime/ctime 的乐观变化检测，不是强文件快照或针对并发外部写入的锁。
+
+`NativeRuntime(..., max_file_bytes=None)` 默认不添加任意文件大小限额。部署者可在 runtime 构造时设非负上限，握手通过 `file_limits` 公布上限与 chunk 大小；这不是新增 CLI 参数。文件传输不把整文件塞进 JSON/RPC 请求上限，但仍受磁盘、网络和实际部署约束。
+
+当前没有断点续传或自动重试。错误或取消会收尾活动 I/O 并清理属于本次传输的 `.part` 文件；为上传创建的目录可能保留。若取消/断连晚于远端发布点，文件可能已经提交，调用方不能把未收到成功响应当作文件不存在。标准 multipart epilogue 可接受，额外文件 part 被拒绝。非 HTTP 自定义 transport 的流式 upload/download 会明确报 `UnsupportedTransport`；roots/stat/remove 仍取决于它是否支持相应 RPC。
+
+## 持久性与会话
+
+已完成文件由原生文件系统持有，可供其他授权会话使用，不属于 session 的 owned refs。GC、`RemoteRef.release()`、Client close 和 daemon 正常关闭都不删除已完成文件；temp 根的后续清理由原生环境或部署者策略决定，Comani 不提供永久保留保证。删除通过 `files.remove()` 明确进行；传入 `RemoteFile` 时会拒绝删除 revision 已改变的文件。
+
+保存 `files = remote.files` 会强持有所属 Client；Client 每次访问都返回新代理，不缓存它，因此没有反向所有权环。只保存 `RemoteFile`/`FileRoot`/`DownloadedFile` 不保活会话。显式 Client close 优先取消活动文件 I/O，关闭后需新建 Client 才能再次操作文件。

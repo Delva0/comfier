@@ -9,13 +9,23 @@ from typing import Any, Callable
 
 PROTOCOL_VERSION = 1
 PYTHON_NODE = "ComaniPython"
+PICKLE_CONTENT_TYPE = "application/vnd.comani.pickle"
+BINARY_FETCH_VERSION = 1
+LZ4_PICKLE_CONTENT_TYPE = "application/vnd.comani.pickle+lz4"
+BINARY_FETCH_LZ4_VERSION = 1
+LZ4_CODEC = "lz4-frame-v1"
+LZ4_ACCEPT_HEADER = "X-Comani-Accept-Codec"
+PICKLE_LENGTH_HEADER = "X-Comani-Uncompressed-Length"
 
 
 def pack_pickle(value: Any) -> dict:
     return {"codec": "pickle", "data": base64.b64encode(pickle.dumps(value)).decode("ascii")}
 
 
-def unpack_pickle(payload: dict) -> Any:
+def unpack_pickle(payload: dict | bytes) -> Any:
+    """Decode the JSON envelope or a negotiated raw pickle HTTP body."""
+    if isinstance(payload, bytes):
+        return pickle.loads(payload)
     if payload.get("codec") != "pickle":
         raise ValueError(f"Unsupported object codec: {payload.get('codec')!r}")
     return pickle.loads(base64.b64decode(payload["data"], validate=True))

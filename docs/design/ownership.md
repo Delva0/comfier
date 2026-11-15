@@ -15,6 +15,8 @@ Borrowed ref 绑定 cache entry 的身份及版本。entry 被驱逐后，即使
 
 Owned 与 borrowed 句柄都保留远端定位所需的 Client 会话能力，但只有 owned lease 保活相应远端结果；borrowed 句柄保留 Client 不会 pin 原生 cache。
 
+文件不是第三种对象 lease。已完成的原生文件由文件系统持有，GC、release、Client close 不删除它。`remote.files` 代理强持有 Client；返回的 `RemoteFile`、`FileRoot`、`DownloadedFile` 只是本地元数据，不保活会话。显式删除与传输提交点见 [文件 I/O](files.md#持久性与会话)。
+
 ## 本地持有链
 
 ```text

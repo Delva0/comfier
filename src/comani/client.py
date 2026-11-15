@@ -14,12 +14,14 @@ from functools import partial
 
 from .code import prepare_code
 from .errors import InvalidReference, NotSubmitted, RemoteError, SessionClosed
+from .files import Files
 from .graph import Graph, GraphInput, GraphRef, _receiver
 from .protocol import PYTHON_NODE, encode_tree, lift_arguments, unpack_pickle
 from .refs import Call, OutputFuture, RemoteRef, _CallState
 from .transport import HTTPTransport
 
 _NODE_INPUTS = object()
+_FETCH_COMPRESSION = object()
 
 
 def _call_weak(callback_ref, *args):
@@ -97,10 +99,17 @@ class _Submission:
 
 
 class Client:
-    def __init__(self, url=None, *, transport=None, token=None):
+    def __init__(self, url=None, *, transport=None, token=None,
+                 fetch_compression=_FETCH_COMPRESSION):
         if transport is None and url is None:
             raise TypeError("Provide a daemon URL or transport")
-        self.transport = transport or HTTPTransport(url, token=token)
+        if fetch_compression is not _FETCH_COMPRESSION:
+            if fetch_compression not in ("auto", "identity"):
+                raise ValueError("fetch_compression must be 'auto' or 'identity'")
+            if transport is not None:
+                raise TypeError("Set fetch_compression on HTTPTransport when supplying a transport")
+        compression = "auto" if fetch_compression is _FETCH_COMPRESSION else fetch_compression
+        self.transport = transport or HTTPTransport(url, token=token, fetch_compression=compression)
         self.session_id = uuid.uuid4().hex
         self.epoch = ""
         self.handshake = {}
@@ -110,6 +119,7 @@ class Client:
         self._sender = None
         self._opening = None
         self._watchers = set()
+        self._file_tasks = set()
         self._uploaded = set()
         self._pending_releases = []
         self._release_task = None
@@ -130,6 +140,10 @@ class Client:
     @property
     def closed(self):
         return self._closed
+
+    @property
+    def files(self) -> Files:
+        return Files(self)
 
     async def __aenter__(self):
         await self.start()
@@ -546,6 +560,8 @@ class Client:
         if self._closed:
             return
         self._closing = True
+        for task in tuple(self._file_tasks):
+            task.cancel()
         self._close_task = asyncio.create_task(self._close(wait=wait))
         self._close_task.add_done_callback(lambda result: None if result.cancelled() else result.exception(),
                                            context=contextvars.Context())

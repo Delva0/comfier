@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "status": "PASS_local_acceptance_ready_for_remote_validation",
+  "accepted_utc": "2026-11-15T10:58:30.460802+00:00",
+  "role": "fresh independent final acceptance; no implementation participation or product edits",
+  "baseline_head": "42350b082ba29b6b5c9e82fed40858d971fccb8c",
+  "scope": "Selected independent local CPU acceptance evidence; paths, process/port/session identifiers and raw logs omitted.",
+  "source_report_sha256": "8ea5ec69ed8ac91b5402e8499ca68b0d765de22c27c1ad3eb53698138f3d50e9",
+  "final_freeze": {
+    "sha256": "88e6b57429b8aaaa8d8f1b2e1c40510b2284f657cacda2180c644c7a4dc05126",
+    "files": 78,
+    "differences_from_built_freeze": [
+      "tests/unit/test_lz4_fetch.py"
+    ],
+    "all_product_files_unchanged": true,
+    "artifact": "final-feature-freeze.json"
+  },
+  "wheel": {
+    "sha256": "38ddaf7d879c39e5402ecbad554b41bf4499138a10aa3e1e00707359908f58ee",
+    "package_python_files": 21,
+    "source_wheel_installed_equal": true,
+    "readme_metadata_matches_current": true,
+    "rebuild_differences": [
+      "comani-0.3.0.dist-info/METADATA",
+      "comani-0.3.0.dist-info/RECORD"
+    ],
+    "production_manifest_sha256": "26d2ca637b98f3b03fd6f7e491d569d5630cbde302c57d896d74f257619e8e49",
+    "filename": "comani-0.3.0-py3-none-any.whl",
+    "production_manifest": "product-manifest.json",
+    "first_functional_tested_wheel_sha256": "e3c255d67195ebf1c19a40f87b8ee495fcb5e44341298456d4bc213c265c4edc"
+  },
+  "installed_environments": {
+    "core": {
+      "torch_absent": true,
+      "folder_paths_absent": true,
+      "lz4_present": false,
+      "dependencies": {
+        "attrs": "26.1.0",
+        "propcache": "0.5.4",
+        "aiohappyeyeballs": "2.7.1",
+        "frozenlist": "1.8.0",
+        "aiosignal": "1.4.0",
+        "yarl": "1.25.1",
+        "comani": "0.3.0",
+        "aiohttp": "3.14.5",
+        "typing_extensions": "4.16.0",
+        "idna": "3.20",
+        "multidict": "7.2.1",
+        "cloudpickle": "3.1.2"
+      }
+    },
+    "lz4": {
+      "torch_absent": true,
+      "folder_paths_absent": true,
+      "lz4_present": true,
+      "dependencies": {
+        "attrs": "26.1.0",
+        "propcache": "0.5.4",
+        "aiohappyeyeballs": "2.7.1",
+        "frozenlist": "1.8.0",
+        "aiosignal": "1.4.0",
+        "yarl": "1.25.1",
+        "lz4": "4.4.5",
+        "comani": "0.3.0",
+        "aiohttp": "3.14.5",
+        "typing_extensions": "4.16.0",
+        "idna": "3.20",
+        "multidict": "7.2.1",
+        "cloudpickle": "3.1.2"
+      }
+    },
+    "fixture": {
+      "torch_absent": true,
+      "folder_paths_absent": true,
+      "lz4_present": false,
+      "dependencies": {
+        "attrs": "26.1.0",
+        "propcache": "0.5.4",
+        "aiohappyeyeballs": "2.7.1",
+        "frozenlist": "1.8.0",
+        "aiosignal": "1.4.0",
+        "yarl": "1.25.1",
+        "comani": "0.3.0",
+        "aiohttp": "3.14.5",
+        "typing_extensions": "4.16.0",
+        "idna": "3.20",
+        "multidict": "7.2.1",
+        "cloudpickle": "3.1.2"
+      }
+    }
+  },
+  "verification": [
+    {
+      "command": "CUDA_VISIBLE_DEVICES=-1 PYTHONPATH=src .venv/bin/python -B -m pytest tests/unit tests/native tests/integration -m 'not gpu and not model' -q",
+      "result": "305 passed, 1 failed, 2 deselected in 94.84s; single full applicable CPU run",
+      "failure": "test_lz4_fetch already-compressed app-wide observer selected a heartbeat JSON after a correct binary fetch; reproduced independently at trial 12, product and value correct"
+    },
+    {
+      "command": "PYTHONPATH=src .venv/bin/python -B -m pytest tests/unit/test_lz4_fetch.py -q",
+      "result": "29 passed after author fixed only the two observers to filter fetch and assert an exact list"
+    },
+    {
+      "result": "200/200 original-case repetitions pass; competing heartbeat response still observed"
+    },
+    {
+      "result": "Actual isolated installed wheel core/no-Torch/no-LZ4 and optional-LZ4 clients against actual native ComfyUI CPU HTTP; 9 native LoadImage passes across input/temp/output; explicit model second root; SHA atomic downloads; create-only/shadow/portable paths; plain Path remains value; cyclic/aliased generic fetch and callable; three codec modes; independent heartbeat and proxy/metadata lifetime"
+    },
+    {
+      "result": "Actual installed-wheel HTTP repeated upload and download cancellation, no precommit publish/partial, source handles closed, same client explicit recovery; checksum/multiple-frame/declared-size LZ4 corruption each fails after one fetch without fallback"
+    },
+    {
+      "result": "Actual immutable git-verified 42350b0 SDK/server source versus current server/current installed wheel: old/new, new/old and new/new, three 8 MiB generic fetches each, exact JSON/binary negotiation"
+    },
+    {
+      "result": "12 MiB synthetic noncontiguous CPU tensor logical SHA, dtype, shape, stride, alias and device unchanged through JSON, binary identity and LZ4; standalone codec headers, no HTTP Content-Encoding"
+    },
+    {
+      "result": "ruff src/unit/native/integration/reuse example and all independent QA scripts; git diff --check pass"
+    },
+    {
+      "result": "After authorized README edits, rebuilt and reinstalled the same 21 package-source files into all three SDK environments; archive differences from functionally tested wheel are only METADATA and its RECORD hash; isolated import and CLI help rechecked"
+    }
+  ],
+  "cleanup": {
+    "observed_pids_all_exited_count": 10,
+    "numeric_ports_rechecked_free_count": 5,
+    "cross_version_ports_checked_free_at_shutdown": 3,
+    "tensor_port_checked_free_at_shutdown": true,
+    "native_final_counters": {
+      "sessions": 0,
+      "calls": 0,
+      "objects": 0,
+      "requests": 0,
+      "uploads": 0,
+      "partials": 0,
+      "child_pids_reaped": true
+    },
+    "temporary_transfer_roots_removed": true,
+    "owned_background_jobs_left": 0
+  },
+  "limits": [
+    "WSL/Linux CPU acceptance; real Windows/NTFS not tested (only WindowsApps Python alias found).",
+    "No GPU/model weights/WAN performance or remote rented machine was used; final remote acceptance remains necessary.",
+    "Synthetic tensor compression is a correctness case and not a real image compression or WAN throughput claim.",
+    "No product edits, push, publication or GPU rental by this agent.",
+    "Full suite was not rerun after the isolated test-only observer repair; unaffected 305 passes plus all 29 LZ4 tests and 200 repetitions establish the final test gate."
+  ]
+}

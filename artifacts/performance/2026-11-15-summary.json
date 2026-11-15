@@ -1,0 +1,761 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-15",
+  "status": "local_accepted_candidate_remote_gpu_wan_pending",
+  "scope": "Selected scalar evidence only; no raw tensors, pickle payloads, logs, remote endpoints, credentials or execution identifiers.",
+  "sources": {
+    "gpu_profile": {
+      "source_file": "profile-report.json",
+      "sha256": "0cb26bb50a8e8e68299179a74b8ebdd215d1c342e7f010a1502e9e2d474125b4"
+    },
+    "strategy": {
+      "source_file": "strategy.md",
+      "sha256": "185578b58ad1bdeaac0ccd392edb23f03c6b3d36d379de36f5919d50816f4ddb"
+    },
+    "legacy_transfer_review": {
+      "source_file": "legacy-transfer-review.md",
+      "sha256": "f00513b0188f409748b3eb0600cf59d732421f6f1e792f61d2d012c20774a6bf"
+    },
+    "file_api_design": {
+      "source_file": "file-api-design.md",
+      "sha256": "717e24d9ced7a7c0c6f441375ce4c1af364a16dce32a4b15645cb479f60ed19d"
+    },
+    "binary_loopback": {
+      "source_file": "benchmark.json",
+      "sha256": "ea1e5c2388cae5b8a71437a3ae45eb83d3c381e713eb7b3cb615a8b64a989209"
+    },
+    "lossless_codec": {
+      "source_file": "benchmark.json",
+      "sha256": "5eee75cc7d4159feba689e599dce8c2bb4045cc4c15fa449c8aaeb8c196a72e4"
+    },
+    "lossless_codec_report": {
+      "source_file": "report.txt",
+      "sha256": "454c40172f4f07f9c6f433e92145b8842f6316b3117052c8d2927ba38498e573"
+    },
+    "independent_local_acceptance": {
+      "source_file": "acceptance-report.json",
+      "sha256": "6bce53701fe4ba1130e3f06d4b2487ff855ece6b61971d94726702c7e1867398"
+    },
+    "production_lz4": {
+      "source_file": "benchmark.json",
+      "sha256": "5a822c8965660c3791dadea29315e2e26161a03e388c1f9e558a89457fd38f48"
+    },
+    "final_independent_local_acceptance": {
+      "source_file": "acceptance-report.json",
+      "sha256": "8ea5ec69ed8ac91b5402e8499ca68b0d765de22c27c1ad3eb53698138f3d50e9"
+    }
+  },
+  "gpu_profile": {
+    "source": "gpu_profile",
+    "comani_commit": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+    "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "gpu": "RTX 4090",
+    "native_flags": [
+      "--reserve-vram",
+      "4"
+    ],
+    "cold_definition": "Fresh daemon/CUDA process only; model files predownloaded and verified. OS/driver/JIT disk caches were not cleared.",
+    "historical_anomaly_reproduced": false,
+    "historical_same_script_total_seconds": {
+      "eager": 177.788,
+      "captured_graph": 152.406,
+      "native_api": 13.478
+    },
+    "uninstrumented_same_script_total_seconds": [
+      {
+        "mode": "eager",
+        "seconds": 25.988641415999155,
+        "max_abs_float_error_vs_eager": 0.0
+      },
+      {
+        "mode": "captured_graph",
+        "seconds": 12.775496660997305,
+        "max_abs_float_error_vs_eager": 0.0
+      },
+      {
+        "mode": "native_api",
+        "seconds": 8.469420075001835,
+        "max_abs_float_error_vs_eager": 0.0
+      }
+    ],
+    "valid_profile_same_seed_sequence": [
+      {
+        "mode": "eager",
+        "seconds": 25.72013327499735,
+        "await_output": 18.41899574999843,
+        "native_worker_seconds": 18.028561346000004,
+        "fetch": 5.816591841001355,
+        "save": 1.470537675999367,
+        "forward_count": 6,
+        "native_nodes_seconds": {
+          "CLIPLoader": 0.984966595,
+          "MiniMaxH3ImageConditioning": 5.900413402,
+          "UNETLoader": 0.488379152,
+          "VAELoader": 0.432506016,
+          "ConditioningZeroOut": 0.000247681,
+          "KSampler": 8.504772763,
+          "PythonNode": 0.001568096,
+          "VAEDecode": 1.651790799
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 1.193862914,
+            "body_read": 4.328071351,
+            "json_decode": 0.125791939,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": 0.252982385
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.164628061
+        ]
+      },
+      {
+        "mode": "captured_graph",
+        "seconds": 12.457819610001025,
+        "await_output": 5.72583520599801,
+        "native_worker_seconds": 5.32329834,
+        "fetch": 5.291555293002602,
+        "save": 1.431362243998592,
+        "forward_count": 6,
+        "native_nodes_seconds": {
+          "MiniMaxH3ImageConditioning": 1.044732312,
+          "ConditioningZeroOut": 0.000532462,
+          "KSampler": 3.277264551,
+          "PythonNode": 0.000466542,
+          "VAEDecode": 0.940433855
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.922339839,
+            "body_read": 4.082446357,
+            "json_decode": 0.132263439,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": 0.238968353
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.150915647
+        ]
+      },
+      {
+        "mode": "native_api",
+        "seconds": 7.385184254999331,
+        "await_output": 1.3570967000014207,
+        "native_worker_seconds": 0.968350225,
+        "fetch": 4.65953298200111,
+        "save": 1.3600116489978973,
+        "forward_count": 0,
+        "native_nodes_seconds": {
+          "VAEDecode": 0.95159777,
+          "PythonNode": 0.000243831
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.873132302,
+            "body_read": 3.509356273,
+            "json_decode": 0.131345167,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": 0.207424564
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.142161723
+        ]
+      }
+    ],
+    "warm_new_seed_and_repeated_cache_sequence": [
+      {
+        "mode": "captured_graph",
+        "seconds": 12.025867462998576,
+        "await_output": 4.666046916998312,
+        "native_worker_seconds": 3.7889230979999997,
+        "fetch": 6.035931231002905,
+        "save": 1.3231324499975017,
+        "forward_count": 6,
+        "native_nodes_seconds": {
+          "KSampler": 2.802581115,
+          "PythonNode": 0.00042789,
+          "VAEDecode": 0.953207812
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.910674158,
+            "body_read": 4.846156381,
+            "json_decode": 0.121683158,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": null
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.152072945
+        ]
+      },
+      {
+        "mode": "native_api",
+        "seconds": 11.309511595998629,
+        "await_output": 4.556495344000723,
+        "native_worker_seconds": 3.898469444,
+        "fetch": 5.266976851999061,
+        "save": 1.4855426680005621,
+        "forward_count": 6,
+        "native_nodes_seconds": {
+          "KSampler": 2.807391123,
+          "VAEDecode": 1.054887771,
+          "PythonNode": 0.00019862
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.947063132,
+            "body_read": 4.027223598,
+            "json_decode": 0.136611724,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": null
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.152114567
+        ]
+      },
+      {
+        "mode": "native_api",
+        "seconds": 8.957432276001782,
+        "await_output": 2.011047690997657,
+        "native_worker_seconds": 0.011645342,
+        "fetch": 5.45903811700191,
+        "save": 1.4868310839992773,
+        "forward_count": 0,
+        "native_nodes_seconds": {
+          "PythonNode": 0.000396601
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.966943749,
+            "body_read": 4.18196869,
+            "json_decode": 0.144884437,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": null
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.161467588
+        ]
+      }
+    ],
+    "eager_explicit_ref_reuse_setup_seconds": 2.833542052001576,
+    "eager_explicit_ref_reuse": [
+      {
+        "mode": "eager_reused_refs",
+        "seconds": 14.964733816999797,
+        "await_output": 4.821505621999677,
+        "native_worker_seconds": 4.28230095,
+        "fetch": 8.600893243001337,
+        "save": 1.5420016600000963,
+        "forward_count": 6,
+        "native_nodes_seconds": {
+          "KSampler": 3.310085119,
+          "PythonNode": 0.00137697,
+          "VAEDecode": 0.940739313
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.992009712,
+            "body_read": 7.326842307,
+            "json_decode": 0.122172629,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": null
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.155599794
+        ]
+      },
+      {
+        "mode": "eager_reused_refs",
+        "seconds": 12.6415944520013,
+        "await_output": 4.936344493999059,
+        "native_worker_seconds": 3.7893437729999997,
+        "fetch": 6.349241971001902,
+        "save": 1.3555428559993743,
+        "forward_count": 6,
+        "native_nodes_seconds": {
+          "KSampler": 2.798679637,
+          "PythonNode": 0.00016083,
+          "VAEDecode": 0.96096156
+        },
+        "fetch_phases": [
+          {
+            "header_wait": 0.947592004,
+            "body_read": 5.144105889,
+            "json_decode": 0.110714356,
+            "bytes": 67109487,
+            "server_pickle_base64_nested_in_header_wait": null
+          }
+        ],
+        "client_base64_unpickle_seconds": [
+          0.141618709
+        ]
+      }
+    ],
+    "cold_first_forward_seconds": 5.2607875,
+    "pin_modules_nested_seconds": 4.9262,
+    "span_rule": "pin_modules and prefetch_queue_pop are nested, not additive. No pure PCIe-copy attribution.",
+    "png_first_use_probe": {
+      "encode_seconds": 2.37855356419459,
+      "bytes": 4817799,
+      "await_encode": 3.6236267879976367,
+      "fetch": 2.9683066770012374,
+      "total": 6.595236933997512
+    },
+    "png_probe_decoded_json_payload_bytes": 6423979,
+    "png_probe_await_includes": [
+      "remote encode",
+      "first helper source-artifact upload"
+    ],
+    "gpu_completion": {
+      "final_barrier_seconds": {
+        "sequence": 0.00012116110883653164,
+        "warm": 0.00010832981206476688,
+        "reuse": 0.00013191020116209984
+      },
+      "all_fetched_tensors_device": "cpu"
+    },
+    "limitations": [
+      "Three paths share Comani RPC/NativeAdapter/PromptExecutor; no direct standalone /prompt comparison.",
+      "The same-seed sequence has order-dependent native warmth/cache state, including zero forwards in its third run.",
+      "Identical normalized full dependency freeze does not prove identical container bytes; no historical immutable image digest.",
+      "CPU, driver and host differ; the historical anomaly has no established root cause.",
+      "Historical decoded JSON payload sizes are not physical wire bytes; response Content-Encoding was not retained.",
+      "End-to-end samples are few sequential observations on one machine/public HTTPS route."
+    ]
+  },
+  "binary_loopback": {
+    "source": "binary_loopback",
+    "scope": "Synthetic torch.arange CPU tensor, local loopback only; not a generated image, WAN or GPU speedup.",
+    "environment": {
+      "python": "3.11.11",
+      "aiohttp": "3.13.2",
+      "cloudpickle": "3.1.2",
+      "torch": "2.9.1+cu128"
+    },
+    "tensor": {
+      "tensor_shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "tensor_dtype": "torch.float32",
+      "tensor_device": "cpu",
+      "tensor_raw_bytes": 50331648,
+      "value_sha256": "5ecb484a5d80e03d137aff2bb484ec3cca642826a5355c35ae1bd402c9a6f4e3"
+    },
+    "sdk_median_fetch_seconds": {
+      "legacy": 0.6722990819998813,
+      "binary": 0.1472658764978405
+    },
+    "entity_captures": {
+      "legacy": {
+        "auto_decompress": false,
+        "status": 200,
+        "content_type": "application/json; charset=utf-8",
+        "content_encoding": null,
+        "content_length": 67109479,
+        "entity_body_bytes": 67109479,
+        "value_sha256": "5ecb484a5d80e03d137aff2bb484ec3cca642826a5355c35ae1bd402c9a6f4e3"
+      },
+      "binary": {
+        "auto_decompress": false,
+        "status": 200,
+        "content_type": "application/vnd.comani.pickle",
+        "content_encoding": null,
+        "content_length": 50332077,
+        "entity_body_bytes": 50332077,
+        "value_sha256": "5ecb484a5d80e03d137aff2bb484ec3cca642826a5355c35ae1bd402c9a6f4e3"
+      }
+    },
+    "wire_definition": "Identity HTTP entity body bytes are measured; HTTP/TCP framing and physical wire bytes are not measured."
+  },
+  "lossless_codec": {
+    "source": "lossless_codec",
+    "scope": "Local CPU lossless codecs only, not an HTTP/WAN/Vast end-to-end benchmark.",
+    "environment": {
+      "python": "3.11.11",
+      "cpu_model": "Intel(R) Core(TM) i7-14700HX",
+      "cloudpickle": "3.1.2",
+      "torch": "2.9.1+cu128",
+      "zlib_runtime": "1.3.1",
+      "lz4": "4.4.5",
+      "torch_threads": 1,
+      "codec_threads": "Synchronous single calling thread; no codec worker threads configured.",
+      "platform_family": "Linux/WSL2"
+    },
+    "method": {
+      "warmups_per_codec_per_case": 2,
+      "measured_rounds_per_codec_per_case": 3,
+      "timing": "perf_counter, encode and decode separately; GC and verification outside timing",
+      "excluded": [
+        "cloudpickle serialization",
+        "HTTP",
+        "proxy",
+        "network",
+        "stream overlap",
+        "unpickle"
+      ],
+      "break_even": "saved_bytes / (median encode_s + median decode_s); below this link rate compression wins in a serial no-overlap model, with equal serialization and transport fixed costs."
+    },
+    "cases": {
+      "real_image_tensor": {
+        "payload_bytes": 50332080,
+        "payload_sha256": "99f4fd4fa448084b2c6b3ec081a0eae09d351f5a1f5ef2bb0693885dcaf44b19",
+        "serialization_roundtrip_value_exact": true,
+        "codecs": {
+          "identity": {
+            "settings": {
+              "modeled_codec_cpu_s": 0
+            },
+            "encoded_bytes": 50332080,
+            "saved_pct": 0.0,
+            "encode_median_s": 2.9280017770361155e-06,
+            "decode_median_s": 2.9199873097240925e-07,
+            "encode_plus_decode_median_s": 0,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          },
+          "gzip_1": {
+            "settings": {
+              "compresslevel": 1,
+              "mtime": 0
+            },
+            "encoded_bytes": 29157756,
+            "saved_pct": 42.06924092944301,
+            "encode_median_s": 1.2949625869987358,
+            "decode_median_s": 0.33081724099974963,
+            "encode_plus_decode_median_s": 1.6257798279984854,
+            "simple_break_even_MB_per_s": 13.024103039873445,
+            "all_roundtrips_byte_exact": true
+          },
+          "gzip_6": {
+            "settings": {
+              "compresslevel": 6,
+              "mtime": 0,
+              "note": "explicit level 6; gzip.compress default is 9"
+            },
+            "encoded_bytes": 28171254,
+            "saved_pct": 44.029227482750564,
+            "encode_median_s": 2.142396473002009,
+            "decode_median_s": 0.32851096499871346,
+            "encode_plus_decode_median_s": 2.4709074380007223,
+            "simple_break_even_MB_per_s": 8.968699377072143,
+            "all_roundtrips_byte_exact": true
+          },
+          "lz4_frame_fast": {
+            "settings": {
+              "compression_level": 0,
+              "block_size": "BLOCKSIZE_DEFAULT",
+              "block_linked": true,
+              "content_checksum": false,
+              "block_checksum": false,
+              "store_size": true
+            },
+            "encoded_bytes": 42363544,
+            "saved_pct": 15.831922702181194,
+            "encode_median_s": 0.10052379899934749,
+            "decode_median_s": 0.04335316799915745,
+            "encode_plus_decode_median_s": 0.14387696699850494,
+            "simple_break_even_MB_per_s": 55.38437573599117,
+            "all_roundtrips_byte_exact": true
+          }
+        }
+      },
+      "high_entropy_bytes": {
+        "payload_bytes": 50331657,
+        "payload_sha256": "5525d172921476db44832c7ecba766a0d41239e4358800be2478857539c159e3",
+        "serialization_roundtrip_value_exact": true,
+        "codecs": {
+          "identity": {
+            "settings": {
+              "modeled_codec_cpu_s": 0
+            },
+            "encoded_bytes": 50331657,
+            "saved_pct": 0.0,
+            "encode_median_s": 3.288998414063826e-06,
+            "decode_median_s": 3.4600088838487864e-07,
+            "encode_plus_decode_median_s": 0,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          },
+          "gzip_1": {
+            "settings": {
+              "compresslevel": 1,
+              "mtime": 0
+            },
+            "encoded_bytes": 50346980,
+            "saved_pct": -0.03044406028595482,
+            "encode_median_s": 1.592646140998113,
+            "decode_median_s": 0.09572608999951626,
+            "encode_plus_decode_median_s": 1.6883722309976292,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          },
+          "gzip_6": {
+            "settings": {
+              "compresslevel": 6,
+              "mtime": 0,
+              "note": "explicit level 6; gzip.compress default is 9"
+            },
+            "encoded_bytes": 50347030,
+            "saved_pct": -0.030543401342816908,
+            "encode_median_s": 1.6385279249989253,
+            "decode_median_s": 0.09333852299823775,
+            "encode_plus_decode_median_s": 1.731866447997163,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          },
+          "lz4_frame_fast": {
+            "settings": {
+              "compression_level": 0,
+              "block_size": "BLOCKSIZE_DEFAULT",
+              "block_linked": true,
+              "content_checksum": false,
+              "block_checksum": false,
+              "store_size": true
+            },
+            "encoded_bytes": 50334752,
+            "saved_pct": -0.006149211419763112,
+            "encode_median_s": 0.04562292300033732,
+            "decode_median_s": 0.03539844599799835,
+            "encode_plus_decode_median_s": 0.08102136899833567,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          }
+        }
+      },
+      "already_compressed_png_bytes": {
+        "payload_bytes": 4817808,
+        "payload_sha256": "96566fc86223241f6d0f634ba392e788621cccac0581c48650c442f233de1ab9",
+        "serialization_roundtrip_value_exact": true,
+        "codecs": {
+          "identity": {
+            "settings": {
+              "modeled_codec_cpu_s": 0
+            },
+            "encoded_bytes": 4817808,
+            "saved_pct": 0.0,
+            "encode_median_s": 3.0199989851098508e-06,
+            "decode_median_s": 2.9600050766021013e-07,
+            "encode_plus_decode_median_s": 0,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          },
+          "gzip_1": {
+            "settings": {
+              "compresslevel": 1,
+              "mtime": 0
+            },
+            "encoded_bytes": 4817311,
+            "saved_pct": 0.010315894697339538,
+            "encode_median_s": 0.15695537200008403,
+            "decode_median_s": 0.007550178001110908,
+            "encode_plus_decode_median_s": 0.16450555000119493,
+            "simple_break_even_MB_per_s": 0.003021174665513655,
+            "all_roundtrips_byte_exact": true
+          },
+          "gzip_6": {
+            "settings": {
+              "compresslevel": 6,
+              "mtime": 0,
+              "note": "explicit level 6; gzip.compress default is 9"
+            },
+            "encoded_bytes": 4817929,
+            "saved_pct": -0.00251151561041868,
+            "encode_median_s": 0.16397384800075088,
+            "decode_median_s": 0.0075928900005237665,
+            "encode_plus_decode_median_s": 0.17156673800127464,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          },
+          "lz4_frame_fast": {
+            "settings": {
+              "compression_level": 0,
+              "block_size": "BLOCKSIZE_DEFAULT",
+              "block_linked": true,
+              "content_checksum": false,
+              "block_checksum": false,
+              "store_size": true
+            },
+            "encoded_bytes": 4818123,
+            "saved_pct": -0.006538243118032101,
+            "encode_median_s": 0.0018504479994589929,
+            "decode_median_s": 0.0005999140012136195,
+            "encode_plus_decode_median_s": 0.0024503620006726123,
+            "simple_break_even_MB_per_s": null,
+            "all_roundtrips_byte_exact": true
+          }
+        }
+      }
+    },
+    "limitations": [
+      "Local CPU bytes codecs only; excludes serialization, HTTP, unpickle and GPU.",
+      "Break-even rates are a serial no-overlap model, not measured network rates.",
+      "A gzip-compressed legacy JSON response is a distinct transport configuration."
+    ]
+  },
+  "earlier_local_acceptance": {
+    "source": "independent_local_acceptance",
+    "baseline": "42350b0",
+    "frozen_source_sha256": {
+      "src/comani/protocol.py": "b26ccd1a9d367f80089ef77af127fbe3a955ed7f81933bb3ccd32413d1c2a040",
+      "src/comani/transport.py": "945ea1656c290473ccf0a5b222705046e4eca40567ae075ff3c62b7faea67276",
+      "src/comani/_runtime/http.py": "b7e2c13e28a73b6ce49291ba1a09795b888483f2a79bf405b32caa2a4cfd2966",
+      "src/comani/_runtime/service.py": "1a04b6ac9fd2dbc030c6c659c15654d9c824c84a78b853084d31e17f88c6a618",
+      "tests/unit/test_binary_fetch.py": "6ca4fb21d72a15288d86aff22794f22c2cab8ad83a37afdb02d5d7dbf62ba392",
+      "examples/minimax_h3_reuse.py": "cd1e1d5dbd219aed00b4d4c75218207ca13627e9f6a50e4d7477af9ab8e722ae"
+    },
+    "binary": "Local correctness and compatibility passed; actual remote validation and final combined package identity remain pending.",
+    "recipe": "Local CPU/native orchestration passed; real H3 GPU throughput remains unverified.",
+    "note": "Historical pre-LZ4/files local binary/recipe snapshot only; the final combined acceptance is recorded in local-acceptance.json."
+  },
+  "production_lz4": {
+    "source": "production_lz4",
+    "scope": "Local production optional codec with size+content checksum, fixed previously captured real image/entropy/PNG pickle bytes; not remote benefit proof.",
+    "minimum_bytes": 1048576,
+    "required_savings_percent": 1,
+    "temporary_allocation": "Every attempted compression allocates a full candidate body, including discarded entropy/PNG candidates, in addition to the original pickle bytes.",
+    "real_image": {
+      "raw_bytes": 50332080,
+      "raw_sha256": "99f4fd4fa448084b2c6b3ec081a0eae09d351f5a1f5ef2bb0693885dcaf44b19",
+      "response_bytes": 42363548,
+      "saved_percent": 15.831914754963439,
+      "encode_attempt_median_seconds": 0.11461336799766286,
+      "decode_median_seconds": 0.054313374999765074,
+      "loopback_http": {
+        "captures": {
+          "identity": {
+            "auto_decompress": false,
+            "content_type": "application/vnd.comani.pickle",
+            "content_encoding": null,
+            "content_length": 50332080,
+            "entity_bytes": 50332080,
+            "entity_sha256": "99f4fd4fa448084b2c6b3ec081a0eae09d351f5a1f5ef2bb0693885dcaf44b19",
+            "uncompressed_length": null
+          },
+          "lz4": {
+            "auto_decompress": false,
+            "content_type": "application/vnd.comani.pickle+lz4",
+            "content_encoding": null,
+            "content_length": 42363548,
+            "entity_bytes": 42363548,
+            "entity_sha256": "8c1e411aaf6731edcb774db645971fc57fb9677b350fec611faa880c958f68e7",
+            "uncompressed_length": "50332080"
+          }
+        },
+        "transport_fetch_samples": [
+          {
+            "mode": "identity",
+            "parallel_fetches": 1,
+            "wall_s": 0.1085768660013855,
+            "distinct_connections": 1,
+            "body_lengths": [
+              50332080
+            ]
+          },
+          {
+            "mode": "lz4",
+            "parallel_fetches": 1,
+            "wall_s": 0.26249360800284194,
+            "distinct_connections": 1,
+            "body_lengths": [
+              42363548
+            ]
+          },
+          {
+            "mode": "lz4",
+            "parallel_fetches": 1,
+            "wall_s": 0.26077696599895717,
+            "distinct_connections": 1,
+            "body_lengths": [
+              42363548
+            ]
+          },
+          {
+            "mode": "identity",
+            "parallel_fetches": 1,
+            "wall_s": 0.11307624200344435,
+            "distinct_connections": 1,
+            "body_lengths": [
+              50332080
+            ]
+          },
+          {
+            "mode": "identity",
+            "parallel_fetches": 2,
+            "wall_s": 0.22874256700015394,
+            "distinct_connections": 2,
+            "body_lengths": [
+              50332080,
+              50332080
+            ]
+          },
+          {
+            "mode": "lz4",
+            "parallel_fetches": 2,
+            "wall_s": 0.5836678009982279,
+            "distinct_connections": 2,
+            "body_lengths": [
+              42363548,
+              42363548
+            ]
+          },
+          {
+            "mode": "lz4",
+            "parallel_fetches": 2,
+            "wall_s": 0.5095519160022377,
+            "distinct_connections": 2,
+            "body_lengths": [
+              42363548,
+              42363548
+            ]
+          },
+          {
+            "mode": "identity",
+            "parallel_fetches": 2,
+            "wall_s": 0.20402083400040283,
+            "distinct_connections": 2,
+            "body_lengths": [
+              50332080,
+              50332080
+            ]
+          }
+        ],
+        "timing_scope": "Fixed original pickle through production HTTP+compression+decode; excludes cloudpickle serialization/unpickle.",
+        "sdk_auto_decompress": true,
+        "physical_wire_bytes_measured": false
+      }
+    },
+    "incompressible_fallbacks": {
+      "high_entropy_bytes.pickle": {
+        "raw_bytes": 50331657,
+        "selected_codec": "identity",
+        "encode_attempt_median_seconds": 0.05912538800112088
+      },
+      "already_compressed_png_bytes.pickle": {
+        "raw_bytes": 4817808,
+        "selected_codec": "identity",
+        "encode_attempt_median_seconds": 0.002503575997252483
+      }
+    },
+    "remote_benefit_verified": false
+  },
+  "candidate": {
+    "base_head": "42350b082ba29b6b5c9e82fed40858d971fccb8c",
+    "wheel_sha256": "38ddaf7d879c39e5402ecbad554b41bf4499138a10aa3e1e00707359908f58ee",
+    "readme_sha256": "0a1e953b461af0ee1252a9943b1da932a34da62abda5e2747fcf69acd3657fc3",
+    "freeze_sha256": "88e6b57429b8aaaa8d8f1b2e1c40510b2284f657cacda2180c644c7a4dc05126",
+    "freeze_files": 78,
+    "production_manifest_sha256": "26d2ca637b98f3b03fd6f7e491d569d5630cbde302c57d896d74f257619e8e49",
+    "local_acceptance_artifact": "local-acceptance.json",
+    "remote_gpu_wan_acceptance": "pending",
+    "recipe": "Local CPU/native orchestration passed; real H3 GPU throughput remains unverified."
+  }
+}

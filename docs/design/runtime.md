@@ -47,6 +47,8 @@ SDK 调用 → 本地发送队列 → submit ACK
 
 当前 worker 每次调用原生执行器执行一个 fragment/prompt，等待原生返回后处理下一项。HTTP、heartbeat 和其他 admission 独立于同步计算。当前后端 prompt 计算串行；原生 workflow 内 async/lazy/loop 行为仍由其执行器决定。本地 await 与是否新增 stream API 都不能代替这一设备能力。
 
+显式文件 I/O 使用独立的文件存储与 HTTP 流，磁盘工作进入 I/O executor，不排进 native 计算队列。文件根跟随当前 `folder_paths` 配置；已完成文件独立于 session 持久存在，细节见 [文件 I/O](files.md)。它不启动第二个原生 HTTP 服务，也不扩大第三方路由兼容范围。
+
 ## 原生适配做什么
 
 - 单节点 eager 请求形成一个明确目标的原生 fragment，普通非 OUTPUT_NODE 也可执行。
