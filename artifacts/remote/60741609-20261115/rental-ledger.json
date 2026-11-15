@@ -1,0 +1,55 @@
+{
+  "instances": [
+    {
+      "instance_id": 60679331,
+      "created_at_utc": "2026-11-14T18:02:47.477834+00:00",
+      "destroyed_and_verified_absent_at_utc": "2026-11-14T18:13:11+00:00",
+      "disk_gib": 80,
+      "compute_usd_per_hour": 0.48000000000000004,
+      "storage_usd_per_hour": 0.014814814814814812,
+      "compute_storage_usd_per_hour": 0.4948148148148149,
+      "ingress_usd_per_gb": 0.00390625,
+      "egress_usd_per_gb": 0.00390625,
+      "elapsed_seconds": 623.522166,
+      "rate_time_upper_estimate_usd_excluding_traffic": 0.08570222363950618,
+      "observed_credit_decrease_between_local_snapshots_usd": 0.21698854999999995,
+      "outcome": "Published 885 startup failed on template Python 3.12; preserved failure."
+    },
+    {
+      "instance_id": 60740761,
+      "created_at_utc": "2026-11-15T04:48:18.367369+00:00",
+      "destroyed_and_verified_absent_at_utc": "2026-11-15T04:55:05.118287+00:00",
+      "disk_gib": 60,
+      "compute_usd_per_hour": 0.4266666666666667,
+      "storage_usd_per_hour": 0.016666666666666663,
+      "compute_storage_usd_per_hour": 0.44333333333333336,
+      "ingress_usd_per_gb": 0.0026041666666666665,
+      "egress_usd_per_gb": 0.00390625,
+      "elapsed_seconds": 406.750918,
+      "rate_time_upper_estimate_usd_excluding_traffic": 0.050090622309259265,
+      "observed_credit_decrease_between_local_snapshots_usd": 0.0017479873999994844,
+      "outcome": "Provider resources unavailable; no model download or daemon."
+    },
+    {
+      "instance_id": 60741609,
+      "created_at_utc": "2026-11-15T04:56:59.251622+00:00",
+      "destroyed_and_verified_absent_at_utc": "2026-11-15T05:38:56.922227+00:00",
+      "disk_gib": 60,
+      "compute_usd_per_hour": 0.4666666666666666,
+      "storage_usd_per_hour": 0.027777777777777776,
+      "compute_storage_usd_per_hour": 0.4944444444444444,
+      "ingress_usd_per_gb": 0.0013020833333333333,
+      "egress_usd_per_gb": 0.0013020833333333333,
+      "elapsed_seconds": 2517.670605,
+      "rate_time_upper_estimate_usd_excluding_traffic": 0.3457911787731481,
+      "observed_credit_decrease_between_local_snapshots_usd": 0.3893091385000007,
+      "outcome": "Official template real H3 three-mode acceptance passed."
+    }
+  ],
+  "rate_time_upper_estimate_total_usd_excluding_traffic": 0.48158402472191353,
+  "observed_task_credit_decrease_usd": 0.6365826027999995,
+  "credit_observation_scope": "All three official-template attempts in this task, from first pre-rental snapshot to final cleanup snapshot.",
+  "billing_limit": "Credit-snapshot changes are observations, not an itemized settled invoice. Rate-time values include loading/stopped windows and exclude traffic/billing-category differences.",
+  "official_final_instances": [],
+  "account_balances_disclosed": false
+}

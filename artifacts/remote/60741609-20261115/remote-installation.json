@@ -1,0 +1,17 @@
+{
+  "python": "3.12.15",
+  "torch": "2.10.0+cu130",
+  "cloudpickle": "3.1.2",
+  "comani_version": "0.3.0",
+  "comani_file": "/venv/main/lib/python3.12/site-packages/comani/__init__.py",
+  "direct_url": {
+    "url": "https://github.com/Delva0/comani.git",
+    "vcs_info": {
+      "commit_id": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+      "requested_revision": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+      "vcs": "git"
+    }
+  },
+  "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+  "torch_ecosystem_unchanged": true
+}

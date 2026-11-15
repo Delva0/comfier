@@ -1,0 +1,40 @@
+{
+  "verified_at_utc": "2026-11-15T05:28:22.506071+00:00",
+  "models": [
+    {
+      "name": "diffusion",
+      "path": "/workspace/ComfyUI/models/diffusion_models/minimax_H3_image_pruned_INT8.safetensors",
+      "bytes": 20979337386,
+      "expected_bytes": 20979337386,
+      "status": "verified",
+      "elapsed_seconds": 857.242,
+      "reused_existing_bytes": 8388608000,
+      "http_status": 206,
+      "content_range": "bytes 8388608000-20979337385/20979337386",
+      "sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+      "verified": true
+    },
+    {
+      "name": "encoder",
+      "path": "/workspace/ComfyUI/models/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "bytes": 15687142551,
+      "expected_bytes": 15687142551,
+      "status": "verified",
+      "elapsed_seconds": 11.638,
+      "reused_existing_bytes": 15687142551,
+      "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6",
+      "verified": true
+    },
+    {
+      "name": "vae",
+      "path": "/workspace/ComfyUI/models/vae/minimax_h3_image_vae_fp16.safetensors",
+      "bytes": 1168505312,
+      "expected_bytes": 1168505312,
+      "status": "verified",
+      "elapsed_seconds": 0.907,
+      "reused_existing_bytes": 1168505312,
+      "sha256": "d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af",
+      "verified": true
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "tested_package_commit": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+  "source_freeze_manifest_sha256": "c003fbdbd01a783f32fb7e3cfb03cb48387cdcce3832c2306154ffe31f44acb4",
+  "published_files": {
+    "artifacts/remote/60741609-20261115/acceptance-summary.json": {
+      "sha256": "7cfc8b660a62f2852bc2e8f44291dff3a53af01a5a2ae6e855a65ac0338d9ada",
+      "bytes": 3867
+    },
+    "artifacts/remote/60741609-20261115/archive-identity.json": {
+      "sha256": "01080f6449443930e498c9e2a9324141b821fcc992f6d430c86cc2d0ba85c515",
+      "bytes": 334
+    },
+    "artifacts/remote/60741609-20261115/client-installation.json": {
+      "sha256": "af8ec5606d78c2f95e179d3a02412ab837e747b5789d502240e38cd8f882b404",
+      "bytes": 2364
+    },
+    "artifacts/remote/60741609-20261115/daemon-start.json": {
+      "sha256": "d7a528b369c02c2e0a9469265027a0dee7e268920c0728693a7c2a790dcde499",
+      "bytes": 414
+    },
+    "artifacts/remote/60741609-20261115/eager.png": {
+      "sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "bytes": 4817799
+    },
+    "artifacts/remote/60741609-20261115/image-comparison.json": {
+      "sha256": "b52128ae9415a1b4d9b8d5805ea76207e9d603f81aca33965023371f1299de64",
+      "bytes": 1341
+    },
+    "artifacts/remote/60741609-20261115/initial-system.json": {
+      "sha256": "7eff4ca487c1f3f6c9712d7c7e3616b69b815b1776f89cd25f09b931b1039479",
+      "bytes": 1150
+    },
+    "artifacts/remote/60741609-20261115/long-wait.json": {
+      "sha256": "b843e4428602d5b58b4d8b94315d1b5f2ace3e59984a55b6a93198fba970ac87",
+      "bytes": 412
+    },
+    "artifacts/remote/60741609-20261115/model-verification.json": {
+      "sha256": "53b64392340eabfecd8f1f57370009d261f32298b052bc738c84e47917c305c3",
+      "bytes": 1398
+    },
+    "artifacts/remote/60741609-20261115/native_prompt.json": {
+      "sha256": "dcd90a3a9ba9d09da40ead39986e12dbb2b41497f6a2c42800131b87eae8f7d9",
+      "bytes": 1852
+    },
+    "artifacts/remote/60741609-20261115/remote-installation.json": {
+      "sha256": "cf13c9807b519941d01baf5f0d98c8cdd84d6ff7976e88ef285903db5d23841a",
+      "bytes": 538
+    },
+    "artifacts/remote/60741609-20261115/rental-ledger.json": {
+      "sha256": "11fa7585b7534b948c8134aef0739ea556d4e916ed1c6493bb1b3dde48798868",
+      "bytes": 2782
+    },
+    "artifacts/remote/60741609-20261115/resource-cleanup.json": {
+      "sha256": "70ba71e65fa60ea5e54cff4909e953b4334377416ba1310f021838e646684166",
+      "bytes": 592
+    },
+    "artifacts/remote/60741609-20261115/resource-summary.json": {
+      "sha256": "acd63f94da0f42d04b11bab20e6e63bd701ad544a6d043fbff762b1fc3a51ce9",
+      "bytes": 1886
+    },
+    "artifacts/remote/60741609-20261115/run.json": {
+      "sha256": "b4d9c1e1f5aa0aaf0b61522940ccdbd571b485c3d3a80b7d3b41eed4eeaee49a",
+      "bytes": 6966
+    },
+    "artifacts/remote/60741609-20261115/runtime-provenance.json": {
+      "sha256": "f08ff869ddaf76c4dfbb403649dd4be42ce5c7a4117a188ec5e25c901a443a8b",
+      "bytes": 3914
+    },
+    "artifacts/remote/60741609-20261115/wheel-build-difference.json": {
+      "sha256": "c048d4f8cfe6ebe7cb4822d7bbb736dc8d7b9248ec7da038c4619b86c05f9355",
+      "bytes": 948
+    }
+  },
+  "source_scripts": {
+    "examples/minimax_h3_source_remote.py": "3e260248bbb2c624e5038cc1458265846e092772b96246e444b18e4cc9b74c4c",
+    "examples/minimax_h3_source_ops.py": "3afaae491527a1212d1d75a6d646629a2c366528a09df7991865471465266242",
+    "examples/minimax_h3_remote.py": "e8e7f8f0b2d9621ecc59309e309a442222b7602c9c7d91f79385e12163153650"
+  },
+  "local_only_files": {
+    "artifacts/remote/60741609-20261115/download-resume.json": {
+      "sha256": "8f47a2a281a9293cf175b0f83e157eabddd9de15783f2e2d8c88e1fa3cc37090",
+      "bytes": 949,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/encoder-check.json": {
+      "sha256": "ab1749bb406bdce3b175551947054bbd9caa905f70ad931fde2eba59c87bbc2f",
+      "bytes": 360,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/nvfp4-diagnostics.json": {
+      "sha256": "138135f55670d2ca1e020e035bd19a36058517d7928be75481c41b8e7c975b19",
+      "bytes": 513,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/runtime-system.json": {
+      "sha256": "fe24511d702a8067ad351c6facdd6b930ad99e3497b233d83835ed7ee58d8d6d",
+      "bytes": 3161,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/captured_graph.png": {
+      "sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "bytes": 4817799,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/native_api.png": {
+      "sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "bytes": 4817799,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/eager.pt": {
+      "sha256": "f299f610ca866a539171caee5208836d181e4226780b69c9d75323fa86dd8b3f",
+      "bytes": 50333147,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/captured_graph.pt": {
+      "sha256": "a15cae7540b77b71aa223e7662c9de17b70351236c7fc67eece8b54cf46f85a4",
+      "bytes": 50333274,
+      "availability": "local only; not a public download"
+    },
+    "artifacts/remote/60741609-20261115/native_api.pt": {
+      "sha256": "5f247b403189ee9b78e6c7cb5ba509c98f710b015dcec5f670ae8be91beb5eee",
+      "bytes": 50333246,
+      "availability": "local only; not a public download"
+    }
+  },
+  "scope": "Only artifact entries under published_files are selected from this evidence directory. source_scripts records execution identities. local_only_files are retained locally, not public download links. The original remote freeze manifest and raw logs remain local."
+}

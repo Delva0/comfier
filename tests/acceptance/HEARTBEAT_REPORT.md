@@ -16,9 +16,10 @@
 | 独立增量结构审查方 | 核对 weak 控制队列、SDK-owned Context 隐藏根和 strong/weak 边；该静态结论不冒充运行验收 | [审查身份与范围](results/heartbeat-v4-r2/ownership-review.json) |
 | 统一发布方 | 冻结 source、wheel archive 及独立 3.11/3.12 实际安装逐字节一致；没有重建 wheel | [身份核对](results/heartbeat-v4-r2/package-identity.json) |
 
-以上 CPU 证据不代表新官方模板的 H3 GPU 旅程已经通过。跨版本观察中使用的 source-file
-例程仍保留在本地，待真实 GPU 运行后单独发布。历史 758738e 的图片与资源记录继续保留为
-[历史 GPU 证据](../../docs/remote_acceptance.md)，不能移记为本次构建通过。
+以上记录保持其 CPU 验收范围。后续公开 cd6 已在官方 ComfyUI 模板完成真实 H3 GPU
+三路与 130 秒 HTTPS 旅程，见 [独立远端报告](../../docs/remote_acceptance.md)；两份
+[source-file 例程](../../examples/minimax_h3_source_remote.py) 在实际 GPU 运行后单独公开。
+历史 758738e 图片保留其原构建身份，不借作新旅程证明。
 
 ## 修复边界
 

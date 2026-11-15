@@ -1,0 +1,48 @@
+{
+  "passed": true,
+  "independent_saved_tensor_comparison": true,
+  "modes": {
+    "eager": {
+      "shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "dtype": "torch.float32",
+      "finite": true,
+      "bitwise_equal_to_eager": true,
+      "max_abs_float_error_vs_eager": 0.0,
+      "raw_tensor_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886"
+    },
+    "captured_graph": {
+      "shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "dtype": "torch.float32",
+      "finite": true,
+      "bitwise_equal_to_eager": true,
+      "max_abs_float_error_vs_eager": 0.0,
+      "raw_tensor_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886"
+    },
+    "native_api": {
+      "shape": [
+        1,
+        2048,
+        2048,
+        3
+      ],
+      "dtype": "torch.float32",
+      "finite": true,
+      "bitwise_equal_to_eager": true,
+      "max_abs_float_error_vs_eager": 0.0,
+      "raw_tensor_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886"
+    }
+  }
+}

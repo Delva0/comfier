@@ -1,0 +1,19 @@
+{
+  "pid": 1687,
+  "command": [
+    "/venv/main/bin/comani",
+    "daemon",
+    "--comfy-root",
+    "/workspace/ComfyUI",
+    "--host",
+    "127.0.0.1",
+    "--port",
+    "18188",
+    "--no-custom-nodes",
+    "--",
+    "--reserve-vram",
+    "4"
+  ],
+  "wheel_sha256": "258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a",
+  "wheel_path": "/workspace/comani-acceptance/comani-0.3.0-py3-none-any.whl"
+}

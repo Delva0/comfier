@@ -99,7 +99,7 @@ COMANI_TEST_CHECKPOINT=existing_checkpoint.safetensors \
 新增压力与远端验收由独立 agent 执行；实现者的 unit、历史 GPU 测量和文档检查不能替代其结论。
 [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md) 绑定当前 v4-r2 原始 wheel：工程 CPU 回归 184 passed、2 deselected；独立 Python 3.12 定向回归和跨版本 source CPU 链通过。[当前压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md) 记录 32 sessions/4,096 calls、1,000 会话短 TTL churn、阻塞业务 loop 后 ownedRef 可用及 GC-before-close；无活跃会话意外失效，关闭中的空会话允许 TTL 兜底。
 
-[历史压力记录](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)、[885b8cd 薄 CLI CPU 验收](../../tests/acceptance/THIN_CLI_REPORT.md) 及 v2 失败各自保留原构建身份。新官方模板 GPU/H3 旅程仍待独立重测；历史 2048×2048 出图不改记为本次构建结果。范围见 [交付状态](README.md#当前边界与证据)。
+[历史压力记录](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)、[885b8cd 薄 CLI CPU 验收](../../tests/acceptance/THIN_CLI_REPORT.md) 及 v2 失败各自保留原构建身份。公开 cd6 的官方模板 GPU/H3 后续独立实测已通过，见 [远端报告](../remote_acceptance.md) 与 [source-file 例程](../../examples/minimax_h3_source_remote.py)；历史数据仍按原构建解读。范围见 [交付状态](README.md#当前边界与证据)。
 
 历史 [environment.json](../environment.json) 和 [delivery.md](../delivery.md) 是对应测量环境的快照，不是产品中的版本选择或安装策略。
 

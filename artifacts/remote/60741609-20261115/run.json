@@ -1,0 +1,132 @@
+{
+  "script": "/home/delva/projects/comani/examples/minimax_h3_source_remote.py",
+  "source_ops": "/home/delva/projects/comani/examples/minimax_h3_source_ops.py",
+  "script_sha256": "3e260248bbb2c624e5038cc1458265846e092772b96246e444b18e4cc9b74c4c",
+  "source_ops_sha256": "3afaae491527a1212d1d75a6d646629a2c366528a09df7991865471465266242",
+  "package_commit": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+  "wheel_sha256": "258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a",
+  "started_at_utc": "2026-11-15T05:30:06.025290+00:00",
+  "prompt": "A detailed studio photograph of a small ceramic red fox sitting on a dark blue wooden table. The fox has white ear tips and a white chest, delicate painted fur grooves, and a soft satin glaze. Warm sunlight enters from the upper left. A small green plant and a closed cream sketchbook sit behind it. The fox is centered, fully visible, with crisp detail, believable shadows, and no lettering.",
+  "seed": 426190,
+  "width": 2048,
+  "height": 2048,
+  "steps": 6,
+  "cfg": 1.0,
+  "sampler": "euler",
+  "scheduler": "simple",
+  "model": "minimax_H3_image_pruned_INT8.safetensors",
+  "model_sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+  "runs": [
+    {
+      "mode": "eager",
+      "call_id": null,
+      "seconds": 177.78806613300003,
+      "max_abs_float_error_vs_eager": 0.0,
+      "png": "/home/delva/projects/comani/artifacts/remote/60741609-20261115/eager.png",
+      "float_tensor": "/home/delva/projects/comani/artifacts/remote/60741609-20261115/eager.pt",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "float_sha256": "f299f610ca866a539171caee5208836d181e4226780b69c9d75323fa86dd8b3f"
+    },
+    {
+      "mode": "captured_graph",
+      "call_id": "ae9aa703241646f286acd2b5016a73c9",
+      "seconds": 152.40616258799855,
+      "max_abs_float_error_vs_eager": 0.0,
+      "png": "/home/delva/projects/comani/artifacts/remote/60741609-20261115/captured_graph.png",
+      "float_tensor": "/home/delva/projects/comani/artifacts/remote/60741609-20261115/captured_graph.pt",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "float_sha256": "a15cae7540b77b71aa223e7662c9de17b70351236c7fc67eece8b54cf46f85a4"
+    },
+    {
+      "mode": "native_api",
+      "call_id": "6aabc2e407be4e62bc0c8a5685521f1a",
+      "seconds": 13.477615039999364,
+      "max_abs_float_error_vs_eager": 0.0,
+      "png": "/home/delva/projects/comani/artifacts/remote/60741609-20261115/native_api.png",
+      "float_tensor": "/home/delva/projects/comani/artifacts/remote/60741609-20261115/native_api.pt",
+      "png_sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+      "float_sha256": "5f247b403189ee9b78e6c7cb5ba509c98f710b015dcec5f670ae8be91beb5eee"
+    }
+  ],
+  "remote": {
+    "python": "3.12.15",
+    "device": "NVIDIA GeForce RTX 4090",
+    "torch": "2.10.0+cu130",
+    "cloudpickle": "3.1.2",
+    "comani_file": "/venv/main/lib/python3.12/site-packages/comani/__init__.py",
+    "comani_version": "0.3.0",
+    "installed_source_sha256": {
+      "comani/__init__.py": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e",
+      "comani/__main__.py": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843",
+      "comani/client.py": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+      "comani/code.py": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+      "comani/errors.py": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+      "comani/graph.py": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+      "comani/protocol.py": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb",
+      "comani/refs.py": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+      "comani/transport.py": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f",
+      "comani/_runtime/__init__.py": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+      "comani/_runtime/__main__.py": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7",
+      "comani/_runtime/adapter.py": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e",
+      "comani/_runtime/http.py": "476ce3b0bc25f2801f1fce08e46e8f93ee025125f756ab8a3ce610c060097354",
+      "comani/_runtime/objects.py": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+      "comani/_runtime/python_node.py": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+      "comani/_runtime/service.py": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9",
+      "comani/_runtime/startup.py": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a"
+    },
+    "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "native_reserve_vram_gib": 4.0,
+    "native_vram_state": "VRAMState.NORMAL_VRAM",
+    "minimum_inference_memory_bytes": 5153960755.2,
+    "model_verification": {
+      "verified_at_utc": "2026-11-15T05:28:22.506071+00:00",
+      "models": [
+        {
+          "name": "diffusion",
+          "path": "/workspace/ComfyUI/models/diffusion_models/minimax_H3_image_pruned_INT8.safetensors",
+          "bytes": 20979337386,
+          "expected_bytes": 20979337386,
+          "status": "verified",
+          "elapsed_seconds": 857.242,
+          "reused_existing_bytes": 8388608000,
+          "http_status": 206,
+          "content_range": "bytes 8388608000-20979337385/20979337386",
+          "sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+          "verified": true
+        },
+        {
+          "name": "encoder",
+          "path": "/workspace/ComfyUI/models/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+          "bytes": 15687142551,
+          "expected_bytes": 15687142551,
+          "status": "verified",
+          "elapsed_seconds": 11.638,
+          "reused_existing_bytes": 15687142551,
+          "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6",
+          "verified": true
+        },
+        {
+          "name": "vae",
+          "path": "/workspace/ComfyUI/models/vae/minimax_h3_image_vae_fp16.safetensors",
+          "bytes": 1168505312,
+          "expected_bytes": 1168505312,
+          "status": "verified",
+          "elapsed_seconds": 0.907,
+          "reused_existing_bytes": 1168505312,
+          "sha256": "d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af",
+          "verified": true
+        }
+      ]
+    }
+  },
+  "resource_peaks": {
+    "process_rss_bytes": 42607919104,
+    "gpu_board_used_mib": 20560,
+    "cgroup_current_bytes": 48291770368,
+    "kernel_process_rss_highwater_bytes": 42742071296,
+    "torch_max_allocated_bytes": 570698616,
+    "torch_max_reserved_bytes": 1107296256
+  },
+  "passed": true,
+  "completed_at_utc": "2026-11-15T05:35:50.187297+00:00"
+}

@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "package_commit": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+  "actual_git_built_wheel_sha256": "258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a",
+  "source_files_equal_frozen_manifest": 17,
+  "original_tested_wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98"
+}

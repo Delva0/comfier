@@ -1,0 +1,51 @@
+{
+  "ram_quote_mib": 128903,
+  "actual_cgroup_ram_limit_bytes": 259515219968,
+  "actual_cgroup_ram_limit_gib": 241.6923828125,
+  "peaks": {
+    "process_rss_bytes": 42607919104,
+    "gpu_board_used_mib": 20560,
+    "cgroup_current_bytes": 48291770368,
+    "kernel_process_rss_highwater_bytes": 42742071296,
+    "torch_max_allocated_bytes": 570698616,
+    "torch_max_reserved_bytes": 1107296256
+  },
+  "final_process_status": {
+    "VmPeak": "395331932 kB",
+    "VmSize": "286379348 kB",
+    "VmHWM": "41740304 kB",
+    "VmRSS": "41543996 kB"
+  },
+  "initial_disk": {
+    "total": 64424509440,
+    "used": 9107243008,
+    "free": 55317266432
+  },
+  "final_disk": {
+    "total": 64424509440,
+    "used": 45953425408,
+    "free": 18471084032
+  },
+  "sampling": {
+    "sample_count": 115,
+    "observed_span_seconds": 336.408075094223,
+    "actual_interval_median_seconds": 2.4276621341705322,
+    "actual_interval_min_seconds": 1.0537455081939697,
+    "actual_interval_max_seconds": 6.449735164642334,
+    "requested_sleep_seconds": 1,
+    "interval_includes_nvidia_smi_and_io_overhead": true
+  },
+  "native_policy": {
+    "reserve_vram_gib": 4.0,
+    "vram_state": "VRAMState.NORMAL_VRAM",
+    "minimum_inference_memory_bytes": 5153960755.2,
+    "dynamic_vram_enabled_in_native_log": true
+  },
+  "interpretation": {
+    "ram": "Measured under the actual 241.69 GiB cgroup quota; no hard 64/128 GiB quota test or minimum-RAM proof.",
+    "gpu": "Board peak is the maximum observed sample. Torch allocator counters do not include all native dynamic-VRAM weight allocations.",
+    "process": "Kernel process RSS high-water covers this daemon lifetime, including encoder and GPU diagnostics.",
+    "cgroup": "Cgroup peak is the maximum observed sample; memory.peak is unavailable on this host.",
+    "disk": "60 GiB was sufficient in this run; a minimum disk size was not established."
+  }
+}

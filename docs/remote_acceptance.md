@@ -1,5 +1,140 @@
 # Independent RTX 4090 acceptance
 
+## Official ComfyUI template: public cd6 checkpoint
+
+**The requested H3 INT8 model passed on the official ComfyUI template on 2026-11-15 UTC.**
+The successful instance was `60741609`. The eager, captured graph and native API
+paths produced real 2048×2048 images. The instance was destroyed at
+`05:38:56.922227 UTC`; the official instance list was subsequently empty and the
+local watchdog was stopped. The [acceptance summary](../artifacts/remote/60741609-20261115/acceptance-summary.json) and [official cleanup observation](../artifacts/remote/60741609-20261115/resource-cleanup.json) retain that boundary.
+
+![Official-template H3 output](../artifacts/remote/60741609-20261115/eager.png)
+
+### Actual scripts and build identity
+
+The executed client is [minimax_h3_source_remote.py](../examples/minimax_h3_source_remote.py),
+with [minimax_h3_source_ops.py](../examples/minimax_h3_source_ops.py) as explicit
+Python source artifacts. They were run before being published with this report;
+[run.json](../artifacts/remote/60741609-20261115/run.json) records both file hashes.
+The pipeline retains original native node names, places a source-file identity
+between KSampler and VAEDecode, and explicitly retains borrowed graph outputs.
+It installs no environment, dependencies or models.
+
+The runtime package came from public commit
+[cd6f45c](https://github.com/Delva0/comani/tree/cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e).
+All 17 installed production Python files match its frozen
+[manifest](../tests/acceptance/results/heartbeat-v4-r2/production-manifest.json).
+The actual Git-built wheel SHA256 was
+`258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a`.
+The local pre-publication CPU-tested original was `64a73a6e…abd98`; these are two
+separate artifacts. ZIP inspection found only METADATA and RECORD member contents
+different: the new UTF-8 long description matches the public cd6 README, all 17
+package Python files and WHEEL content are identical. No wheel was rebuilt merely
+to force the same byte hash. See [archive identity](../artifacts/remote/60741609-20261115/archive-identity.json) and the [measured ZIP difference](../artifacts/remote/60741609-20261115/wheel-build-difference.json).
+
+The template retained Python **3.12.15** and **Torch 2.10.0+cu130** in its existing
+interpreter. Its ComfyUI source was explicitly updated to
+`eee59185ff4f43ae2d9ad122b245619d27d9daad` for the required native H3 nodes;
+this was not an assertion that the template's initial Comfy revision already
+contained them. The initial revision was `2c75dc1b379a59e0880619d029607af5169a62ef`, recorded in [initial-system.json](../artifacts/remote/60741609-20261115/initial-system.json). The template was ID `325864`, image `vastai/comfy:v0.44.0-cuda-13.2-py312`; the actual Torch build remained cu130. Torch was not replaced. The genuine project CLI applied native
+`--reserve-vram 4`; the measured reserve was 4.0 GiB and native VRAM mode NORMAL_VRAM.
+[runtime-provenance.json](../artifacts/remote/60741609-20261115/runtime-provenance.json)
+records the actual installed source hashes, environment and three verified model files.
+The model and companion SHA256 values match the exact requested files listed in
+the historical section below; no different quantization or checkpoint was substituted.
+
+Run the source example from this checkout with an authenticated daemon and the
+verified model files already available. COMANI_URL and COMANI_TOKEN come from the
+environment; Tensor fetch also requires the client's Tensor dependencies.
+
+```sh
+python examples/minimax_h3_source_remote.py \
+  --output artifacts/my-h3-run \
+  --package-commit cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e \
+  --wheel-sha256 258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a \
+  --verification-path /workspace/comani-acceptance/model-verification.json
+```
+
+The actual operator journey has six phases: select the official template and verify its real limits; use its existing interpreter and conditionally update the existing Comfy source for H3 support; download/hash the three weights in native directories; install the fixed public Comani package; replace the template comfyui/api-wrapper process with the thin daemon while reusing the existing authentication/HTTPS route; run the installed public client and explicit source example. No new runtime venv or Torch installation was made. The command was:
+
+```sh
+/venv/main/bin/comani daemon --comfy-root /workspace/ComfyUI \
+  --host 127.0.0.1 --port 18188 --no-custom-nodes -- --reserve-vram 4
+```
+
+Token configuration was supplied through the environment, not printed in the command.
+[Remote installation](../artifacts/remote/60741609-20261115/remote-installation.json)
+records the actual fixed Git commit. The local client used a normal target installation
+from that public commit, selected with PYTHONPATH in an existing Python 3.11.11
+interpreter that supplied Tensor dependencies; it did not import editable/src Comani.
+[Client installation](../artifacts/remote/60741609-20261115/client-installation.json)
+records all 17 installed hashes.
+
+The verification path is a caller-selectable record produced after hashing the
+three model files; it is not a model installer. The acceptance endpoint has been
+shut down, so a new deployment must provide its own URL/token and environment.
+
+### Three real output paths and long waiting
+
+| Sequential mode | End-to-end seconds | Max absolute float error versus eager |
+|---|---:|---:|
+| Eager native → source Python → native | 177.788 | 0 |
+| Captured graph → explicit eager retention | 152.406 | 0 |
+| Native API JSON → explicit eager retention | 13.478 | 0 |
+
+These are observations from that execution order. The example did not reset models/native cache between modes, so warm/cache effects are possible; these timings are not a fair cold-start benchmark or a claim of parallel native computation. Three complete saved float32 tensors were separately
+loaded and compared locally: shape `[1,2048,2048,3]`, finite values, torch.equal true,
+raw tensor SHA256 `38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4`.
+All three PNGs are 4,817,799 bytes and have SHA256
+`db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886`.
+See [image-comparison.json](../artifacts/remote/60741609-20261115/image-comparison.json)
+and the actual [native prompt](../artifacts/remote/60741609-20261115/native_prompt.json).
+One unchanged original PNG is published; duplicate PNGs and all full `.pt` tensors
+remain local and are not public download links.
+
+The new actual HTTPS long task also passed: **130 seconds of remote work,
+133.6386 seconds end to end, one submit, seven polls, one execution**.
+[long-wait.json](../artifacts/remote/60741609-20261115/long-wait.json) retains the
+record. The callable/source boundary remains explicit: source files allow the
+3.11 client/3.12 runtime path without sending incompatible callable bytecode.
+
+### Measured resources and cleanup boundary
+
+| Observation | Actual value |
+|---|---:|
+| Requested / actual filesystem disk | 60 GiB / 64,424,509,440 bytes |
+| Final disk used / free | 45,953,425,408 / 18,471,084,032 bytes |
+| Quoted RAM | 128,903 MiB |
+| Actual enforced cgroup RAM limit | 259,515,219,968 bytes ≈ 241.69 GiB |
+| Highest sampled process RSS | 42,607,919,104 bytes |
+| Kernel process RSS high-water | 42,742,071,296 bytes |
+| Highest sampled cgroup current memory | 48,291,770,368 bytes |
+| Highest sampled GPU board use | 20,560 MiB |
+
+There were 115 samples across 336.408 seconds. The sampler sleeps one second but
+includes nvidia-smi/collection overhead; this is not strict 1 Hz sampling. These
+are observed sampled peaks and a kernel RSS high-water, not proof of a minimum
+memory requirement. The actual cgroup allowance was much higher than 64/128 GiB,
+so **this is not a hard-64-GiB or hard-128-GiB acceptance result**. Different counter
+windows must not be treated as interchangeable whole-workload peaks. Native dynamic VRAM was enabled; Torch allocator counters do not include all native weight allocations. The [resource record](../artifacts/remote/60741609-20261115/resource-summary.json) states the counter and sampling scope.
+
+The [rental ledger](../artifacts/remote/60741609-20261115/rental-ledger.json) separates all three attempts:
+
+| Instance | Recorded outcome |
+|---|---|
+| 60679331 | Published 885 startup failed on template Python 3.12; failure preserved and instance destroyed. |
+| 60740761 | Provider resources unavailable; no model download or daemon, instance destroyed. |
+| 60741609 | Official-template H3 acceptance passed; instance destroyed. |
+
+The successful instance and all other task instances were verified
+absent through the official account API; stopping a container alone was not used
+as proof of stopped billing. The observed account-credit decrease over the task
+window was about **$0.6365826**. The compute/storage time × rate upper estimate for all three attempts is **$0.481584**, excluding traffic. These separate values do
+not turn the observation into an itemized settled invoice. Account balances,
+credentials, raw logs and private rental state remain local. The [publication manifest](../artifacts/remote/60741609-20261115/publication-manifest.json) explicitly separates the 17 selected artifacts from files retained only locally; it does not advertise the latter as public downloads.
+
+## Historical 0.2.0 execution baseline
+
 This is the **historical 0.2.0 execution baseline** preserved at
 [758738e](https://github.com/Delva0/comani/tree/758738ee07e1d13223fde9013effd4fa6286f942).
 Its scripts, exact build and commands describe that run. They do not validate
@@ -14,7 +149,7 @@ Comani eager, captured graph, and native API JSON execution. The three complete
 float tensors are bitwise equal. The first default-memory attempt failed;
 the successful run used native Comfy `--reserve-vram 4`.
 
-## Actual output and runnable client
+### Actual output and runnable client
 
 ![Actual requested H3 INT8 output](../artifacts/remote/60662518-20261114/eager.png)
 
@@ -66,7 +201,7 @@ They are not remote download links. The different `.pt` container hashes in
 `run.json` do not indicate different tensor contents; their raw tensor bytes and
 PNG bytes are identical.
 
-## Exact build and model identity
+### Exact build and model identity
 
 The client and daemon used wheel `comani-0.2.0-py3-none-any.whl`, SHA256
 `16a04c6a0afe494880c084039bffd1f02548d13e068c41240997f95972f005c6`.
@@ -107,7 +242,7 @@ step, so the sole original writer was left running and completed successfully.
 A normal local public API request reported Cloudflare error 1010. No challenge,
 authentication or request-policy control was bypassed.
 
-## SDK and transport acceptance
+### SDK and transport acceptance
 
 [acceptance.py](https://github.com/Delva0/comani/blob/758738ee07e1d13223fde9013effd4fa6286f942/scripts/remote/acceptance.py) passed all ten cases over the
 actual local-client → HTTPS → remote-daemon route, on the final wheel:
@@ -136,7 +271,7 @@ The independent agent also reran the eight native argument tests, including real
 fresh-process Comfy parsing and explicit rejection of unknown/mutually exclusive
 native flags. Those tests passed independently after the implementation freeze.
 
-## Default OOM, native offload, and measured resources
+### Default OOM, native offload, and measured resources
 
 The first exact-model 4MP eager attempt used the default Comfy reserve of 400 MiB.
 It failed inside native INT8 linear: allocating 172 MiB with 157.75 MiB free,
@@ -192,7 +327,7 @@ At least 80 GiB of RAM allowance is a practical starting suggestion for repeatin
 this particular acceptance workload, not an experimentally established minimum.
 70 GiB disk was sufficient, with 28.26 GiB remaining; smaller disks were not tested.
 
-## Actual Ada NVFP4 support
+### Actual Ada NVFP4 support
 
 Native NVFP4 compute requires NVIDIA compute major >=10 in pinned Comfy.
 RTX 4090 is Ada SM 8.9, so it uses the native packed-weight/dequantization fallback
@@ -213,7 +348,7 @@ bitwise. That failure is retained locally in the earlier instance's artifacts.
 The corrected oracle compares the same GPU computation; it did not loosen the
 tolerance. Full-model success is established separately by the three real images.
 
-## Rental cost and verified cleanup
+### Rental cost and verified cleanup
 
 Only this task's instances were managed. The official CLI used the user's normal
 local credential configuration; the Vast account API key was never printed or
@@ -241,7 +376,7 @@ exited, and both temporary tunnels returned HTTP 530/disconnected. The original
 normal completion destroyed the instance much earlier. Container shutdown alone
 was never treated as proof of stopped billing.
 
-## Deployment lessons and scope
+### Deployment lessons and scope
 
 Earlier SSH routes established TCP but returned no SSH banner despite sshd
 listening in the container. System proxy/firewall/VPN settings were left alone.

@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "instance_id": 60741609,
+  "package_commit": "cd6f45c8b7da5ca71a1e80f5be5b7fa49993433e",
+  "production_manifest_sha256": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+  "original_tested_wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+  "actual_git_built_remote_wheel_sha256": "258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a",
+  "template": {
+    "id": 325864,
+    "creator_id": 62897,
+    "hash": "7a57409b680b49a49a176abf22879b74",
+    "actual_image": "vastai/comfy:v0.44.0-cuda-13.2-py312",
+    "python": "3.12.15",
+    "initial_comfy_commit": "2c75dc1b379a59e0880619d029607af5169a62ef",
+    "updated_existing_comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "interpreter": "/venv/main/bin/python",
+    "torch_ecosystem_unchanged": true,
+    "torch": "2.10.0+cu130"
+  },
+  "client_installation": "client-installation.json",
+  "script_sha256": {
+    "examples/minimax_h3_source_remote.py": "3e260248bbb2c624e5038cc1458265846e092772b96246e444b18e4cc9b74c4c",
+    "examples/minimax_h3_source_ops.py": "3afaae491527a1212d1d75a6d646629a2c366528a09df7991865471465266242",
+    "examples/minimax_h3_remote.py": "e8e7f8f0b2d9621ecc59309e309a442222b7602c9c7d91f79385e12163153650"
+  },
+  "images": {
+    "eager": "eager.png",
+    "width": 2048,
+    "height": 2048,
+    "bytes": 4817799,
+    "sha256": "db9f84dd9885542f6d02e8f1224552c263dfb2258c5c64c7aa0e145aa46ab886",
+    "raw_float_sha256": "38efaa6cb2da7f55332b1b9584db0359f1084ba563a4bfbaf00dd247d4e4c5d4",
+    "three_complete_float_tensors_bitwise_equal": true
+  },
+  "mode_seconds": {
+    "eager": 177.78806613300003,
+    "captured_graph": 152.40616258799855,
+    "native_api": 13.477615039999364
+  },
+  "timing_scope": "Client end-to-end includes output transfer and file creation. Eager and captured include native model initialization; native API follows warm/cache state. These are not controlled cold-start benchmarks.",
+  "long_wait": {
+    "passed": true,
+    "script": "/home/delva/projects/comani/.local/template-acceptance/long_wait_source.py",
+    "source_file": "/home/delva/projects/comani/tests/acceptance/long_wait.py",
+    "elapsed_seconds": 133.63858743499986,
+    "submit_count": 1,
+    "call_id": "74a24c2510c34f1cbfa562d553bfff8d",
+    "wait_query_count": 7,
+    "remote": {
+      "executions": 1,
+      "seconds": 130,
+      "host": "782248d62c32"
+    }
+  },
+  "resources": "resource-summary.json",
+  "rental": "rental-ledger.json",
+  "cleanup": "resource-cleanup.json",
+  "official_final_instances": [],
+  "minimal_deployment": {
+    "operator_phases": 6,
+    "phases": [
+      "Rent the official ComfyUI template and verify actual limits.",
+      "Use /venv/main; update its existing ComfyUI checkout/requirements only when model support is absent.",
+      "Place the three exact weights in native model directories and verify their SHA256.",
+      "Install Comani from the fixed public Git commit in the existing interpreter.",
+      "Stop template comfyui/api-wrapper and start the thin daemon on existing internal 18188 with native reserve-vram 4; reuse template authentication/HTTPS.",
+      "Install the same public client package, supply local Tensor dependencies and endpoint/token, then run the explicit source-file example."
+    ],
+    "this_run_remote_package_install_commands": 2,
+    "this_run_client_package_install_commands": 1,
+    "remote_deployment_new_virtual_environments_or_torch_installs": 0,
+    "simplifications": "A template with H3 support avoids the conditional checkout update. Reuse the existing HTTPS route. Standard verified downloads suffice; the optional aria2 trial is unnecessary."
+  },
+  "raw_artifacts_local_only": "Three .pt files and duplicate PNGs remain locally; raw sampler/log evidence is under .local/template-acceptance/evidence-60741609."
+}

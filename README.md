@@ -52,9 +52,9 @@ asyncio.run(main())
 
 `await call` 返回按槽排列的 ready refs；`await call.output(i)` 返回其中一个。`RemoteRef` 本身不可 await。无关调用不会因一次本地 await 获得额外的远端顺序依赖。
 
-实际出图来源保留为 [本地 checkpoint 例程](examples/local_checkpoint.py) 和 [Minimax H3 远端例程](examples/minimax_h3_remote.py)。下图来自 0.2.0 执行基线：指定 INT8 模型的 eager、captured graph 与 raw API graph 三路原始 Tensor/PNG 完全一致；环境、原生显存参数及清理记录见 [历史远端报告](docs/remote_acceptance.md)。该记录不替代新 CLI 的独立验收。
+实际例程见 [本地 checkpoint](examples/local_checkpoint.py) 和 [H3 source-file 远端脚本](examples/minimax_h3_source_remote.py) / [source ops](examples/minimax_h3_source_ops.py)。公开 cd6 代码已在官方 ComfyUI 模板的 RTX 4090、Python 3.12.15 环境完成指定 INT8 模型三路 2048×2048 出图，完整 Tensor 逐位一致；环境、资源、清理及历史结果见 [独立远端报告](docs/remote_acceptance.md)。
 
-![指定 Minimax H3 INT8 模型生成的 2048×2048 实际样图](artifacts/remote/60662518-20261114/eager.png)
+![指定 Minimax H3 INT8 模型生成的 2048×2048 实际样图](artifacts/remote/60741609-20261115/eager.png)
 
 ## 适用边界
 
@@ -64,7 +64,7 @@ Eager 输出由有效会话持有，最后一个本地别名消失后通知释�
 
 公开 Call、未 release 的输出句柄与 Graph 共享保留所属 Client；删除局部 Client 变量不会单独关闭会话。显式 close/context 退出仍优先关闭整个会话。
 
-HTTP 会话通过独立后台 keeper 续约；业务 loop 暂停后可继续使用仍有效的 owned refs，提交、读取和 GC 控制消息仍需要业务 loop 可运行。已验的 CPU 范围见 [启动与保活验收](tests/acceptance/HEARTBEAT_REPORT.md) 和 [压力报告](tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)，模板 GPU 重测状态见 [交付状态](docs/design/README.md#当前边界与证据)。原生 CLI 的 parser 接受某个参数，不等于 headless driver 已实现对应服务；支持项和明确拒绝项见 [Runtime 边界](docs/design/runtime.md)。
+HTTP 会话通过独立后台 keeper 续约；业务 loop 暂停后可继续使用仍有效的 owned refs，提交、读取和 GC 控制消息仍需要业务 loop 可运行。已验的 CPU 范围见 [启动与保活验收](tests/acceptance/HEARTBEAT_REPORT.md) 和 [压力报告](tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)，官方模板 GPU 结果及资源边界见 [远端报告](docs/remote_acceptance.md)。原生 CLI 的 parser 接受某个参数，不等于 headless driver 已实现对应服务；支持项和明确拒绝项见 [Runtime 边界](docs/design/runtime.md)。
 
 ## 文档
 

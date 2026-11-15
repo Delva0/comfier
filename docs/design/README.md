@@ -42,7 +42,7 @@ daemon 主事件循环：接收、依赖等待、会话与对象记录
 | 当前 v4-r2 / `64a73a6e…` wheel | [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md)：工程 CPU 184 passed、2 deselected；独立 Python 3.12 定向回归和跨版本 source 三路 CPU 链通过。 |
 | HTTP 独立保活与回收 | [独立压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)：32 会话/4,096 calls、1,000 会话短 TTL churn、业务 loop 阻塞超过 TTL 后 ownedRef 可用，GC 在 close 前完成；无活跃会话意外失效。关闭中的空会话允许 TTL 兜底回收，不承诺所有历史运行零 expiry。 |
 | 885b8cd、被否决 v2/v3 与旧 v4 | 保留业务 loop 心跳失活、暂态错误/HTTP 503 误拦及 queued/context 隐藏拥有者的反例；早期候选的部分通过不改记为最终通过。 |
-| 新版官方模板 GPU/H3 旅程 | 仍待使用固定公开 commit 独立重测；历史 758738e 图片不替代此项验收。 |
+| 官方模板 GPU/H3 旅程 | 公开 cd6 的 17 个生产源码身份核对通过，source-file 三路真实 GPU 2048×2048 Tensor 逐位一致、130 秒 HTTPS 一次提交通过，实例已销毁；[新远端报告](../remote_acceptance.md) 分列资源与历史结果。 |
 
 专用 keeper 只负责 HTTP lease 续约；业务 RPC、GC 控制消息仍需要业务 loop。进程/OS 冻结、任意长 GIL 占用和网络中断不在保活保证内，详见 [会话语义](ownership.md#会话续约与业务-loop-暂停)。
 

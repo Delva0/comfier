@@ -1,0 +1,18 @@
+{
+  "verified_at_utc": "2026-11-15T05:38:56.922227+00:00",
+  "instances": [],
+  "destroyed_instance_id": 60741609,
+  "watchdog_pid": 165387,
+  "watchdog_active": false,
+  "watchdog_stop_checked_at_utc": "2026-11-15T05:40:30.626011+00:00",
+  "destroy_command": "vastai destroy instance 60741609 -y --raw",
+  "destroy_cli_observed_exit_code": 0,
+  "destroy_cli_stdout": "empty",
+  "template_https_cleanup": {
+    "checked_at_utc": "2026-11-15T05:48:37.880832+00:00",
+    "instance_id": 60741609,
+    "url_disclosed": false,
+    "daemon_handshake_succeeded": false,
+    "http_status": 530
+  }
+}

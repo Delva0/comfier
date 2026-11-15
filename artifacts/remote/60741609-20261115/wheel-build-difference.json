@@ -1,0 +1,21 @@
+{
+  "original_tested_wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+  "actual_git_built_wheel_sha256": "258dbeaaf952f69c43e485ffdcbcf2849ef66810f08f0ea81bde2ef952bae58a",
+  "production_python_files_identical": 17,
+  "zip_members_changed": [
+    "comani-0.3.0.dist-info/METADATA",
+    "comani-0.3.0.dist-info/RECORD"
+  ],
+  "new_metadata_readme_matches_public_commit": true,
+  "old_and_new_readme_bodies_differ": true,
+  "changed_member_hashes": {
+    "comani-0.3.0.dist-info/METADATA": {
+      "original_sha256": "59de047bd46c92261a02fc4f5965e1b0ab0913565e075845bcc08d05eee33f15",
+      "actual_sha256": "f1381e2cb0d13e7e8eda276b3ccd504308a114ca93170e61aa6b4acb516c42ef"
+    },
+    "comani-0.3.0.dist-info/RECORD": {
+      "original_sha256": "cf71a6ff828c558c243219e20b9bc355e2cf99fd6ca6bf7f3a3264a2ae7a77e7",
+      "actual_sha256": "da5324a6e1d4da65944f65b8c6f4ab40a569a2d5b43339a84310522b6ec08a32"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "python": "3.12.15",
+  "executable": "/venv/main/bin/python",
+  "workspace": "/workspace",
+  "disk": {
+    "total": 64424509440,
+    "used": 9107243008,
+    "free": 55317266432
+  },
+  "supervisor": "api-wrapper                      RUNNING   pid 627, uptime 0:01:03\ncaddy                            RUNNING   pid 628, uptime 0:01:03\ncomfyui                          RUNNING   pid 629, uptime 0:01:03\ncron                             RUNNING   pid 630, uptime 0:01:03\ninstance_portal                  RUNNING   pid 632, uptime 0:01:03\njupyter                          EXITED    Nov 15 04:59 AM\npyworker                         EXITED    Nov 15 04:59 AM\nsyncthing                        RUNNING   pid 643, uptime 0:01:03\ntensorboard                      EXITED    Nov 15 04:59 AM\ntunnel_manager                   RUNNING   pid 653, uptime 0:01:03",
+  "cgroup": {
+    "/sys/fs/cgroup/memory.max": "259515219968\n"
+  },
+  "gpu": "NVIDIA GeForce RTX 4090, 615.71.09, 24564 MiB",
+  "comfy_commit": "2c75dc1b379a59e0880619d029607af5169a62ef",
+  "comfy_h3": false,
+  "portal_files": [],
+  "observed_at_utc": "2026-11-15T05:00:11.676967+00:00"
+}

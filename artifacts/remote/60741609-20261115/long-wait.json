@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "script": "/home/delva/projects/comani/.local/template-acceptance/long_wait_source.py",
+  "source_file": "/home/delva/projects/comani/tests/acceptance/long_wait.py",
+  "elapsed_seconds": 133.63858743499986,
+  "submit_count": 1,
+  "call_id": "74a24c2510c34f1cbfa562d553bfff8d",
+  "wait_query_count": 7,
+  "remote": {
+    "executions": 1,
+    "seconds": 130,
+    "host": "782248d62c32"
+  }
+}
