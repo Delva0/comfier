@@ -1,5 +1,7 @@
 """Bridge native initialization without starting ComfyUI's second HTTP/worker pair."""
 
+import argparse
+import copy
 import importlib
 import os
 import sys
@@ -19,14 +21,14 @@ _SERVER_OPTIONS = {
 def initialize(root, arguments, *, custom_nodes):
     from comfy.cli_args import args, parser
 
-    rejected = []
-    provided = set()
-    for token in arguments:
-        option = parser._parse_optional(token)
-        if option is not None and option[0] is not None:
-            provided.add(option[0].dest)
-            if option[0].dest in _SERVER_OPTIONS:
-                rejected.append(option[1])
+    # Let argparse resolve aliases, abbreviations and values. Suppress defaults
+    # on a copy so native defaults and auto-detected args are never user intent.
+    explicit_parser = copy.deepcopy(parser)
+    explicit_parser.set_defaults(**{action.dest: argparse.SUPPRESS for action in explicit_parser._actions})
+    explicit_parser._defaults.clear()
+    provided = set(vars(explicit_parser.parse_args(arguments)))
+    rejected = [action.option_strings[0] for action in parser._actions
+                if action.dest in provided and action.dest in _SERVER_OPTIONS]
     if rejected:
         parser.error("Comani does not host the native HTTP/UI/asset services required by: " + ", ".join(sorted(set(rejected))) + ". Use Comani --host/--port, or run the official ComfyUI server for those services.")
     if args.cache_none:

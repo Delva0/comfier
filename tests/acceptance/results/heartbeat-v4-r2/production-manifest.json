@@ -1,0 +1,25 @@
+{
+  "baseline_commit": "885b8cd4709608f0e624d1e1f63b897115528b81",
+  "created_utc": "2026-11-15T04:11:59.650347+00:00",
+  "revision_reason": "Final v4-r2 candidate: retain user-authorized public shared owners; GC control messages dispatch weak methods; SDK-owned task/callback/Future/keeper-thread contexts are fresh to prevent hidden Graph or application ContextVar owners. User active awaits and explicit close context remain unchanged.",
+  "files": {
+    "pyproject.toml": "d9f6da533eafc426b8ae1add9aa3e3f2173bbf0e0463a52f1f047e7af0b5b393",
+    "src/comani/__init__.py": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e",
+    "src/comani/__main__.py": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843",
+    "src/comani/_runtime/__init__.py": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+    "src/comani/_runtime/__main__.py": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7",
+    "src/comani/_runtime/adapter.py": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e",
+    "src/comani/_runtime/http.py": "476ce3b0bc25f2801f1fce08e46e8f93ee025125f756ab8a3ce610c060097354",
+    "src/comani/_runtime/objects.py": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+    "src/comani/_runtime/python_node.py": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+    "src/comani/_runtime/service.py": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9",
+    "src/comani/_runtime/startup.py": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+    "src/comani/client.py": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+    "src/comani/code.py": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+    "src/comani/errors.py": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+    "src/comani/graph.py": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+    "src/comani/protocol.py": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb",
+    "src/comani/refs.py": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+    "src/comani/transport.py": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f"
+  }
+}

@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import gc
 import time
+import weakref
 
 import pytest
 from aiohttp import ClientSession
@@ -81,8 +82,7 @@ async def test_active_http_wait_renews_session_then_disconnect_expires(native_ht
     remote = await Client(url).start()
     try:
         # Isolate the active HTTP request guard from the SDK heartbeat.
-        remote._heartbeat_task.cancel()
-        await asyncio.gather(remote._heartbeat_task, return_exceptions=True)
+        await remote._lease.close()
         call = remote.python(blocked, args=(31, 0.5))
         ref = await call.output()
         assert await ref.fetch() == 31
@@ -145,16 +145,32 @@ async def test_completed_call_records_and_objects_are_collected(native_http):
 
 async def test_workflow_borrowed_value_expires_after_native_cache_clear(native_http):
     runtime, url = native_http
-    async with Client(url) as remote:
+    async def returned_borrow():
+        remote = await Client(url).start()
         with remote.graph() as graph:
             value, = await remote.python(lambda: [5, 6])
             graph.output("value", value)
         run = remote.submit(graph)
         ref = await run.output("value")
+        return ref, weakref.ref(remote), remote._lease, remote.session_id
+
+    ref, client_ref, lease, session = await returned_borrow()
+    try:
+        gc.collect()
+        assert client_ref() is not None and ref.ownership == "borrowed"
         assert await ref.fetch() == [5, 6]
         runtime.adapter.executor.caches.outputs.cache.clear()
         with pytest.raises(Expired):
             await ref.fetch()
+        assert client_ref() is not None
+        ref.release()
+        gc.collect()
+        await eventually(lambda: client_ref() is None and lease.done.done()
+                         and session not in runtime.session_seen)
+    finally:
+        remaining = client_ref()
+        if remaining is not None:
+            await remaining.close(wait=False)
 
 
 async def test_workflow_reuses_eager_object_and_native_prompt(native_http):

@@ -10,7 +10,8 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def test_native_arguments_set_import_time_memory_policy_in_fresh_process():
+@pytest.mark.parametrize("reserve_argument", [["--reserve-vram", "4"], ["--reserve-vram=4"], ["--reserve-v=4"]])
+def test_native_arguments_set_import_time_memory_policy_in_fresh_process(reserve_argument):
     result = subprocess.run(
         [sys.executable, "-c", """
 import asyncio
@@ -20,7 +21,7 @@ from comani._runtime import NativeRuntime
 async def main():
     original_argv = sys.argv
     runtime = NativeRuntime(sys.argv[1], cpu=True, custom_nodes=False, comfy_args=[
-        "--reserve-vram", "4", "--disable-smart-memory", "--disable-dynamic-vram",
+        *sys.argv[2:], "--disable-smart-memory", "--disable-dynamic-vram",
     ])
     try:
         await runtime.start()
@@ -36,7 +37,7 @@ async def main():
         await runtime.close()
 
 asyncio.run(main())
-""", COMFY],
+""", COMFY, *reserve_argument],
         capture_output=True, text=True, timeout=120,
     )
     assert result.returncode == 0, result.stdout + result.stderr
@@ -44,6 +45,7 @@ asyncio.run(main())
 
 @pytest.mark.parametrize(("native_args", "message"), [
     (["--unknown-comani-native-option"], "unrecognized arguments"),
+    (["--cuda"], "ambiguous option"),
     (["--lowvram", "--highvram"], "not allowed with argument"),
 ])
 def test_native_parser_rejects_invalid_arguments_before_nodes_import(native_args, message):

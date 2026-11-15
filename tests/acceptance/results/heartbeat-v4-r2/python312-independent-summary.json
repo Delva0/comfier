@@ -1,0 +1,117 @@
+{
+  "recorded_at_utc": "2026-11-15T04:18:35.340378+00:00",
+  "stage": "Frozen v4-r2 targeted installed-Python3.12 acceptance; public checkpoint and GPU pending",
+  "passed": true,
+  "identity": {
+    "stage": "Frozen v4-r2 control/context isolation and shared ownership candidate",
+    "wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+    "manifest_sha256": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+    "source_and_archive_files_verified": 17,
+    "changed_from_v4": [
+      "src/comani/client.py",
+      "src/comani/refs.py",
+      "src/comani/transport.py"
+    ],
+    "source_hashes": {
+      "src/comani/_runtime/startup.py": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+      "src/comani/client.py": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+      "src/comani/refs.py": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+      "src/comani/transport.py": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f"
+    }
+  },
+  "installed_python312": {
+    "passed": true,
+    "python": "3.12.11",
+    "comani_file": "/home/delva/projects/comani/.local/template-acceptance/heartbeat-v4-r2/installed/comani/__init__.py",
+    "version": "0.3.0",
+    "direct_url": {
+      "url": "file:///home/delva/projects/comani/.local/template-acceptance/heartbeat-v4-r2/comani-0.3.0-py3-none-any.whl",
+      "archive_info": {}
+    },
+    "wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+    "package_source_files_verified": 17,
+    "refs_sha256": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db"
+  },
+  "ownership_context_python312": {
+    "tests": "14",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "time": "8.275"
+  },
+  "new_context_queue_regressions": [
+    "test_queued_gc_control_callback_does_not_own_client_during_loop_block[False-release]",
+    "test_queued_gc_control_callback_does_not_own_client_during_loop_block[False-forget]",
+    "test_queued_gc_control_callback_does_not_own_client_during_loop_block[True-release]",
+    "test_queued_gc_control_callback_does_not_own_client_during_loop_block[True-forget]",
+    "test_internal_start_isolates_context_without_changing_user_context[False]",
+    "test_internal_start_isolates_context_without_changing_user_context[True]",
+    "test_pending_state_internal_callbacks_do_not_keep_application_client_context",
+    "test_keeper_thread_construction_and_start_use_fresh_context"
+  ],
+  "supporting_owner_release_close_borrowed_cases": [
+    "test_helper_returned_handle_keeps_session_until_last_owner_disappears[call]",
+    "test_helper_returned_handle_keeps_session_until_last_owner_disappears[future]",
+    "test_helper_returned_handle_keeps_session_until_last_owner_disappears[ref]",
+    "test_release_revokes_all_output_aliases_and_their_session_ownership",
+    "test_explicit_close_revokes_live_pending_call_and_output_owners",
+    "test_workflow_borrowed_value_expires_after_native_cache_clear"
+  ],
+  "junit_file": ".local/template-acceptance/heartbeat-v4-r2/ownership-context-python312.xml",
+  "cross_python_native_http": {
+    "passed": true,
+    "local_python": "3.11.11",
+    "remote_python": "3.12.11",
+    "source_file": "/home/delva/projects/comani/examples/minimax_h3_source_ops.py",
+    "tensor_shape": [
+      1,
+      64,
+      64,
+      3
+    ],
+    "modes": [
+      "eager native/source/native",
+      "captured source then eager retention",
+      "native API then source retention"
+    ],
+    "all_tensors_bitwise_equal": true,
+    "blocked_business_loop": {
+      "server_ttl_seconds": 0.6,
+      "clock": "time.monotonic",
+      "blocked_seconds": 2.4356808650009043,
+      "ttl_multiple": 4,
+      "heartbeats_during_block": 12,
+      "other_active_data_requests_during_block": 0,
+      "ref_fetch_and_reuse_passed": true
+    },
+    "native_cli_state": {
+      "python": "3.12.11",
+      "reserve_vram": 4.0,
+      "reserved_bytes": 4294967296.0,
+      "startup_file": "/home/delva/projects/comani/.local/template-acceptance/heartbeat-v4-r2/installed/comani/_runtime/startup.py",
+      "startup_sha256": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+      "client_sha256": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+      "transport_sha256": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f"
+    },
+    "daemon_cli_command": [
+      "/home/delva/projects/comani/.local/template-acceptance/python312/bin/python",
+      "/home/delva/projects/comani/.local/template-acceptance/short_ttl_native_server.py",
+      "--port",
+      "42031",
+      "--ttl",
+      "0.6",
+      "--events",
+      "/home/delva/projects/comani/.local/template-acceptance/heartbeat-v4-r2/short-ttl/http-events.jsonl"
+    ]
+  },
+  "http_classification_prior_scope": "heartbeat-v4-http-r3/independent-summary.json; classification implementation unchanged, not repeated",
+  "startup_prior_scope": "startup-independent-summary.json; startup unchanged, not repeated",
+  "prior_v4_scope_and_wallclock_artifacts_preserved": true,
+  "local_native_server": {
+    "pid": 130158,
+    "active": false
+  },
+  "keeper_threads_after_close": "smoke asserted none before successful exit",
+  "official_instances": [],
+  "gpu": "pending final published commit and remaining independent load conclusions; rental already authorized"
+}

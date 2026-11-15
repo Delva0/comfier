@@ -1,0 +1,9 @@
+{
+  "scope": "Independent static incremental review of queued Client bound methods, SDK-owned Context roots and existing strong/weak ownership edges; not a runtime acceptance claim",
+  "review_sha256": "042c0cc65d177731488a3705ae1d7899264444c8c30306e69281c17491dc2e65",
+  "wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+  "manifest_sha256": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+  "known_queued_or_ambient_owner_roots_found": false,
+  "review_source_retained_locally": ".local/ownership-review/v4-r2-review.md",
+  "earlier_review_and_failures_preserved": true
+}

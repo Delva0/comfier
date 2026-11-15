@@ -1,0 +1,828 @@
+{
+  "status": "passed_final_v4_r2_shared_ownership",
+  "candidate": "v4-r2",
+  "wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+  "manifest_sha256": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+  "installed_package_python_files": {
+    "__init__.py": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e",
+    "__main__.py": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843",
+    "_runtime/__init__.py": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+    "_runtime/__main__.py": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7",
+    "_runtime/adapter.py": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e",
+    "_runtime/http.py": "476ce3b0bc25f2801f1fce08e46e8f93ee025125f756ab8a3ce610c060097354",
+    "_runtime/objects.py": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+    "_runtime/python_node.py": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+    "_runtime/service.py": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9",
+    "_runtime/startup.py": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+    "client.py": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+    "code.py": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+    "errors.py": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+    "graph.py": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+    "protocol.py": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb",
+    "refs.py": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+    "transport.py": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f"
+  },
+  "frozen_source_files": {
+    "pyproject.toml": "d9f6da533eafc426b8ae1add9aa3e3f2173bbf0e0463a52f1f047e7af0b5b393",
+    "src/comani/__init__.py": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e",
+    "src/comani/__main__.py": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843",
+    "src/comani/_runtime/__init__.py": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+    "src/comani/_runtime/__main__.py": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7",
+    "src/comani/_runtime/adapter.py": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e",
+    "src/comani/_runtime/http.py": "476ce3b0bc25f2801f1fce08e46e8f93ee025125f756ab8a3ce610c060097354",
+    "src/comani/_runtime/objects.py": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+    "src/comani/_runtime/python_node.py": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+    "src/comani/_runtime/service.py": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9",
+    "src/comani/_runtime/startup.py": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+    "src/comani/client.py": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+    "src/comani/code.py": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+    "src/comani/errors.py": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+    "src/comani/graph.py": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+    "src/comani/protocol.py": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb",
+    "src/comani/refs.py": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+    "src/comani/transport.py": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f"
+  },
+  "archive_installed_manifest_checkout_match": true,
+  "native_server": {
+    "comfy_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "package": "/home/delva/projects/comani/.venv/lib/python3.11/site-packages/comani",
+    "service_sha256": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9",
+    "all_unchanged_native_runtime_files_match_candidate": true,
+    "note": "Separate compatible baseline CPU native installation; candidate ownership and queued-control behavior are in the installed SDK. Native runtime files match; HTTP-only r3 is preserved as a distinct ownership baseline."
+  },
+  "lifecycle": {
+    "checks": [
+      {
+        "name": "four_owned_refs_survive_cpu_block",
+        "seconds": 3.3030839259999993,
+        "iterations": 51354503
+      },
+      {
+        "name": "gc_clears_objects_and_calls_with_four_sessions_still_open"
+      },
+      {
+        "name": "retained_ref_keeps_client_until_last_owner_disappears"
+      },
+      {
+        "name": "terminal_session_does_not_revive_or_resubmit"
+      },
+      {
+        "name": "closed_business_loop_leaves_no_keeper_thread"
+      }
+    ],
+    "extra_keeper_threads": [],
+    "socket_fds_restored": true,
+    "loop_closed_with_owners_retained": true
+  },
+  "open_failure_and_cancellation": {
+    "failed_open": {
+      "expected_connection_error": "ClientConnectorError",
+      "http_session_closed": {
+        "_session": true,
+        "_wait_session": true,
+        "_data_session": true
+      },
+      "client_closed": true,
+      "sender_stopped": true,
+      "passed": true
+    },
+    "startup_cancel": {
+      "passed": true,
+      "handshake_cancelled": true,
+      "pending_call_error": "SessionClosed",
+      "http_sessions_closed": {
+        "_session": true,
+        "_wait_session": true,
+        "_data_session": true
+      },
+      "sender_stopped": true,
+      "client_closed": true
+    },
+    "extra_threads": 0,
+    "socket_fds_after": 0
+  },
+  "pressure": {
+    "ttl": 1.5,
+    "sessions": 32,
+    "calls": 4096,
+    "actual_awaits_started": 18412,
+    "waiters_cancelled": 4096,
+    "seconds": 25.02414364699962,
+    "business_rpc_errors": 0,
+    "active_lease_expiries": 0,
+    "all_32_sessions_active_and_empty_before_close": true,
+    "closing_fallback_expiries": [
+      {
+        "close": {
+          "begin": 8182.880405523,
+          "session": "af3cfb0c33af42dfb21954c109162629",
+          "active_before_close": true,
+          "calls_before_close": 0,
+          "objects_before_close": 0,
+          "end": 8188.011589245,
+          "closed": true
+        },
+        "expiry": {
+          "time": 8187.69959527,
+          "session": "af3cfb0c33af42dfb21954c109162629",
+          "seen_age": 1.6328358860000662,
+          "caller": "_expire_sessions",
+          "active_requests": 0,
+          "calls": 0
+        },
+        "server_close_events": [
+          {
+            "time": 8187.69959527,
+            "session": "af3cfb0c33af42dfb21954c109162629",
+            "seen_age": 1.6328358860000662,
+            "caller": "_expire_sessions",
+            "active_requests": 0,
+            "calls": 0
+          },
+          {
+            "time": 8187.7495922,
+            "session": "af3cfb0c33af42dfb21954c109162629",
+            "seen_age": null,
+            "caller": "rpc",
+            "active_requests": 0,
+            "calls": 0
+          }
+        ]
+      }
+    ],
+    "native_events": {
+      "accepted": 4096,
+      "queued": 4096,
+      "running": 4096,
+      "native": 32768,
+      "output_ready": 5632,
+      "completed": 4096
+    },
+    "extra_keeper_threads": [],
+    "native_server_peak_rss_mib": 1041.40625,
+    "sdk_client_peak_rss_mib": 176.87890625,
+    "client_max_loop_lag_ms": 2069.0721310006484,
+    "server_max_loop_lag_ms": 283.643144000489
+  },
+  "churn": {
+    "ttl": 0.3,
+    "sessions": 1000,
+    "seconds": 13.20369457400011,
+    "snapshots": [
+      {
+        "label": "closed_100",
+        "snapshot": {
+          "calls": [],
+          "objects": [],
+          "sessions": [],
+          "closed": 64,
+          "requests": 0,
+          "queue": 0,
+          "events": {
+            "accepted": 100,
+            "queued": 100,
+            "running": 100,
+            "native": 600,
+            "output_ready": 100,
+            "completed": 100
+          },
+          "gated_waits_entered": []
+        }
+      },
+      {
+        "label": "closed_300",
+        "snapshot": {
+          "calls": [],
+          "objects": [],
+          "sessions": [],
+          "closed": 64,
+          "requests": 0,
+          "queue": 0,
+          "events": {
+            "accepted": 300,
+            "queued": 300,
+            "running": 300,
+            "native": 1800,
+            "output_ready": 300,
+            "completed": 300
+          },
+          "gated_waits_entered": []
+        }
+      },
+      {
+        "label": "closed_1000",
+        "snapshot": {
+          "calls": [],
+          "objects": [],
+          "sessions": [],
+          "closed": 64,
+          "requests": 0,
+          "queue": 0,
+          "events": {
+            "accepted": 1000,
+            "queued": 1000,
+            "running": 1000,
+            "native": 6000,
+            "output_ready": 1000,
+            "completed": 1000
+          },
+          "gated_waits_entered": []
+        }
+      },
+      {
+        "label": "additional_1_ttl",
+        "snapshot": {
+          "calls": [],
+          "objects": [],
+          "sessions": [],
+          "closed": 64,
+          "requests": 0,
+          "queue": 0,
+          "events": {
+            "accepted": 1000,
+            "queued": 1000,
+            "running": 1000,
+            "native": 6000,
+            "output_ready": 1000,
+            "completed": 1000
+          },
+          "gated_waits_entered": []
+        }
+      },
+      {
+        "label": "additional_3_ttl",
+        "snapshot": {
+          "calls": [],
+          "objects": [],
+          "sessions": [],
+          "closed": 64,
+          "requests": 0,
+          "queue": 0,
+          "events": {
+            "accepted": 1000,
+            "queued": 1000,
+            "running": 1000,
+            "native": 6000,
+            "output_ready": 1000,
+            "completed": 1000
+          },
+          "gated_waits_entered": []
+        }
+      },
+      {
+        "label": "additional_10_ttl",
+        "snapshot": {
+          "calls": [],
+          "objects": [],
+          "sessions": [],
+          "closed": 64,
+          "requests": 0,
+          "queue": 0,
+          "events": {
+            "accepted": 1000,
+            "queued": 1000,
+            "running": 1000,
+            "native": 6000,
+            "output_ready": 1000,
+            "completed": 1000
+          },
+          "gated_waits_entered": []
+        }
+      }
+    ],
+    "only_expiry_is_intentional_idle_session": [
+      {
+        "time": 8235.740670073,
+        "session": "c1615a4969f446198c62a3e71a300f8e",
+        "seen_age": 0.3795655909998459,
+        "caller": "_expire_sessions",
+        "active_requests": 0,
+        "calls": 0
+      }
+    ],
+    "extra_keeper_threads": []
+  },
+  "preserved_failures": {
+    "baseline_source": {
+      "wheel_sha256": "bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a",
+      "installed_files": {
+        "graph.py": "ddf34b36d01704598d729ec1fda4f86417f38efe5a9a0cd0df8be9589ce79550",
+        "errors.py": "d3e470cbf9fb7cfa52a6ba29cddea7dd599d1cc359b7ad6b82b1cdffb0db8dc3",
+        "code.py": "3ddf0fe8310b7b5f4bae5e49f5fc1ffc503719ff843820e3b4120c0da29f1153",
+        "client.py": "365402325f13275e5514798e7f37e8cee2d9d4ef29d19ca585f8e87a04c7c7db",
+        "__main__.py": "c2977b0da5b67cf69edc7f52bc5c0e840e616b81be62218dbf758cbac6047843",
+        "__init__.py": "95974d9df9661ab9e0a72aa16a9f8f26efa836f1e429539fb0689e4d649d7f7e",
+        "refs.py": "dcf753ba5e56cbd3078d38a579dd95e8a00f65c7649f58e399488fa3658d1e58",
+        "protocol.py": "631024440cbefd76f02cb8b677ba2b353e8abb8339a222630eee2230b0835ebb",
+        "transport.py": "ba293dd843e380efe58b529b8e23c206f8f2d29ffce861b5537f9ad8b4063d07",
+        "_runtime/python_node.py": "4c2b75047d572b04b4423d82ea0a8087f4ed3aaa3c228f74e9ff63bb5ca80021",
+        "_runtime/service.py": "0b95ca36c99e80908779e07013775b402f70c1ddb6cb4c57170e9c5a4c607ea9",
+        "_runtime/http.py": "476ce3b0bc25f2801f1fce08e46e8f93ee025125f756ab8a3ce610c060097354",
+        "_runtime/objects.py": "da3e310c3694840c61e05b727ea5af8ecb36de1f3e10a73d04fc8721118ce537",
+        "_runtime/__main__.py": "b3f7099d3b2da00cff0778a754a1364cd1e3f5ab16a5b6e301937c64cb3134d7",
+        "_runtime/__init__.py": "f35518a810df5fa00c786b7c5b0fa64dd092a64ce8b3fe0b59b0280e7e156af2",
+        "_runtime/adapter.py": "72cbe7504d3592ff44e9048b306ff9bb9efbf139fadbc51bc6856c6c8db97b9e",
+        "_runtime/startup.py": "db6a408be10aa4a122fa179c78a1f32eeb318c0674a11e379f4d604bde210c9d"
+      }
+    },
+    "baseline_shared_32_sessions": {
+      "name": "load_32_sessions",
+      "calls": 4096,
+      "waits_started": 18378,
+      "waiters_cancelled": 4096,
+      "unexpected_count": 1,
+      "unexpected_samples": [
+        "SessionClosed: This runtime session is unknown or closed; open a new client session"
+      ]
+    },
+    "baseline_shared_churn": {
+      "exit_code": 1,
+      "final_json_produced": false,
+      "failure": "SessionClosed at submit while awaiting output, full stack in session_churn_probe.log"
+    },
+    "baseline_held_owned_ref": {
+      "survived": false,
+      "block_seconds": 2.275131594999948,
+      "expiry": [
+        {
+          "time": 843.719242482,
+          "session": "06db901e21e04eedaceea71d8f8f7f6c",
+          "seen_age": 1.9185772499999985,
+          "caller": "_expire_sessions",
+          "active_requests": 0,
+          "calls": 1
+        }
+      ]
+    },
+    "v2_churn": {
+      "completed_sessions": 20,
+      "native_completed": 30,
+      "error": "Traceback (most recent call last):\n  File \"/home/delva/projects/comani/tests/stress/isolated_load_probe.py\", line 287, in client\n    await asyncio.gather(*(one_session(i) for i in range(*report['current_batch'])))\n  File \"/home/delva/projects/comani/tests/stress/isolated_load_probe.py\", line 281, in one_session\n    assert await ref.fetch() == index\n           ^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/sdk311-v2/lib/python3.11/site-packages/comani/refs.py\", line 192, in fetch\n    return await client._fetch(self._cell.record[\"info\"])\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/sdk311-v2/lib/python3.11/site-packages/comani/client.py\", line 449, in _fetch\n    self._check_heartbeat()\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/sdk311-v2/lib/python3.11/site-packages/comani/client.py\", line 157, in _check_heartbeat\n    raise type(error)(str(error), details=error.details) from None\ncomani.errors.RemoteError: Session heartbeat unavailable: \n",
+      "server_rpc_errors": 0,
+      "server_expiries": 0
+    },
+    "v2_closing_expiry_is_not_active_lease_failure": [
+      {
+        "close": {
+          "begin": 2362.215280971,
+          "session": "caa54bed8dc94563a4bb92bd51e5e1f1",
+          "active_before_close": true,
+          "calls_before_close": 0,
+          "objects_before_close": 0,
+          "end": 2368.981398325,
+          "closed": true
+        },
+        "expiry": {
+          "time": 2368.074835476,
+          "session": "caa54bed8dc94563a4bb92bd51e5e1f1",
+          "seen_age": 1.9404045339997538,
+          "caller": "_expire_sessions",
+          "active_requests": 0,
+          "calls": 0
+        },
+        "server_close_events": [
+          {
+            "time": 2368.074835476,
+            "session": "caa54bed8dc94563a4bb92bd51e5e1f1",
+            "seen_age": 1.9404045339997538,
+            "caller": "_expire_sessions",
+            "active_requests": 0,
+            "calls": 0
+          },
+          {
+            "time": 2368.418767086,
+            "session": "caa54bed8dc94563a4bb92bd51e5e1f1",
+            "seen_age": null,
+            "caller": "rpc",
+            "active_requests": 0,
+            "calls": 0
+          }
+        ]
+      }
+    ]
+  },
+  "reused_unchanged_server_evidence": {
+    "bounded_wait": {
+      "native_delay_seconds": 140.0,
+      "proxy_read_cutoff_seconds": 125,
+      "started": "2026-11-15T02:10:01+0800",
+      "pid": 926686,
+      "long_call_id": "fce8cd521ccf465ea47ce30cf45f6331",
+      "elapsed_seconds": 140.01,
+      "long_call_submissions": 1,
+      "local_waiters": 16,
+      "local_waiters_cancelled": 4,
+      "wait_query_count": 10,
+      "pending_responses": 6,
+      "sdk_wait_query_times": {
+        "n": 10,
+        "p50_ms": 20001.928,
+        "p95_ms": 20004.678,
+        "max_ms": 20004.678
+      },
+      "stable_terminal_ref": "436cfaf8c8d549c6a975fc3f55fca40b",
+      "terminal_rechecks": 3,
+      "control_latency": {
+        "n": 275,
+        "p50_ms": 1.424,
+        "p95_ms": 2.919,
+        "max_ms": 5.434
+      },
+      "long_task_passed": true,
+      "after_local_gc_before_close": {
+        "calls": 0,
+        "objects": 0,
+        "sdk_states": 0,
+        "sdk_watchers": 0
+      },
+      "capability_absent_single_legacy_query": true,
+      "passed": true,
+      "completed": "2026-11-15T02:12:15+0800",
+      "final": {
+        "calls": 0,
+        "objects": 0,
+        "leases": 0,
+        "active_sessions": 0,
+        "sdk_watchers": 0,
+        "tasks": 3,
+        "rss_mib": 936.15
+      }
+    },
+    "saturated_wait_pool": {
+      "calls_created": 128,
+      "accepted_after_800ms": 128,
+      "native_first_done_before_control_test": false,
+      "http_connections_acquired_before_probe": 0,
+      "separate_wait_connections_before_probe": 100,
+      "separate_control_ms": 1.434,
+      "sdk_heartbeat_timed_out_300ms": false,
+      "sdk_heartbeat_ms": 0.467,
+      "sdk_close_wait_false_timed_out_300ms": false,
+      "sdk_close_ms": 19.871,
+      "all_http_sessions_closed": true,
+      "sdk_watchers_after_close": 0,
+      "tasks_after_native_settle": 3,
+      "runtime_calls_after_settle": 0,
+      "runtime_objects_after_settle": 0,
+      "passed": true
+    }
+  },
+  "raw_evidence_directory": "/home/delva/projects/comani/.local/shared-owner-acceptance-20261115T034719Z",
+  "final_process_port_and_sdk_cleanup": {
+    "test_process_exists": {
+      "127317": false,
+      "127329": false,
+      "131067": false,
+      "131076": false,
+      "132894": false,
+      "132900": false,
+      "134748": false,
+      "134765": false,
+      "139659": false,
+      "139666": false,
+      "140038": false,
+      "140044": false,
+      "140177": false,
+      "140180": false,
+      "140197": false,
+      "140440": false,
+      "140452": false,
+      "143128": false,
+      "143416": false
+    },
+    "ports_listening": {
+      "18400": false,
+      "18401": false,
+      "18402": false,
+      "18403": false,
+      "18404": false,
+      "18405": false,
+      "18406": false,
+      "18407": false,
+      "18408": false,
+      "18409": false,
+      "18410": false,
+      "18411": false,
+      "18412": false,
+      "18413": false,
+      "18414": false
+    },
+    "sdk_torch_present": false
+  },
+  "raw_json_sha256": {
+    "r3-baseline/production-manifest.json": "6132b77c41dc64dc6f1f461b352c8da3e869b58bacdcb78988ce3eecefa947db",
+    "r3-baseline/shared_owner-server.json": "932ab4fed99adab68402f57ac82483d13b1c9e5497a4372a5b3792742dde583d",
+    "r3-baseline/shared_owner.json": "8c41eac14883922372a0cb1dfadc2e11731c1b393dc856264a9191bd428b02ff",
+    "prior-v3-public/CURRENT_HEAD_PRESSURE_RESULTS.json": "602dee13192cecf0461518af95dfdfd6bab37fcf61b44c8ad34c6a2efe4d4e8c",
+    "v4/context_owner_counterexample-server.json": "880d1cfec0eec8d5d706837e5729e0baa0a3901af204fcc4f1f11e757f32e13f",
+    "v4/failed_open-audit.json": "f220a7f0403991876498fe1b09e6e2c6e4f926bbe69d1f324c55ef8fdf4c212c",
+    "v4/isolated_32sessions-server.json": "fa3ba9491a7424a25c57d4d29f559a4617c95f8c2994b40ee701c08c6cfce35b",
+    "v4/isolated_32sessions.json": "539f447719d3c5e672214b61c16e9706c0bd8e221d92d87b858ae1a3106960c8",
+    "v4/churn_1000.json": "b5cc08cfa391a5521d3c18cca636cb5587ca06434ea25d2a0b799816524098bb",
+    "v4/queued_owner_cleanup-server.json": "0e8fbb9a370cdca06cd27276d0fc747f5f32a0a087a93e8fc994e917257661d9",
+    "v4/startup_cancel-audit.json": "ee6f543e46e82cf633270364ec0aa0ed54e56eea1b467ec1f8d5ba9831df7a36",
+    "v4/churn_1000-server.json": "7f4b6a4ec70a90e347bdfc1aa3276cf74720a31a4c65fc533ae7e0afeef55339",
+    "v4/scoped-summary.json": "162a56cd518fc2b804d9f2c735c10798469c68f286e06ecb0303e4dedba67056",
+    "v4/queued_owner_cleanup.json": "4b3e650b6e86d7eab3cc70c9898bafa04ae6f19a8dc27ff145ef28ecdd8f55cc",
+    "v4/startup_cancel.json": "9b0d3f3967879182b77c8e2a361ab190b359e39b15055c2cbb981f7435cb11d7",
+    "v4/production-manifest.json": "664f3b91c463ffefbc4722ffd65bab593bac38eaeb1c322e0bdb0be10b1aa91c",
+    "v4/lease_lifecycle-server.json": "76e7fbaa02a5a8168ca2ca961d9e39f024bddb2c173b26c5dd182fd9ba2d0b62",
+    "v4/lease_lifecycle-loop-worker.json": "66e0becd67d6cef4b142fce541beac104fe67ea54a9a10a766b125e5d849fad7",
+    "v4/failed_open.json": "5c5a9a3c7dabe8db783750628a6ee9d8c1528a90c81d571f426fe399852f4000",
+    "v4/final_cleanup.json": "96e2b4eca6776c9155c1d1e13ed7ec86e79da0bf6dc5a92d093f3be2f20f082a",
+    "v4/context_owner_counterexample.json": "613c0b97822ca190e6f63b75bfaba0ed3de73505a60a0d13c09a5292a996d8bc",
+    "v4/shared_owner-server.json": "a528380def33b5eef157f6225a70eb66acaf8fad1b72565e46bfb046a2f0986e",
+    "v4/shared_owner.json": "274ccecfbe6525a5ad35774f397e72d44d75135c669b4126c4a5c0102859ef65",
+    "v4/lease_lifecycle.json": "4e8d5ecff0f9956050d2f2b7a626b3fd0c84eb892fbb6f6ca16d17a2b320ee6a",
+    "v4-r2/large_graphs-server.json": "31fbedc60979731b8e2c5ce4ace705cb862485c696bb866a0a63128ef3bc86b9",
+    "v4-r2/failed_open-audit.json": "d589ed934748bd7fcbc0cd4b6a657f9a88b8f4f198cd1f1ae787a79bb70b30c9",
+    "v4-r2/isolated_32sessions-server.json": "939aad4cb070bc30e3928e42d4b140ea3bf48c597ba89428d856b77efd3911d2",
+    "v4-r2/isolated_32sessions.json": "6313b6dca4e8950e533454c12a47ad466fe79391808cc0066e3216db563af37c",
+    "v4-r2/churn_1000.json": "7ad07ee549720f435be4bc58ac3fb716487add4e19a048184f77e301f6891a8b",
+    "v4-r2/context_owner_cleanup-server.json": "ae86c553053d8d1e451a642e8d134d858dbdcc97081c5d0e399fc5b453b8ee84",
+    "v4-r2/queued_owner_cleanup-server.json": "cd651f43eeb37d2b0508f88feff704190e402a130db03a3a478d2f67f2ef7616",
+    "v4-r2/large_graphs.json": "4515a36fe643657fb6b1b161f22e216e4788aa1b24fd4e0b01b522d70df9e161",
+    "v4-r2/startup_cancel-audit.json": "88097029166f89ff66add5d7a623a9b70f26537f6f3ea7c943659d37cd494632",
+    "v4-r2/churn_1000-server.json": "c9df252c866050849ef18f332c47aa8c7863351f813d5c58ce730badd326288b",
+    "v4-r2/queued_owner_cleanup.json": "c9a2a7cb2ff0b286bce26456cfdf98a35b6e1a42a375d616468fc2ccb1828e86",
+    "v4-r2/startup_cancel.json": "9b0d3f3967879182b77c8e2a361ab190b359e39b15055c2cbb981f7435cb11d7",
+    "v4-r2/production-manifest.json": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+    "v4-r2/lease_lifecycle-server.json": "f17401b4ca6a4c7fc9f915b93abe64516c4f555e78c5d70f348044c709f1fcc4",
+    "v4-r2/lease_lifecycle-loop-worker.json": "35f1e49df78df66d9bcc10a636755ae543929b678a14995396fcfdd1b3aaa3f8",
+    "v4-r2/queued_owner_cleanup_final.json": "58d7854346421a1009ae50e96f58a2f9f0633047d21910444f13c19ce5e65d94",
+    "v4-r2/failed_open.json": "5c5a9a3c7dabe8db783750628a6ee9d8c1528a90c81d571f426fe399852f4000",
+    "v4-r2/final_cleanup.json": "3874fcfce7bcff8976380b154355776d6d2208f22c044ed067798d6546aba291",
+    "v4-r2/context_owner_cleanup.json": "556d02e2585378c89a3678bd37eb98501fdf364a50424199931ea898206ddea9",
+    "v4-r2/queued_owner_cleanup_final-server.json": "455ec0cca8d3ea6b324f0db720e4ad8ccb30c6ea4500d9225d93772448b42c10",
+    "v4-r2/shared_owner-server.json": "a00c2ebcc32007a1f32361f7df82d2d30dd7502be338c93661b2107ab8823f82",
+    "v4-r2/shared_owner.json": "d6beefe7b474a19fe559a632cdbc790971629b1c8752f35fed7d56e0c2fa9fe0",
+    "v4-r2/lease_lifecycle.json": "39e63a06546f3ec82106d7c67e483f5cd40d9b905e04e6a3fd68d03f23a4458c"
+  },
+  "public_probe_sha256": {
+    "shared_owner_probe.py": "083d46cdb0d05fd38c5d08320504c84f43c55cd79f2130456c981dffa3274394",
+    "isolated_load_probe.py": "d16f0356a4be0745a71eca62a250ef8d3d36c0d0f2fd73541e2d5a73af725c61",
+    "lease_lifecycle_probe.py": "81f911d1cc49caec1062b90b087460fda5de43efd0d2ef4d607151472303b6d3",
+    "lease_startup_cleanup_probe.py": "80f932eb65b57911055cabed6816e023c2891091b829af7fdb6ada3c3cd76959",
+    "blocked_loop_probe.py": "d8cdbfcae8c781b02da2e89a2ab643125c2654b3e711f251f3a5653b7f465d64",
+    "queued_owner_cleanup_probe.py": "e58a6b6d80d254a1cab86f09f42c9eb817f0b0a22b173c16d8f9e3c40aa6b4d4"
+  },
+  "changed_from_HTTP_only_r3": [
+    "src/comani/client.py",
+    "src/comani/refs.py",
+    "src/comani/transport.py"
+  ],
+  "prior_v3_scope": {
+    "results_sha256": "602dee13192cecf0461518af95dfdfd6bab37fcf61b44c8ad34c6a2efe4d4e8c",
+    "note": "Previous heartbeat/lifecycle acceptance assumed weak Client ownership. Its retained-Ref Client-GC test is not a pass for the subsequently selected shared-ownership requirement."
+  },
+  "shared_ownership": {
+    "retained_cases": [
+      {
+        "kind": "call",
+        "session": "ff3c109249f748458996b12a9e28567a",
+        "client_alive_with_handle": true,
+        "value": 71,
+        "usable": true,
+        "client_collected_after_last_handle": true
+      },
+      {
+        "kind": "future",
+        "session": "9c6ff04d83ba4071bd6006f96fb526af",
+        "client_alive_with_handle": true,
+        "value": 72,
+        "usable": true,
+        "client_collected_after_last_handle": true
+      },
+      {
+        "kind": "ref",
+        "session": "8ff034c114b34415bbde72c108dbe26e",
+        "client_alive_with_handle": true,
+        "value": 73,
+        "usable": true,
+        "client_collected_after_last_handle": true
+      }
+    ],
+    "checks": [
+      {
+        "name": "last_future_alias_keeps_client_until_dropped",
+        "session": "26d3ada1e72348848562fa6163f9d1d1"
+      },
+      {
+        "name": "release_revokes_all_cell_aliases_and_cell_client_hold",
+        "aliases_still_held": 3,
+        "session": "38db05f2aea144f7908f60b7ee4418a4"
+      },
+      {
+        "name": "retained_call_is_an_independent_owner_after_cell_release",
+        "session": "f830a5246d4e48a4bd9f732db849f805"
+      },
+      {
+        "name": "releasing_one_cell_preserves_sibling_owner_until_last_cell_release",
+        "session": "52f09282b6964dcfb30118c74b31588b"
+      },
+      {
+        "name": "explicit_close_revokes_all_public_owner_operations",
+        "session": "2c47a54fd37e4818a9095b60a9eb7c12"
+      },
+      {
+        "name": "async_with_close_overrides_retained_ref",
+        "session": "3c89614aee7a40269b04c3a08f42941b"
+      },
+      {
+        "name": "acknowledged_hung_http_watcher_has_no_user_owner_and_does_not_root_client",
+        "session": "ea737a24856e4025ba455d61355f9bf8",
+        "call_id": "371abd0251544a97af37c5fdb29b7a7a"
+      },
+      {
+        "name": "cleared_user_context_is_not_copied_into_internal_tasks_futures_or_hung_watcher",
+        "session": "3130ad0329864b9aad0d363c0bd187ba"
+      },
+      {
+        "name": "borrowed_ref_keeps_session_but_native_cache_eviction_remains_expired",
+        "session": "7d02ffb6b4f24b899455500e97c86367",
+        "native_cache_eviction": {
+          "cache_entries_before": 1,
+          "cache_entries_after": 0
+        }
+      }
+    ],
+    "extra_keeper_threads": [],
+    "socket_fds_restored": true,
+    "factories_return_only_handles_and_client_weakref_plus_strings": true,
+    "r3_baseline": {
+      "wheel_sha256": "236b06c743540d95b6b2510bdf6ea481ec42727d16e5882a6006182a367c50e2",
+      "manifest_sha256": "6132b77c41dc64dc6f1f461b352c8da3e869b58bacdcb78988ce3eecefa947db",
+      "shared_ownership_passed": false,
+      "retained_cases": [
+        {
+          "kind": "call",
+          "session": "ca41cf2bc2d24e859f6fbc36696d88c8",
+          "client_alive_with_handle": false,
+          "usable": false,
+          "error": "SessionClosed: The client session closed before completion",
+          "stack": "Traceback (most recent call last):\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 63, in retained_case\n    record['value'] = await consume(handle, kind)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 49, in consume\n    refs = await handle\n           ^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/v4-http-r3/sdk311/lib/python3.11/site-packages/comani/refs.py\", line 243, in _ready\n    await asyncio.shield(self._state.done)\ncomani.errors.SessionClosed: The client session closed before completion\n",
+          "client_collected_after_last_handle": true
+        },
+        {
+          "kind": "future",
+          "session": "25d77eaeb15d4a02ad1f1ce6477f594b",
+          "client_alive_with_handle": false,
+          "usable": false,
+          "error": "SessionClosed: The client session closed before completion",
+          "stack": "Traceback (most recent call last):\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 63, in retained_case\n    record['value'] = await consume(handle, kind)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 52, in consume\n    ref = await handle\n          ^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/v4-http-r3/sdk311/lib/python3.11/site-packages/comani/refs.py\", line 153, in _ready\n    await asyncio.shield(self._cell.state.done)\ncomani.errors.SessionClosed: The client session closed before completion\n",
+          "client_collected_after_last_handle": true
+        },
+        {
+          "kind": "ref",
+          "session": "dddc168123b946fe9330761e88cafa74",
+          "client_alive_with_handle": false,
+          "usable": false,
+          "error": "SessionClosed: The client session is closed",
+          "stack": "Traceback (most recent call last):\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 63, in retained_case\n    record['value'] = await consume(handle, kind)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 54, in consume\n    return await handle.fetch()\n           ^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/v4-http-r3/sdk311/lib/python3.11/site-packages/comani/refs.py\", line 191, in fetch\n    client = self._cell.state.client()\n             ^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/.local/independent-heartbeat/v4-http-r3/sdk311/lib/python3.11/site-packages/comani/refs.py\", line 71, in client\n    raise SessionClosed(\"The client session is closed\")\ncomani.errors.SessionClosed: The client session is closed\n",
+          "client_collected_after_last_handle": true
+        }
+      ]
+    }
+  },
+  "queued_control_cleanup": {
+    "cases": [
+      {
+        "kind": "release",
+        "session": "6e634ee5dec04c1daece88667ccf56f2",
+        "sessions": [
+          "6e634ee5dec04c1daece88667ccf56f2"
+        ],
+        "client_alive_before_block": false,
+        "block_start": 7693.763897082,
+        "block_end": 7694.815340359,
+        "client_alive_after_block": false,
+        "session_active_after_block": false,
+        "collected_after_loop_progress": true,
+        "late_heartbeats_while_business_loop_blocked": []
+      },
+      {
+        "kind": "forget_zero_output",
+        "session": "7aec7d4507a744c99a75c4efde60ad39",
+        "sessions": [
+          "7aec7d4507a744c99a75c4efde60ad39"
+        ],
+        "client_alive_before_block": false,
+        "block_start": 7694.884033149,
+        "block_end": 7695.935739958,
+        "client_alive_after_block": false,
+        "session_active_after_block": false,
+        "collected_after_loop_progress": true,
+        "late_heartbeats_while_business_loop_blocked": []
+      }
+    ],
+    "extra_keeper_threads": [],
+    "socket_fds_restored": true,
+    "original_v4_baseline": [
+      {
+        "kind": "release",
+        "session": "71694c7daf934930b755813e10bc0d25",
+        "client_alive_before_block": true,
+        "client_alive_after_block": true,
+        "session_active_after_block": true,
+        "block_start": 6701.201620042,
+        "block_end": 6702.280156534,
+        "late_heartbeat_count": 8
+      },
+      {
+        "kind": "forget_zero_output",
+        "session": "f75a7f3ee6ca4c27878baac2fe6966bc",
+        "client_alive_before_block": true,
+        "client_alive_after_block": true,
+        "session_active_after_block": true,
+        "block_start": 6702.419774844,
+        "block_end": 6703.531722383,
+        "late_heartbeat_count": 9
+      }
+    ]
+  },
+  "internal_context_cleanup": {
+    "cases": [
+      {
+        "kind": "context_release",
+        "session": "2b61e96687fb4b0c98afa5c1643ef802",
+        "sessions": [
+          "2b61e96687fb4b0c98afa5c1643ef802"
+        ],
+        "client_alive_before_block": false,
+        "block_start": 7715.014668839,
+        "block_end": 7716.066580969,
+        "client_alive_after_block": false,
+        "session_active_after_block": false,
+        "collected_after_loop_progress": true,
+        "late_heartbeats_while_business_loop_blocked": []
+      },
+      {
+        "kind": "context_forget",
+        "session": "32da2140812642a0aabe6259638f3615",
+        "sessions": [
+          "32da2140812642a0aabe6259638f3615"
+        ],
+        "client_alive_before_block": false,
+        "block_start": 7716.138560552,
+        "block_end": 7717.191063673,
+        "client_alive_after_block": false,
+        "session_active_after_block": false,
+        "collected_after_loop_progress": true,
+        "late_heartbeats_while_business_loop_blocked": []
+      },
+      {
+        "kind": "context_cross_client_gc",
+        "session": "47a88f9eb23d42fe96737fe0d77be603",
+        "sessions": [
+          "47a88f9eb23d42fe96737fe0d77be603",
+          "c4fbc82cbdd64f47b0b1a7841f8a8663"
+        ],
+        "client_alive_before_block": false,
+        "block_start": 7717.215271424,
+        "block_end": 7718.276090492,
+        "client_alive_after_block": false,
+        "session_active_after_block": false,
+        "collected_after_loop_progress": true,
+        "late_heartbeats_while_business_loop_blocked": []
+      }
+    ],
+    "extra_keeper_threads": [],
+    "socket_fds_restored": true,
+    "cleared_user_context_hung_watcher_positive": true,
+    "user_context_preserved_during_active_public_await": true,
+    "old_v4_context_counterexample": "Traceback (most recent call last):\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 333, in main\n    result['checks'].append(await operation(url))\n                            ^^^^^^^^^^^^^^^^^^^^\n  File \"/home/delva/projects/comani/tests/stress/shared_owner_probe.py\", line 259, in context_hung_wait_case\n    await observations.eventually(lambda: client_weak() is None)\n  File \"/home/delva/projects/comani/tests/stress/lease_lifecycle_probe.py\", line 80, in eventually\n    assert time.monotonic() < deadline, 'observed state did not converge'\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: observed state did not converge\n"
+  },
+  "large_graphs": {
+    "ttl": 120.0,
+    "sessions": 8,
+    "graphs": 32,
+    "declared_nodes_per_graph": 224,
+    "invocations": 64,
+    "seconds": 54.138043282999206,
+    "actual_awaits_started": 286,
+    "waiters_cancelled": 64,
+    "details": [
+      "8 sessions x 4 invocations x 224 declared nodes: 7168 declared nodes in 32 large composed graphs; 64 HTTP invocations",
+      "each graph: two composed 32-step native/Python/expansion chains, 16 unselected failing branches, two aliased outputs",
+      "all 32 owned outputs equal input+448; in-progress waiter cancellation preserved all siblings"
+    ],
+    "native_events": {
+      "accepted": 64,
+      "queued": 64,
+      "running": 64,
+      "native": 34216,
+      "output_ready": 6688,
+      "completed": 64
+    },
+    "extra_keeper_threads": [],
+    "native_server_peak_rss_mib": 3215.1953125,
+    "sdk_client_peak_rss_mib": 64.86328125,
+    "overlap": "The beginning overlapped only one small old-v4 Context counterexample in separate processes. This is correctness evidence, not a maximum-throughput benchmark."
+  },
+  "observer_timing_correction": {
+    "first_attempt": "v4-r2/queued_owner_cleanup.json",
+    "first_attempt_sha256": "c9a2a7cb2ff0b286bce26456cfdf98a35b6e1a42a375d616468fc2ccb1828e86",
+    "scope": "Both ownership/heartbeat checks already passed; socket-FD assertion ran before the resumed business loop could dispose HTTP pools.",
+    "correction": "Explicitly progress the loop and await final socket-FD convergence; rerun retained in a different file, queued_owner_cleanup_final.json."
+  }
+}

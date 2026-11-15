@@ -97,7 +97,9 @@ COMANI_TEST_CHECKPOINT=existing_checkpoint.safetensors \
 上述命令不下载/复制 checkpoint。保留大量 MODEL/CLIP/VAE refs 会保留 owned 对象，测试不同 pipeline 时应让不再需要的局部引用自然退出；workflow 要长期保留的结果使用显式 eager 消费者，遵循 [所有权](ownership.md)。
 
 新增压力与远端验收由独立 agent 执行；实现者的 unit、历史 GPU 测量和文档检查不能替代其结论。
-[历史本地独立验收](../../tests/stress/INDEPENDENT_LOAD_REPORT.md) 记录原非 GPU suite、持续负载、生命周期与 140 秒代理验证；758738e 基线标准非 GPU 回归为 **89 passed、2 deselected**。本轮薄 CLI、原生选项和 execution metadata 的 [独立非 GPU 回归](../../tests/acceptance/THIN_CLI_REPORT.md) 为 **113 passed、2 deselected**，包含真实 CPU HTTP、缓存/设备/路径及 metadata eager/captured/raw 三路验证。新的 ComfyUI 模板 GPU 重测尚待后续，不能把历史 2048×2048 出图改记为本轮结果。
+[启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md) 绑定当前 v4-r2 原始 wheel：工程 CPU 回归 184 passed、2 deselected；独立 Python 3.12 定向回归和跨版本 source CPU 链通过。[当前压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md) 记录 32 sessions/4,096 calls、1,000 会话短 TTL churn、阻塞业务 loop 后 ownedRef 可用及 GC-before-close；无活跃会话意外失效，关闭中的空会话允许 TTL 兜底。
+
+[历史压力记录](../../tests/stress/INDEPENDENT_LOAD_REPORT.md)、[885b8cd 薄 CLI CPU 验收](../../tests/acceptance/THIN_CLI_REPORT.md) 及 v2 失败各自保留原构建身份。新官方模板 GPU/H3 旅程仍待独立重测；历史 2048×2048 出图不改记为本次构建结果。范围见 [交付状态](README.md#当前边界与证据)。
 
 历史 [environment.json](../environment.json) 和 [delivery.md](../delivery.md) 是对应测量环境的快照，不是产品中的版本选择或安装策略。
 
@@ -113,14 +115,16 @@ wheel 使用 `src/comani/`，发布前应在源码冻结后重建。构建工具
 
 开发者可用 `scripts/refresh_wheel.py` 刷新本地 wheel 测试环境；只更新 editable 安装不会更新已安装 wheel。仓库现存 [docs/wheel_manifest.json](../wheel_manifest.json) 是历史 **0.2.0** 快照，不能用作当前 0.3.0 证明。
 
-本轮独立验收的原始 wheel 为 `comani-0.3.0-py3-none-any.whl`，SHA256 为 `bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a`。在装有该 wheel 的解释器中，可用迁移后的 [verifier](../../tests/acceptance/verify_wheel.py) 核对实际文件：
+本次 Git checkpoint 仍使用版本号 `0.3.0`；已测 v4-r2 原始 wheel 的 SHA256 为 `64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98`。以下 [verifier](../../tests/acceptance/verify_wheel.py) 命令用于核对该原件：
 
 ```sh
 mkdir -p .local/verification
 python tests/acceptance/verify_wheel.py \
   --wheel /path/to/comani-0.3.0-py3-none-any.whl \
-  --sha256 bb117cd54002d794e90d0ce6d7dcf3d647efa18cf80f32339b8be1aeece6ed3a \
+  --sha256 64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98 \
   --report .local/verification/wheel.json
 ```
 
-对应 [源码清单](../../tests/acceptance/results/thin-cli-0.3.0/production-manifest.json) 与 [实际安装比对](../../tests/acceptance/results/thin-cli-0.3.0/cleanup-wheel.json) 独立保留。后续重新构建的产物需要记录自己的 hash，不能直接沿用本次验收 wheel 的值。
+[当前生产清单](../../tests/acceptance/results/heartbeat-v4-r2/production-manifest.json) 包含 17 个 package Python 文件和 `pyproject.toml`；[实际安装核对](../../tests/acceptance/results/heartbeat-v4-r2/package-identity.json) 将 source/archive/独立安装绑定到同一内容。重新构建的文件应按其实际 SHA256 重新验证，不能借用已测原件的身份。
+
+885b8cd 的 `bb117…` [基线清单](../../tests/acceptance/results/thin-cli-0.3.0/production-manifest.json) 与 [安装记录](../../tests/acceptance/results/thin-cli-0.3.0/cleanup-wheel.json) 继续作为历史证据保存。

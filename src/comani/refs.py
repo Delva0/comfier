@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import weakref
 from typing import Generic, TypeVar
 
@@ -35,6 +36,7 @@ class _InvocationLifetime:
 class _OwnerCell:
     def __init__(self, state, slot):
         self.state = state
+        self._client = state.client_ref()
         self.slot = slot
         self.record = {"released": False, "info": None}
         self.ready_ref = None
@@ -45,7 +47,10 @@ class _OwnerCell:
             raise Released("This output lease was released")
 
     def release(self):
-        self.finalizer()
+        try:
+            self.finalizer()
+        finally:
+            self._client = None
 
 
 class _CallState:
@@ -59,9 +64,11 @@ class _CallState:
         self.names = names or {}
         self.status = "queued"
         self.done = asyncio.get_running_loop().create_future()
-        self.done.add_done_callback(lambda f: None if f.cancelled() else f.exception())
+        self.done.add_done_callback(lambda f: None if f.cancelled() else f.exception(),
+                                    context=contextvars.Context())
         self.accepted = accepted if accepted is not None else asyncio.get_running_loop().create_future()
-        self.accepted.add_done_callback(lambda f: None if f.cancelled() else f.exception())
+        self.accepted.add_done_callback(lambda f: None if f.cancelled() else f.exception(),
+                                        context=contextvars.Context())
         self.cells = weakref.WeakValueDictionary()
         self.call_ref = lambda: None
 
@@ -207,6 +214,7 @@ class RemoteRef(Generic[T]):
 class Call(Generic[T]):
     def __init__(self, state):
         self._state = state
+        self._client = state.client_ref()
         self._outputs = {}
         self._graph = None
         state.call_ref = weakref.ref(self)

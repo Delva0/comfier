@@ -60,9 +60,11 @@ asyncio.run(main())
 
 本项目提供 ComfyUI **后端**执行能力：原生 API prompt graph、节点与对象。前端 canvas JSON、WebUI 行为及所有第三方自定义 HTTP route 不在统一兼容承诺内；driver 仅实现少量辅助路由。
 
-Eager 输出由会话持有，最后一个本地别名消失后通知释放；workflow 输出借用原生缓存，失效会报 `Expired`，不会自动重算。目录包同名不同内容会报 `PackageConflict`，不会覆盖已安装模块。
+Eager 输出由有效会话持有，最后一个本地别名消失后通知释放；workflow 输出借用原生缓存，失效会报 `Expired`，不会自动重算。本地持有引用与原生 cache、模型 offload 是不同层，详见 [所有权与会话保活](docs/design/ownership.md)。目录包同名不同内容会报 `PackageConflict`，不会覆盖已安装模块。
 
-后端执行、生命周期及长等待的历史证据见 [独立压力报告](tests/stress/INDEPENDENT_LOAD_REPORT.md)。原生 CLI 的 parser 接受某个参数，不等于 headless driver 已实现对应服务；支持项和明确拒绝项见 [Runtime 边界](docs/design/runtime.md)。
+公开 Call、未 release 的输出句柄与 Graph 共享保留所属 Client；删除局部 Client 变量不会单独关闭会话。显式 close/context 退出仍优先关闭整个会话。
+
+HTTP 会话通过独立后台 keeper 续约；业务 loop 暂停后可继续使用仍有效的 owned refs，提交、读取和 GC 控制消息仍需要业务 loop 可运行。已验的 CPU 范围见 [启动与保活验收](tests/acceptance/HEARTBEAT_REPORT.md) 和 [压力报告](tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)，模板 GPU 重测状态见 [交付状态](docs/design/README.md#当前边界与证据)。原生 CLI 的 parser 接受某个参数，不等于 headless driver 已实现对应服务；支持项和明确拒绝项见 [Runtime 边界](docs/design/runtime.md)。
 
 ## 文档
 
@@ -76,7 +78,7 @@ Eager 输出由会话持有，最后一个本地别名消失后通知释放；wo
 | callable、文件和目录包 | [Python artifacts](docs/design/python-artifacts.md) |
 | 环境、运行、扩展节点与测试 | [开发指南](docs/design/development.md) |
 | 环境与验收记录 | [文档目录](docs/README.md) |
-| 当前薄 CLI、metadata 与 CPU 验收 | [独立 0.3.0 报告](tests/acceptance/THIN_CLI_REPORT.md) |
+| 已发布薄 CLI、metadata 与 CPU 基线 | [独立 0.3.0 报告](tests/acceptance/THIN_CLI_REPORT.md) |
 
 历史环境与交付测量保存在 [`docs/`](docs/)，按报告中的源码版本和硬件范围解读；当前 API 以 `docs/design/` 和 `src/comani/` 为准。
 

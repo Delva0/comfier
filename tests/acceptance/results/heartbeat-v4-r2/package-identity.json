@@ -1,0 +1,17 @@
+{
+  "production_files_verified": 18,
+  "package_python_files_verified": 17,
+  "engineering_publish_files_verified": 10,
+  "manifest_sha256": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+  "wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+  "source_archive_installed_match": true,
+  "installed_copies_verified": [
+    "isolated_sdk_python311",
+    "independent_python312"
+  ],
+  "excluded_unvalidated_examples": {
+    "examples/minimax_h3_source_ops.py": "3afaae491527a1212d1d75a6d646629a2c366528a09df7991865471465266242",
+    "examples/minimax_h3_source_remote.py": "3e260248bbb2c624e5038cc1458265846e092772b96246e444b18e4cc9b74c4c"
+  },
+  "scope": "Static source/archive/actual installed-file checks only"
+}

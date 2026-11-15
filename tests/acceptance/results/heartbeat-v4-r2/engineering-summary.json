@@ -1,0 +1,61 @@
+{
+  "baseline_commit": "885b8cd4709608f0e624d1e1f63b897115528b81",
+  "publish_files": {
+    "src/comani/_runtime/startup.py": "235da0de661824eeeb87c806395a5ac094cd93ea2d4b00d796e878d91618978a",
+    "src/comani/client.py": "57b09af29ca2136212f5b62d770efec8efb26b7f08f499585ac37817140a6ec3",
+    "src/comani/transport.py": "8329eacaa6882b08e7de15f687ad65c4206f1fd6e435a24210d54b10a9b6c82f",
+    "src/comani/refs.py": "2dc2261f793325b5744f3b3f5052601b40fb395143c249818e766e455bc3c8db",
+    "tests/unit/test_runtime_args.py": "94dea0ae96b4fbb2332eb365c2588f716dd37139fdf623399db5ef9326520159",
+    "tests/unit/test_heartbeat.py": "bc5e61e851719fb01049598f30952d68255b868cb3ddd10fc806fdcf20d5df27",
+    "tests/unit/test_shared_ownership.py": "927c59399d309ce2e55dc0d164c6a3a8267fff2672474be69835e5b6d31abb9f",
+    "tests/native/test_runtime_args.py": "90e800a3f6de6ade9822df5db809ff87d28976d267d9284be0181997b3cb5c5a",
+    "tests/native/test_startup.py": "b18ebe09c5e87854785a79b85488c0a9ee2160405a6704ec173dce3348528bde",
+    "tests/integration/test_http.py": "a12f7505bdc453974cf985ce281308883ce8563ccccd4d7457c4e00a64ab9838"
+  },
+  "manifest_sha256": "0b12ee002fb774911ee64604bbff1c1b761ce2c668b66508a2d4dab9956249a2",
+  "wheel_sha256": "64a73a6e6a3c40ca6435c521bb9d7df4411e9e646c45334c863796b741babd98",
+  "public_ownership_contract": [
+    "Public Call strongly retains its Client until Call GC, including zero-output, pending and completed Calls. Releasing every output does not release the independent Call owner.",
+    "OutputFuture and RemoteRef aliases share an owner cell. The unreleased cell strongly retains Client; release invalidates all that cell aliases and clears the cell Client edge in finally.",
+    "Public Graph is the existing independent Client owner. Workflow Call._graph remains a legitimate graph-binding capability while that public Call exists; no Graph architecture change.",
+    "Explicit Client.close and async context exit revoke network/session resources even while Calls/cells/Graphs remain. Local completed metadata may remain as tombstones; remote operations fail.",
+    "State/client_ref, invocation lifetime, state.cells, ready_ref and call_ref remain weak. Finalizer arguments remain weak Client plus pure wire record; no Cell/State in callback registry.",
+    "After the last public owner disappears, GC stops the keeper and schedules normal transport/session disposal. Whole-session close/TTL may subsume individual release messages; no per-output release ordering promise.",
+    "Borrowed output handles retain session capability but do not pin native cache. Native cache eviction still yields Expired and does not recreate/recompute the producer."
+  ],
+  "internal_scheduling_contract": {
+    "weak_gc_controls": "release_info and forget_call enqueue module weak-method dispatch with only wire data; queued callbacks cannot become another session owner",
+    "fresh_contexts": "SDK-owned tasks, internal Task/Future done callbacks, GC scheduling, keeper notifications/watch/cancel, and keeper OS thread construction/start all use fresh contextvars.Context",
+    "legitimate_user_context": "User active fetch/close/await execution, user tasks and user-registered callbacks are untouched. The user-requested close task keeps caller context; only its SDK exception-retrieval callback is isolated.",
+    "context_policy_basis": "No prior public API or documentation promised app ContextVars propagation into long-lived SDK internal tasks; copying arbitrary Client/Graph values caused real hidden owners. No ContextVar blacklist or new framework introduced.",
+    "runtime_boundary": "Actual supported-environment validation is Python3.11/3.12. No runtime claim for newer inheriting-thread builds; public Context.run wraps both Thread construction and start without version branches."
+  },
+  "history_and_failures_retained": {
+    "startup_only": ".local/python312-startup-fix/",
+    "v2_real_churn": ".local/current-pressure-20261114T180558Z/heartbeat-v2/churn_1000.json and server evidence: local transient heartbeat failure blocked a still-valid business RPC",
+    "v3_http503": ".local/delivery-audit/heartbeat-http503-counterexample.json and original runner",
+    "http_intermediates": ".local/independent-heartbeat/v4-http*, including final HTTP-only r3 164/2 and independent24 raw HTTP matrix; all original artifacts unchanged",
+    "v4_local_cleanup_assertion_race": "v4/cpu-source-python311.log had175 pass/one new test asserted server cleanup synchronously after keeper exit. Only test eventual server-disposal predicate corrected; v4/cpu-source-python311-final.log176/2. Production unchanged during that correction.",
+    "v4_queued_roots": "v4/queued-control-owner-counterexample.json, capture-context-owner-counterexample.json and queued-control-regression-cleanup.log; independent queued_owner_cleanup probe evidence retained by acceptance agent",
+    "draft_copy_context_root": "v4-r2/application-context-owner-counterexample.json binds draft sourcehash; draft-before-empty-context-* preserves source; ownership-tests.log records failed limited-filter context attempt",
+    "old_v4_artifacts": ".local/independent-heartbeat/v4/ wheel, manifest and SDK remain unchanged. Its prior green result scope excludes later discovered queued/context root failures."
+  },
+  "non_changes": [
+    "No docs writes; unified publisher owns contract wording",
+    "No SessionCore or generic scheduler",
+    "No native worker scheduling, ACK input ownership, per-slot data ownership, TTL, heartbeat timeout/interval, package policy or Torch/environment policy changes",
+    "No automatic handshake revival or producer resubmission",
+    "Baseline .venv not reinstalled; only existing .venv-wheel test target refreshed; all acceptance SDKs isolated"
+  ],
+  "record_type": "Engineering freeze; runtime acceptance is recorded separately",
+  "source_record_sha256": "bb19eb3cced511a389c8f8c7e467cd67975a2f6b31533c5f177944e8de24a22e",
+  "engineering_validation": {
+    "full_cpu_python311": "184 passed, 2 deselected, 23 warnings in104.02s; .local/independent-heartbeat/v4-r2/cpu-source-python311.log",
+    "focused_owner_http_sdk": "75 passed; .local/independent-heartbeat/v4-r2/ownership-tests-final.log",
+    "new_root_regressions_against_installed_v4": "8 failed, 13 deselected; .local/independent-heartbeat/v4-r2/regression-on-v4.log",
+    "ruff_changed_files": "passed",
+    "git_diff_check": "passed",
+    "source_manifest_wheel": "all18 production source files and17 wheel Python members match",
+    "architecture_review": ".local/ownership-review/v4-r2-review.md: no blocker within identified queued-method/context-root and strong/weak graph audit scope; reviewer did not claim runtime acceptance"
+  }
+}

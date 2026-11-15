@@ -96,7 +96,7 @@ from comani import Client, InProcessTransport
 from comani._runtime import NativeRuntime
 
 async def main():
-    for expected in (17, 23):
+    for expected in (17, 23, 29):
         runtime = NativeRuntime(sys.argv[1], cpu=True, custom_nodes=False)
         try:
             async with Client(transport=InProcessTransport(runtime)) as remote:
@@ -170,6 +170,7 @@ finally:
 @pytest.mark.parametrize("arguments", [
     ["--cache-none"], ["--listen", "0.0.0.0"], ["--port", "9001"], ["--auto-launch"],
     ["--enable-assets"], ["--enable-manager"], ["--enable-agent"],
+    ["--liste=127.0.0.1"], ["--port=8188"],
 ])
 def test_unsupported_native_services_fail_before_torch_import(arguments):
     result = subprocess.run([sys.executable, "-B", "-c", """

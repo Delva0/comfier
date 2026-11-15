@@ -15,6 +15,10 @@ async with Client(url, token=token) as remote:
 
 调用时创建 Call、完成 future 和发送项。后台 sender 完成握手/必要 artifact 上传后发送；等待提交 ACK 不等于等待计算完成。未 await 的调用也会执行，但事件循环必须有调度机会。Client 应通过 `async with` 或显式 `await close()` 管理。
 
+提交、结果读取和 GC 控制消息仍需要业务 loop 可运行。独立会话保活的改动只针对 lease 续约，不把阻塞的业务协程变为继续执行；HTTP keeper 的已验范围、历史暂停反例与 custom transport 限制见 [会话语义](ownership.md#会话续约与业务-loop-暂停)。
+
+公开 Call、未 release 的 Future/Ref owner cell 与 Graph 共享保留所属 Client；helper 返回句柄后，局部 Client 变量消失不会单独关闭会话。Call 本身是独立拥有者，输出全部 release 后仍保留会话，直到 Call 被回收；当前没有 Call release API。输出 `release()` 撤销同 cell 的全部别名并交还该 cell 的会话持有，不撤销其他 Call/Graph。显式 Client close/context exit 优先撤销整个 session；最后拥有者 GC 则安排异步清理，详见 [所有权](ownership.md)。
+
 | 对象/操作 | 含义 |
 |---|---|
 | `Call` | 一次 invocation；可持有该调用的全部输出槽 |
