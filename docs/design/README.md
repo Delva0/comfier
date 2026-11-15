@@ -25,6 +25,8 @@ daemon 主事件循环：接收、依赖等待、会话与对象记录
 | [文件 I/O](files.md) | [files.py](../../src/comani/files.py)、[文件存储](../../src/comani/_runtime/files.py)、[文件 HTTP](../../src/comani/_runtime/file_http.py) | 显式 async 上传/下载、原生目录与模型根、文件校验和持久性 |
 | [启动与开发](development.md) | [CLI](../../src/comani/__main__.py)、[runtime 入口](../../src/comani/_runtime/__main__.py)、[pyproject.toml](../../pyproject.toml) | 当前解释器内启动 driver、节点接入与开发测试 |
 
+待实施设计另见 [远程管理与连接恢复提案](remote-management-plan.md)：独立带外管理 daemon、bash/comfyui/plugins/models、共同 Operation 和计算 session resume；不属于当前已交付 API。
+
 ## 设计约束
 
 1. `.node/.python/.submit` 返回的 Call 已进入活动发送流程；await 不是启动开关。
