@@ -1,8 +1,10 @@
 """Save a scene, disconnect, continue its project in a new Client, then export.
 
 Independent adaptation of LongForge v7.8 (resource2926029/version3467080).
-Use --plugin-dir with the locally extracted original MIT LongForge NodePack
-and --download-models to prepare the workflow before execution. This small validation setup
+The original MIT LongForge NodePack is published in the official archive
+declared below. --install-plugin permits daemon-side acquisition and installation;
+that official-source path still needs independent remote validation.
+Use --download-models to prepare the weights before execution. This small validation setup
 uses existing Singularity REF2VA weights, 544x960/2 new seconds, HARD22 overlap,
 and original20-step Euler/simple sampling. The supplied GUI has model placeholders,
 768x1344/10 new seconds, SOFT5 overlap and optional Sage/VEDA preview patches.
@@ -23,11 +25,17 @@ import shlex
 import tempfile
 import time
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 
-from local_node_package import install_local_node_package
-
 import comani
+
+NODE_ARCHIVE = {
+    "url": "https://civitai.com/api/download/models/3467080?fileId=3370455",
+    "sha256": "5754f4594ed185577da67e1b4015139793bbfdbbeca0ef33b0a378b8185ccc0d",
+    "size": 649345,
+    "packages": {"ComfyUI-H3-LongForge-NodePack": "ComfyUI-H3-LongForge-NodePack"},
+}
 
 STORY = [
     {"name": "Lake", "prompt": "VIDEO: A copper toy sailboat drifts across a calm garden pond in warm morning light. "
@@ -81,11 +89,21 @@ async def main(args):
         for scene_number in (1, 2):
             async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
                 started = time.perf_counter()
-                if scene_number == 1 and args.plugin_dir:
-                    profile["installed_original_package"] = await install_local_node_package(
-                        args.plugin_dir, "ComfyUI-H3-LongForge-NodePack", required_files=("__init__.py", "LICENSE"))
-                    if not profile["installed_original_package"]["reused"]:
-                        info = await comani.comfyui.info()
+                if scene_number == 1 and args.install_plugin:
+                    installed = await comani.plugins.list()
+                    missing = {name: path for name, path in NODE_ARCHIVE["packages"].items() if not any(
+                        Path(plugin.path).name.casefold() == name.casefold() for plugin in installed)}
+                    info = await comani.comfyui.info()
+                    dependencies = await comani.bash.run(shlex.join([info.runtime_python, "-c",
+                        "import importlib.metadata,importlib.util,shutil; "
+                        "assert int(importlib.metadata.version('filelock').split('.')[0]) >= 3; "
+                        "assert shutil.which('ffmpeg') or importlib.util.find_spec('imageio_ffmpeg')"]), check=False)
+                    if missing or dependencies.exit_code:
+                        await comani.comfyui.stop()
+                    if missing:
+                        profile["node_installation"] = asdict(await comani.plugins.install_archive(
+                            {**NODE_ARCHIVE, "packages": missing}))
+                    if dependencies.exit_code:
                         await comani.bash.run(shlex.join([
                             info.runtime_python, "-m", "pip", "install", "filelock>=3", "imageio-ffmpeg"]))
                 info = await comani.comfyui.start()
@@ -166,8 +184,8 @@ if __name__ == "__main__":
     parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--project", help="existing project name to continue; default creates a new unique project")
     parser.add_argument("--story", type=Path, help="JSON list of exactly two scene cards with name/prompt")
-    parser.add_argument("--plugin-dir", type=Path,
-                        help="local extracted original LongForge NodePack; install only if missing")
+    parser.add_argument("--install-plugin", action="store_true",
+                        help="install the missing original NodePack from its official archive on the daemon")
     parser.add_argument("--download-models", action="store_true",
                         help="acquire the four default H3 weights through the daemon")
     parser.add_argument("--model", default="Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors")

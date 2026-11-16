@@ -1,7 +1,7 @@
 """Make two scored scenes through the original native dynamic scene graph.
 
 ScoreToScreen v9.0/resource2975051/version3470191. Requires the four original
-user-provided Score packages, Python3.12, official4B Q4_K_M GGUF+F16 mmproj,
+original Score packages, Python3.12, official4B Q4_K_M GGUF+F16 mmproj,
 local llama-server, original FastH3 Omni NVFP4 and the shared H3 components.
 The default LLM uses CPU; --llm-device cuda selects the original CUDA build
 and all GPU layers with the same GGUF and vision weights.
@@ -12,8 +12,10 @@ FastH3 engine, shifts12/3 and VSA10% match the supplied GUI; size/duration are
 small explicit validation inputs. Models/outputs retain their original terms.
 
 python examples/score_to_screen.py --image adult.png --audio song.wav --abc song.abc
-First use: add --plugins-dir <extracted-original/custom_nodes>
---prepare-llama --download-models. The original node chooses a compatible
+The official node archive is declared below; --install-plugins permits its
+daemon-side acquisition/installation, which still needs remote validation.
+Add --prepare-llama --download-models to prepare
+tools and weights. The original node chooses a compatible
 official llama.cpp release only when explicitly permitted; no release is pinned.
 For a CPU-limited server, --llm-threads N passes -t N -tb N to the original
 llama.cpp node. Choose N from that server's available CPU quota; omitting it
@@ -30,13 +32,18 @@ import shlex
 import tempfile
 import time
 import uuid
+from dataclasses import asdict
 from pathlib import Path
-
-from local_node_package import install_local_node_package
 
 import comani
 
 PACKAGES = ("ComfyUI-ABCScoreIO", "ComfyUI-PromptSplitter", "ComfyUI-ABCTiming", "ComfyUI-ABCInstrumentalize")
+NODE_ARCHIVE = {
+    "url": "https://civitai.com/api/download/models/3470191?fileId=3377291",
+    "sha256": "c6f55583038e259c441cebe8a0e31e9cfc727f9f4990e1dc65ed83488dad4b49",
+    "size": 2056796,
+    "packages": {name: "Score2Screen_v9.0/custom_nodes/" + name for name in PACKAGES},
+}
 WEIGHTS = (
     ("diffusion_models", "FastVideo/FastH3-Omni-NVFP4-QAD-Comfy", "fasth3_omniref_qad_nvfp4_comfy.safetensors", "fasth3_omniref_qad_nvfp4_comfy.safetensors"),
     ("text_encoders", "Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors", "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"),
@@ -79,9 +86,14 @@ async def main(args):
             configured = await comani.comfyui.info()
             await comani.bash.run(shlex.join([configured.runtime_python, "-c",
                 "import sys; assert sys.version_info >= (3,12), 'Original Score packages require Python >=3.12'"]))
-            if args.plugins_dir:
-                profile["original_packages"] = [
-                    await install_local_node_package(args.plugins_dir / name, name) for name in PACKAGES]
+            if args.install_plugins:
+                installed = await comani.plugins.list()
+                missing = {name: path for name, path in NODE_ARCHIVE["packages"].items() if not any(
+                    Path(plugin.path).name.casefold() == name.casefold() for plugin in installed)}
+                if missing:
+                    await comani.comfyui.stop()
+                    profile["node_installation"] = asdict(await comani.plugins.install_archive(
+                        {**NODE_ARCHIVE, "packages": missing}))
             info = await comani.comfyui.start()
             required = {"ABCLoadSong", "S2SSceneList", "S2SScenePlanN", "S2SSceneRunner", "S2SLLMSettings",
                         "PromptSplitterLLM", "S2SH3Engine", "S2SOmniPatch", "ABCTimingPrompt"}
@@ -233,8 +245,8 @@ if __name__ == "__main__":
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--audio", type=Path, required=True)
     parser.add_argument("--abc", type=Path, required=True)
-    parser.add_argument("--plugins-dir", type=Path,
-                        help="local original Score custom_nodes directory; install only missing packages")
+    parser.add_argument("--install-plugins", action="store_true",
+                        help="install missing original Score packages from the official archive on the daemon")
     parser.add_argument("--prepare-llama", action="store_true",
                         help="permit the original package to prepare its compatible official llama-server")
     parser.add_argument("--llm-device", choices=("cpu", "cuda"), default="cpu",

@@ -28,13 +28,13 @@ export COMANI_TOKEN='...'                 # 仅在入口要求鉴权时设置
 | [h3_seed_hunter.py](h3_seed_hunter.py) | 所用节点均来自当前原生 H3 后端 | `--download-models`，6 个权重 | 支持所选 INT8 / NVFP4 编码器的 GPU 和运行环境 |
 | [moss_bbox.py](moss_bbox.py) | 所用节点均来自当前原生 MOSS 后端 | `--download-models`，默认 3 个；`--hires` 加第 4 个 LoRA | 当前 MOSS 原生节点 |
 | [ideogram4.py](ideogram4.py) | KJNodes、Detail-Daemon | `--install-plugins --download-models`，3 个权重 | 当前 Ideogram4 原生节点与兼容硬件 |
-| [h3_longforge.py](h3_longforge.py) | 用户取得的原作者 LongForge NodePack | `--plugin-dir` 安装本地原包和 filelock/imageio-ffmpeg；`--download-models` 下载 4 个默认权重 | 提供已解压原包；当前 H3 后端与兼容硬件 |
-| [score_to_screen.py](score_to_screen.py) | 用户取得的 ABCScoreIO、PromptSplitter、ABCTiming、ABCInstrumentalize 原包 | `--plugins-dir` 安装本地原包；`--prepare-llama` 准备原工具；`--download-models` 下载 6 个默认权重 | 提供已解压原包；Python 3.12 和当前 FastH3 后端与兼容硬件 |
+| [h3_longforge.py](h3_longforge.py) | 官方 LongForge 附件中的 NodePack | `--install-plugin` 让 daemon 按官方 URL/SHA 安装并准备 filelock/imageio-ffmpeg；`--download-models` 下载 4 个默认权重 | 官方 archive 的实际 daemon 获取尚未验证；当前 H3 后端与兼容硬件 |
+| [score_to_screen.py](score_to_screen.py) | 官方附件中的 ABCScoreIO、PromptSplitter、ABCTiming、ABCInstrumentalize | `--install-plugins` 让 daemon 从同一官方 archive 安装缺失包；`--prepare-llama` 准备原工具；`--download-models` 下载 6 个默认权重 | 官方 archive 的实际 daemon 获取尚未验证；Python 3.12 和当前 FastH3 后端与兼容硬件 |
 | [h3_perfect_looper.py](h3_perfect_looper.py) | CoolB Nodes、H3-Motion-Context-MultiRef、KJNodes | `--install-plugins --download-models`，5 个权重；`--download-lora` 可只准备原 Turbo-v4 | 当前 H3 后端与兼容硬件 |
 
-十个示例均把工作流自身的可选准备、执行和结果下载放进同一入口；它们仍需要上面所述的 daemon 与当前计算环境。LongForge、Score 和 PerfectLooper 的新增准备路径目前只完成本地检查，不自动继承旧执行路径的 GPU 验收。脚本不会创建或租用机器，也不会自动替调用者选择 Python、Torch/CUDA 或 GPU。
+准备、执行和结果下载均已写入各示例入口；LongForge/Score 的官方 archive 直下仍是未验证项，不能声称十例均已从零跑通。PerfectLooper 的新增准备路径目前只完成本地检查，不自动继承旧执行路径的 GPU 验收。脚本不会创建或租用机器，也不会自动替调用者选择 Python、Torch/CUDA 或 GPU。
 
-LongForge、Score 的用户原包未随仓库分发；不要将原包、第三方私有代码、权重或 `.local` 验收目录提交到 Git。PerfectLooper 的公开包为 [CoolB Nodes](https://github.com/CoolBreeze164/ComfyUI-CoolB-Nodes)、[H3 Motion Context](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef) 和 [KJNodes](https://github.com/kijai/ComfyUI-KJNodes)；复用已安装的匹配节点能力，记录实际安装身份。
+LongForge、Score 是原作者官方公开附件中的节点包；其公开资源应由 daemon 获取，不要求调用者先保存到个人目录再上传。原包未随仓库分发；不要将第三方代码、权重或 `.local` 验收目录提交到 Git。PerfectLooper 的公开包为 [CoolB Nodes](https://github.com/CoolBreeze164/ComfyUI-CoolB-Nodes)、[H3 Motion Context](https://github.com/seitanism/ComfyUI-H3-Motion-Context-MultiRef) 和 [KJNodes](https://github.com/kijai/ComfyUI-KJNodes)；复用已安装的匹配节点能力，记录实际安装身份。
 
 ## 准备、执行和取回
 
@@ -48,20 +48,25 @@ python examples/qwen_click_mask.py --install-plugin --download-models \
 
 后续可去掉两个准备参数，复用已验证的模型和插件。`--install-plugin` 仅在发现缺失插件时停止计算并安装；没有缺失时不为安装而重启。`--download-models` 对相同目标使用 `reuse=True`，仍核验模型 SHA。Qwen Tiled 的默认分支包含 Viggle Turbo；`--no-turbo --steps 25` 选择源工作流的慢分支。
 
-后三例的首次准备和运行不再依赖验收 harness：
+后三例的显式准备调用如下。LongForge/Score 的官方附件尚无 daemon 直下验证，受限环境不得把以下命令当作已通过的首次部署：
 
 ```sh
-python examples/h3_longforge.py \
-  --plugin-dir /local/original/ComfyUI-H3-LongForge-NodePack --download-models
+python examples/h3_longforge.py --install-plugin --download-models
 
-python examples/score_to_screen.py \
-  --plugins-dir /local/original/Score2Screen_v9.0/custom_nodes \
-  --prepare-llama --download-models --image adult.png --audio song.wav --abc song.abc
+python examples/score_to_screen.py --install-plugins --prepare-llama --download-models \
+  --image adult.png --audio song.wav --abc song.abc
 
 python examples/h3_perfect_looper.py --install-plugins --download-models
 ```
 
-本地原包安装只复用或新建包目录，不覆盖已装包。共用的 [local_node_package.py](local_node_package.py) 仅做一件事：原目录打包后经 `files.upload` 放进 input，通过 `bash.run` 校验 SHA、拒绝绝对路径/`..`/symlink、解到 `.disabled` staging，再原子发布，最后移除 input zip。`custom_nodes` 仍是软件路径，不开放为数据上传根。节点实际启动后再检查本工作流所需能力。原包在远端执行其原生逻辑，Comani 不修改它，也不代替它的依赖管理。
+LongForge/Score 脚本中的 `NODE_ARCHIVE` 记录已保存官方 metadata 的来源，未执行受限资源请求：
+
+| 来源 | 固定附件身份 | 字节数 / SHA256 | 节点子目录 |
+| --- | --- | --- | --- |
+| AIBOB1199 · [LongForge v7.8](https://civitai.com/models/2926029) | version `3467080` / file `3370455` | `649345` / `5754f4594ed185577da67e1b4015139793bbfdbbeca0ef33b0a378b8185ccc0d` | `ComfyUI-H3-LongForge-NodePack/` |
+| koyan0418439 · [Score to Screen v9.0](https://civitai.com/models/2975051) | version `3470191` / file `3377291` | `2056796` / `c6f55583038e259c441cebe8a0e31e9cfc727f9f4990e1dc65ed83488dad4b49` | `Score2Screen_v9.0/custom_nodes/` 下表列四包 |
+
+Score 四包为 `ComfyUI-ABCScoreIO`、`ComfyUI-PromptSplitter`、`ComfyUI-ABCTiming`、`ComfyUI-ABCInstrumentalize`。官方说明未给出这些原包的独立 GitHub/registry 发布。`plugins.install` 接 registry ID，`install_git` 接 Git 仓库；例子用 `plugins.install_archive(NODE_ARCHIVE)` 表达官方 ZIP 来源，由 daemon 获取、校验 SHA、安装选定包目录并正常处理包内依赖。同一个 ZIP 的多个包共用一次获取，例子只提交缺失包；archive 不经过客户端。LongForge 未在 pyproject 声明的 filelock/imageio-ffmpeg 由例子显式安装，不从历史验收环境推断依赖已齐。`custom_nodes` 继续属于软件路径，不开放为数据上传根。官方 archive 的实际 daemon 下载与安装尚待验证，不以本地已有附件上传代替通过。
 
 后三例分别并发准备自己需要的独立模型文件；所有已开始的准备均结束并且全部成功后才加载模型。Score 先检查 Python 3.12 和原 `llama-server --version`，缺少工具时仅 `--prepare-llama` 允许原作者代码选择当前平台兼容的官方 release；不硬编码 b12436 或软件 commit。普通运行不悄悄进入首次工具下载。LongForge/Score 的 `--download-models` 对应脚本所列默认权重组，自定义 `--model` 等参数应先安装选定权重并省略此准备参数。
 
