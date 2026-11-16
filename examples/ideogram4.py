@@ -77,15 +77,9 @@ async def main(args):
                     source = await comani.models.resolve({"repo_id": "Comfy-Org/Ideogram-4",
                                                           "path": f"{category}/{filename}"})
                     artifact, = source.files
-                    roots = await comani.files.roots(category=category)
-                    if not roots:
-                        raise ValueError(f"No native model roots for {category}")
-                    existing = await comani.models.list(category=category, prefix=filename)
-                    present = {f["root"]["id"] for f in existing["files"] if f["relative_path"] == filename}
-                    root = min([r for r in roots if r.id in present] or roots, key=lambda r: r.priority)
-                    await comani.models.download(artifact, root=root, path=filename, reuse=True)
+                    file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": filename, "sha256": artifact.sha256,
-                                   "revision": source.revision, "root": root.path,
+                                   "revision": source.revision, "root": file.root.path,
                                    "seconds": time.perf_counter() - started})
             started = time.perf_counter()
             model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")

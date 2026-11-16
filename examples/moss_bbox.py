@@ -70,11 +70,7 @@ async def main(args):
                     started = time.perf_counter()
                     source = await comani.models.resolve({"repo_id": repository, "path": path})
                     artifact, = source.files
-                    roots = await comani.files.roots(category=category)
-                    existing = await comani.models.list(category=category, prefix=filename)
-                    present = {f["root"]["id"] for f in existing["files"] if f["relative_path"] == filename}
-                    root = min([r for r in roots if r.id in present] or roots, key=lambda r: r.priority)
-                    await comani.models.download(artifact, root=root, path=filename, reuse=True)
+                    await comani.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": filename, "sha256": artifact.sha256,
                                    "revision": source.revision, "seconds": time.perf_counter() - started})
             started = time.perf_counter()

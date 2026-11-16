@@ -71,20 +71,12 @@ async def main(args):
                     started = time.perf_counter()
                     source = await comani.models.resolve({"repo_id": repository, "path": path})
                     artifact, = source.files
-                    roots = await comani.files.roots(category=category)
-                    if not roots:
-                        raise ValueError(f"No native model roots for {category}")
                     filename = Path(path).name
-                    existing = await comani.models.list(category=category, prefix=filename)
-                    existing_ids = {item["root"]["id"] for item in existing["files"]
-                                    if item["relative_path"] == filename}
-                    # Reuse the first native match; download still verifies its SHA256.
-                    candidates = [root for root in roots if root.id in existing_ids]
-                    root = min(candidates or roots, key=lambda candidate: candidate.priority)
-                    await comani.models.download(artifact, root=root, path=filename, reuse=True)
+                    file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": path,
                                    "sha256": artifact.sha256, "revision": source.revision,
-                                   "root": root.path, "priority": root.priority, "seconds": time.perf_counter() - started})
+                                   "root": file.root.path, "priority": file.root.priority,
+                                   "seconds": time.perf_counter() - started})
             started = time.perf_counter()
             uploaded = await comani.files.upload(args.input)
             stages.append({"phase": "upload", "seconds": time.perf_counter() - started})
