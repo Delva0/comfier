@@ -2,7 +2,7 @@
   "schema_version": 1,
   "record_date": "2026-11-16",
   "date_timezone": "Asia/Shanghai",
-  "status": "TESTED_MANAGEMENT_CANDIDATE_RECORD_FINAL_RELEASE_PENDING",
+  "status": "SCOPED_MANAGEMENT_RELEASE_PUBLISHED_API_AND_OVERALL_GOAL_OPEN",
   "scope": "R01-R25 management, recovery, files/LZ4, rewritten examples and root-to-cli-to-daemon entry structure across three attributed candidate stages. Stable product39 matches the cleanup wheel; deferred API research is archived outside that product scope.",
   "excluded": {
     "optional_CLI_expansions": 39,
@@ -736,7 +736,7 @@
         "cleanup-independent",
         "cleanup-integration"
       ],
-      "state": "aggregate_final_delivery_pending"
+      "state": "scoped_management_release_complete_API_and_overall_goal_open"
     },
     {
       "id": "R23",
@@ -746,7 +746,7 @@
         "cleanup-gate",
         "cleanup-integration"
       ],
-      "state": "aggregate_final_delivery_pending"
+      "state": "scoped_management_release_complete_API_and_overall_goal_open"
     },
     {
       "id": "R24",
@@ -827,10 +827,16 @@
     "Default offline grace is one hour; expiry probes used shortened grace.",
     "No pip/script rollback, cross-daemon-crash durable exactly-once, universal root matrix, maximum-capacity or universal speedup certification."
   ],
-  "remaining_release_gates": [
-    "Fresh independent review of cleanup-updated public documentation/artifacts and overall release scope",
-    "Final delivery tree/package freeze including documentation; stable product39 matches the cleanup wheel, while API research remains OPEN and archived",
-    "Authorized exact staging/commit/push and remote commit verification; R22/R23 and the API goal are not complete"
-  ],
-  "sanitization": "Explicit numeric/boolean/hash/name allowlist; no private endpoints, credentials, signed URLs, operation handles, raw logs, tensors or pickle payloads."
+  "remaining_release_gates": [],
+  "sanitization": "Explicit numeric/boolean/hash/name allowlist; no private endpoints, credentials, signed URLs, operation handles, raw logs, tensors or pickle payloads.",
+  "management_release": {
+    "repository_url": "https://github.com/Delva0/comani",
+    "commit": "11318c6cf9be761d67088fa83f33b140bc849fef",
+    "verified_at_UTC": "2026-11-16T03:20:25.720347Z",
+    "scope": "Stable management, transfers, stage publication and missing-output cleanup; unselected node API and overall user goal remain OPEN."
+  },
+  "remaining_open_work": [
+    "Unselected node API research, final design, implementation and independent acceptance remain OPEN; archived candidate payload is not the current product.",
+    "Overall user-goal completion remains OPEN; the verified management release does not close it."
+  ]
 }
