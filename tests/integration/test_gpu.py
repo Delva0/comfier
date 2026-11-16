@@ -26,10 +26,10 @@ async def test_gpu_node_python_node_matches_native_function(gpu_url):
     import torch
 
     async with Client(gpu_url) as remote:
-        source = remote.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
+        source = remote.node("EmptyImage", return_call=True, width=64, height=64, batch_size=1, color=0x123456)
         adjusted = remote.python(lambda image: image.to("cuda") * 0.5,
                                  inputs={"image": source.output()})
-        output = remote.node("ImageInvert", image=adjusted.output())
+        output = remote.node("ImageInvert", return_call=True, image=adjusted.output())
         reference = remote.python(
             lambda image: __import__("nodes").NODE_CLASS_MAPPINGS["ImageInvert"]().invert(
                 image.to("cuda") * 0.5)[0], inputs={"image": source.output()},
@@ -68,19 +68,19 @@ async def test_existing_checkpoint_eager_matches_native_workflow(gpu_url):
             history.write(json.dumps(snapshot) + "\n")
 
     async def eager_image(remote):
-        loaded = remote.node("CheckpointLoaderSimple", ckpt_name=checkpoint)
+        loaded = remote.node("CheckpointLoaderSimple", return_call=True, ckpt_name=checkpoint)
         model, clip, vae = (loaded.output(i) for i in range(3))
-        positive = remote.node("CLIPTextEncode", text="a red cube", clip=clip)
-        negative = remote.node("CLIPTextEncode", text="", clip=clip)
-        latent = remote.node("EmptyLatentImage", width=64, height=64, batch_size=1)
+        positive = remote.node("CLIPTextEncode", return_call=True, text="a red cube", clip=clip)
+        negative = remote.node("CLIPTextEncode", return_call=True, text="", clip=clip)
+        latent = remote.node("EmptyLatentImage", return_call=True, width=64, height=64, batch_size=1)
         adjusted = remote.python(lambda value: {"samples": value["samples"] + 0.0},
                                  inputs={"value": latent.output()})
         sampled = remote.node(
-            "KSampler", model=model, seed=42, steps=1, cfg=1.0, sampler_name="euler",
+            "KSampler", return_call=True, model=model, seed=42, steps=1, cfg=1.0, sampler_name="euler",
             scheduler="normal", positive=positive.output(), negative=negative.output(),
             latent_image=adjusted.output(), denoise=1.0,
         )
-        decoded = remote.node("VAEDecode", samples=sampled.output(), vae=vae)
+        decoded = remote.node("VAEDecode", return_call=True, samples=sampled.output(), vae=vae)
         observe("eager_submitted", session=remote.session_id, call_id=decoded.id)
         eager = await (await decoded.output()).fetch()
         observe("eager_ready", session=remote.session_id, call_id=decoded.id)

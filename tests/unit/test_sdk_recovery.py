@@ -64,7 +64,7 @@ async def test_lost_acceptance_reply_reuses_call_id_spec_and_submission_window()
     transport = DroppingTransport(runtime)
     transport.drop_once.add("submit")
     async with Client(transport=transport) as remote:
-        call = remote.node("Effect", value="exactly one effect")
+        call = remote.node("Effect", return_call=True, value="exactly one effect")
         assert await call == ()
         assert runtime.effects == [{"value": "exactly one effect"}]
         assert runtime.handshakes == 1 and runtime.resumes == 1
@@ -78,7 +78,7 @@ async def test_wait_fetch_and_release_recover_without_replacing_owned_references
     transport = DroppingTransport(runtime)
     async with Client(transport=transport) as remote:
         transport.drop_once.add("wait_result")
-        call = remote.node("Echo", value="retained")
+        call = remote.node("Echo", return_call=True, value="retained")
         a, b = await asyncio.gather(asyncio.ensure_future(call), asyncio.ensure_future(call))
         ref = a[0]
         assert ref is b[0]
@@ -95,7 +95,7 @@ async def test_runtime_epoch_change_is_terminal_and_never_creates_a_fresh_sessio
     runtime = RecoverableRuntime()
     transport = DroppingTransport(runtime)
     async with Client(transport=transport) as remote:
-        ref, = await remote.node("Echo", value=42)
+        ref, = await remote.node("Echo", return_call=True, value=42)
         transport.drop_once.add("fetch")
         transport.change_epoch = True
         with pytest.raises(Expired, match="epoch"):
@@ -107,10 +107,10 @@ async def test_offline_close_revokes_locally_and_reports_unconfirmed_remote_clea
     runtime = RecoverableRuntime()
     transport = DroppingTransport(runtime)
     remote = await Client(transport=transport).start()
-    call = remote.node("Block", value=42)
+    call = remote.node("Block", return_call=True, value=42)
     await eventually(lambda: bool(runtime.submissions))
     transport.offline = True
-    ref_call = remote.node("Echo", value=1)
+    ref_call = remote.node("Echo", return_call=True, value=1)
     await eventually(lambda: remote._recovery.reconnecting)
     await asyncio.wait_for(remote.close(), 1)
     assert remote.closed and not remote.close_confirmed
@@ -128,7 +128,7 @@ async def test_concurrent_sessions_resume_their_own_original_authorization():
     try:
         for transport in transports:
             transport.drop_once.add("submit")
-        calls = [client.node("Echo", value=index) for index, client in enumerate(clients)]
+        calls = [client.node("Echo", return_call=True, value=index) for index, client in enumerate(clients)]
         result = await asyncio.gather(*(asyncio.ensure_future(call) for call in calls))
         assert await result[0][0].fetch() == 0
         assert await result[1][0].fetch() == 1

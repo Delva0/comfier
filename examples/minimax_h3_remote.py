@@ -176,17 +176,17 @@ def identity(remote, value, *, source=False):
 
 def pipeline(remote, *, source=False, seed=SEED):
     clip = remote.node("CLIPLoader", clip_name=ENCODER, type="minimax", device="default")
-    condition = remote.node("MiniMaxH3ImageConditioning", clip=clip.output(),
-                            prompt=PROMPT, width=WIDTH, height=HEIGHT)
-    negative = remote.node("ConditioningZeroOut", conditioning=condition.output(0))
+    positive, latent = remote.node("MiniMaxH3ImageConditioning", clip=clip,
+                                   prompt=PROMPT, width=WIDTH, height=HEIGHT)
+    negative = remote.node("ConditioningZeroOut", conditioning=positive)
     model = remote.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-    sampled = remote.node("KSampler", model=model.output(), positive=condition.output(0),
-                          negative=negative.output(), latent_image=condition.output(1),
+    sampled = remote.node("KSampler", model=model, positive=positive,
+                          negative=negative, latent_image=latent,
                           seed=seed, steps=STEPS, cfg=1.0, sampler_name="euler",
                           scheduler="simple", denoise=1.0)
-    passed = identity(remote, sampled.output(), source=source)
+    passed = identity(remote, sampled, source=source)
     vae = remote.node("VAELoader", vae_name=VAE)
-    return remote.node("VAEDecode", samples=passed.output(), vae=vae.output()).output()
+    return remote.node("VAEDecode", samples=passed.output(), vae=vae)
 
 
 def native_prompt():
@@ -207,7 +207,7 @@ def native_prompt():
 
 
 async def download_png(remote, image, local_path, prefix):
-    saved = remote.node("SaveImage", images=image, filename_prefix=prefix)
+    saved = remote.node("SaveImage", images=image, filename_prefix=prefix, return_call=True)
     await saved
     metadata = await saved.metadata()
     item = metadata.ui["result"]["images"][0]

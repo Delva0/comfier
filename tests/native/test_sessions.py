@@ -40,8 +40,8 @@ async def test_sdk_uses_server_session_before_first_unawaited_call_and_reclaims_
             client = Client(url)
             proposed = client.session_id
             # No explicit start/await barrier before constructing either call.
-            source = client.node("SessionEcho", value=index)
-            dependent = client.node("SessionEcho", value=source.output())
+            source = client.node("SessionEcho", return_call=True, value=index)
+            dependent = client.node("SessionEcho", return_call=True, value=source.output())
             ref = await dependent.output()
             assert await ref.fetch() == index
             assert client.session_id != proposed

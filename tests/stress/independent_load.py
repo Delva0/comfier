@@ -86,8 +86,8 @@ class Expand(Echo):
     def run(self, value):
         from comfy_execution.graph_utils import GraphBuilder
         graph = GraphBuilder()
-        first = graph.node("IndependentAdd", value=value, amount=2)
-        second = graph.node("IndependentAdd", value=first.out(0), amount=3)
+        first = graph.node("IndependentAdd", return_call=True, value=value, amount=2)
+        second = graph.node("IndependentAdd", return_call=True, value=first.out(0), amount=3)
         return {"result": (second.out(0),), "expand": graph.finalize()}
 
 
@@ -222,16 +222,16 @@ async def assert_output(call, expected, meter, *, fetch=True):
 async def make_graph(client):
     with client.graph() as sub:
         value = sub.input("value", type="*")
-        early, = await client.node("IndependentAdd", value=value, amount=7)
-        expanded = client.node("IndependentExpand", value=early)
-        bad = client.node("IndependentFail", value=-999)
-        selected = client.node("IndependentLazy", left=expanded.output(), right=bad.output(), choose_left=True)
+        early, = await client.node("IndependentAdd", return_call=True, value=value, amount=7)
+        expanded = client.node("IndependentExpand", return_call=True, value=early)
+        bad = client.node("IndependentFail", return_call=True, value=-999)
+        selected = client.node("IndependentLazy", return_call=True, left=expanded.output(), right=bad.output(), choose_left=True)
         computed = client.python(nested_sum, inputs={"payload": {"left": [selected.output()], "right": {"value": early}}})
         sub.output("value", computed.output())
     with client.graph() as graph:
         value = graph.input("value", type="*")
         combined = client.submit(sub, inputs={"value": value})
-        final = client.node("IndependentAdd", value=combined.output("value"), amount=1)
+        final = client.node("IndependentAdd", return_call=True, value=combined.output("value"), amount=1)
         graph.output("value", final.output())
         graph.output("alias", final.output())
     return graph
@@ -244,9 +244,9 @@ async def load_session(index, rounds, url, meter):
         calls, checks = [], []
         for i in range(rounds):
             n = index * 100000 + i
-            root = client.node("IndependentEcho", value=n)
+            root = client.node("IndependentEcho", return_call=True, value=n)
             py = client.python(nested_sum, inputs={"payload": {"left": [root.output()], "right": {"value": root.output()}}})
-            final = client.node("IndependentAdd", value=py.output(), amount=1)
+            final = client.node("IndependentAdd", return_call=True, value=py.output(), amount=1)
             calls.extend((root, py, final))
             checks.extend((assert_output(root, n, meter), assert_output(py, n * 2, meter), assert_output(final, n * 2 + 1, meter)))
             if i % 4 == 0:
@@ -309,10 +309,10 @@ async def settle(runtime, timeout=10):
 async def semantic_phase(url, runtime, meter):
     notes = []
     async with Client(transport=TimedTransport(url, meter)) as client:
-        barrier = client.node("IndependentSlow", value=321, delay=.2)
+        barrier = client.node("IndependentSlow", return_call=True, value=321, delay=.2)
         local_await = asyncio.create_task(waiter(barrier.output(), meter))
-        dependent = client.node("IndependentEcho", value=barrier.output())
-        unrelated = client.node("IndependentEcho", value=654)
+        dependent = client.node("IndependentEcho", return_call=True, value=barrier.output())
+        unrelated = client.node("IndependentEcho", return_call=True, value=654)
         await unrelated._state.accepted
         await asyncio.sleep(.01)
         assert not local_await.done()
@@ -324,8 +324,8 @@ async def semantic_phase(url, runtime, meter):
         notes.append("local await leaves independent call queued while its sibling waits on inputs")
         before = len(runtime.calls)
         with client.graph() as graph:
-            early, = await client.node("IndependentEcho", value=47)
-            slow = client.node("IndependentSlow", value=early, delay=.2)
+            early, = await client.node("IndependentEcho", return_call=True, value=47)
+            slow = client.node("IndependentSlow", return_call=True, value=early, delay=.2)
             graph.output("value", slow.output())
         assert len(runtime.calls) == before, "capture unexpectedly executed"
         run = client.submit(graph)
@@ -363,13 +363,13 @@ async def semantic_phase(url, runtime, meter):
             notes.append("ready reference is not awaitable")
         else:
             raise AssertionError("ready reference was awaitable")
-        pair = client.node("IndependentPair", value=12)
+        pair = client.node("IndependentPair", return_call=True, value=12)
         both = await asyncio.gather(*(waiter(pair.output(slot), meter) for slot in (0, 1) for _ in range(4)))
         assert len({ref.id for ref in both[:4]}) == 1
         assert len({ref.id for ref in both[4:]}) == 1
         assert both[0].id != both[4].id
         first, second = await pair
-        consumer = client.node("IndependentSlow", value=first, delay=.03)
+        consumer = client.node("IndependentSlow", return_call=True, value=first, delay=.03)
         await consumer._state.accepted
         first_id = first.id
         first.release()
@@ -377,16 +377,16 @@ async def semantic_phase(url, runtime, meter):
         assert await second.fetch() == 13
         await asyncio.sleep(.05)
         assert first_id not in runtime.store.entries
-        bad = client.node("IndependentFail", value=8)
-        downstream = client.node("IndependentEcho", value=bad.output())
-        independent = client.node("IndependentEcho", value=99)
+        bad = client.node("IndependentFail", return_call=True, value=8)
+        downstream = client.node("IndependentEcho", return_call=True, value=bad.output())
+        independent = client.node("IndependentEcho", return_call=True, value=99)
         failures = await asyncio.gather(waiter(bad, meter), waiter(downstream, meter), return_exceptions=True)
         assert all(isinstance(e, RemoteError) for e in failures)
         assert await (await independent.output()).fetch() == 99
         with client.graph() as lazygraph:
-            selected = client.node("IndependentExpand", value=11)
-            unselected = client.node("IndependentFail", value=99)
-            choice = client.node("IndependentLazy", left=selected.output(), right=unselected.output(), choose_left=True)
+            selected = client.node("IndependentExpand", return_call=True, value=11)
+            unselected = client.node("IndependentFail", return_call=True, value=99)
+            choice = client.node("IndependentLazy", return_call=True, left=selected.output(), right=unselected.output(), choose_left=True)
             lazygraph.output("chosen", choice.output())
         lazyrun = client.submit(lazygraph)
         assert await (await lazyrun.output()).fetch() == 16
@@ -398,7 +398,7 @@ async def semantic_phase(url, runtime, meter):
             raise AssertionError("unselected branch did not raise Skipped")
         async with Client(transport=TimedTransport(url, meter)) as other:
             try:
-                other.node("IndependentEcho", value=second)
+                other.node("IndependentEcho", return_call=True, value=second)
             except InvalidReference:
                 notes.append("SDK cross-session ref rejected")
             else:
@@ -409,8 +409,8 @@ async def semantic_phase(url, runtime, meter):
                 notes.append("wire cross-session token rejected")
             else:
                 raise AssertionError("wire cross-session token fetched")
-        image = client.node("EmptyImage", width=16, height=16, batch_size=1, color=0)
-        invert = client.node("ImageInvert", image=image.output())
+        image = client.node("EmptyImage", return_call=True, width=16, height=16, batch_size=1, color=0)
+        invert = client.node("ImageInvert", return_call=True, image=image.output())
         tensor_summary = client.python(lambda x: (tuple(x.shape), float(x.mean())), inputs={"x": invert.output()})
         assert await (await tensor_summary.output()).fetch() == ((1, 16, 16, 3), 1.0)
         notes.append("built-in native CPU EmptyImage/ImageInvert plus Python verified")
@@ -545,13 +545,13 @@ async def large_graph_phase(url, runtime, meter):
                 value = inner.input("value", type="*")
                 current = value
                 for step in range(32):
-                    first = client.node("IndependentAdd", value=current, amount=1)
+                    first = client.node("IndependentAdd", return_call=True, value=current, amount=1)
                     py = client.python(nested_sum, inputs={"payload": {"left": [first.output()], "right": {"value": 1}}})
-                    expanded = client.node("IndependentExpand", value=py.output())
+                    expanded = client.node("IndependentExpand", return_call=True, value=py.output())
                     current = expanded.output()
                     if step % 4 == 0:
-                        never = client.node("IndependentFail", value=step)
-                        current = client.node("IndependentLazy", left=current, right=never.output(), choose_left=True).output()
+                        never = client.node("IndependentFail", return_call=True, value=step)
+                        current = client.node("IndependentLazy", return_call=True, left=current, right=never.output(), choose_left=True).output()
                 inner.output("value", current)
             with client.graph() as outer:
                 value = outer.input("value", type="*")

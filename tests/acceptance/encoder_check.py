@@ -23,8 +23,8 @@ async def main(args):
     spec.loader.exec_module(example)
     started = time.monotonic()
     async with Client(args.url, token=os.environ.get('COMANI_TOKEN')) as remote:
-        clip = remote.node('CLIPLoader', clip_name=example.ENCODER, type='minimax', device='default')
-        call = remote.node('MiniMaxH3ImageConditioning', clip=clip.output(), prompt=example.PROMPT,
+        clip = remote.node('CLIPLoader', return_call=True, clip_name=example.ENCODER, type='minimax', device='default')
+        call = remote.node('MiniMaxH3ImageConditioning', return_call=True, clip=clip.output(), prompt=example.PROMPT,
                            width=example.WIDTH, height=example.HEIGHT)
         details = await (await remote.python(describe, inputs={
             'conditioning': call.output(0), 'latent': call.output(1)}).output()).fetch()

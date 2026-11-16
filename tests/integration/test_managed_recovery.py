@@ -65,9 +65,9 @@ async def test_managed_http_start_lost_replies_and_owned_references(tmp_path):
             assert len(resumes) == 3
             assert len({item["session_id"] for item in resumes}) == 1
             assert len({item["epoch"] for item in resumes}) == 1
-            image = remote.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
+            image = remote.node("EmptyImage", return_call=True, width=64, height=64, batch_size=1, color=0x123456)
             save = remote.node("SaveImage", {"images": image.output(),
-                "filename_prefix": "comani-metadata-" + uuid.uuid4().hex},
+                "filename_prefix": "comani-metadata-" + uuid.uuid4().hex}, return_call=True,
                 extra_data={"api_key_comfy_org": "private-metadata-sentinel"})
             metadata = await save.metadata()
             assert isinstance(await save, tuple)

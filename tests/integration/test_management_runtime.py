@@ -67,7 +67,12 @@ async def test_explicit_runtime_lifecycle_binary_proxy_and_offline_files(tmp_pat
                 assert downloaded.local_path.read_bytes() == source.read_bytes()
                 started = await remote.comfyui.start()
                 assert started.state == "running" and started.pid != os.getpid()
-                call = remote.node("EmptyLatentImage", width=8192, height=8192, batch_size=1)
+                assert started.extra["node_metadata"]["epoch"] == started.runtime_epoch
+                assert remote._node_metadata_epoch == started.runtime_epoch
+                assert remote.epoch == "" and remote._compute_opening is None
+                assert remote._lease is None and remote._heartbeat_task is None
+                assert (await supervisor.runtime_rpc("runtime_info"))["sessions"] == 0
+                call = remote.node("EmptyLatentImage", return_call=True, width=8192, height=8192, batch_size=1)
                 reference = await call.output()
                 metadata = await call.metadata()
                 assert metadata.prompt_id == call.id and "result" in metadata.executed
@@ -90,10 +95,15 @@ async def test_explicit_runtime_lifecycle_binary_proxy_and_offline_files(tmp_pat
                 assert (await remote.comfyui.stop()).state == "stopped"
                 assert (await remote.files.stat(staged)).size == source.stat().st_size
                 assert (await remote.bash.run("printf alive")).stdout == "alive"
-                await remote.comfyui.start()
+                restarted = await remote.comfyui.start()
+                assert restarted.extra["node_metadata"]["epoch"] == restarted.runtime_epoch
+                assert remote._node_metadata_epoch == restarted.runtime_epoch != old_epoch
+                assert remote.epoch == "" and remote._compute_opening is None
+                assert remote._lease is None and remote._heartbeat_task is None
+                assert (await supervisor.runtime_rpc("runtime_info"))["sessions"] == 0
                 with pytest.raises(Expired):
                     await reference.fetch()
-                next_call = remote.node("EmptyLatentImage", width=64, height=64, batch_size=1)
+                next_call = remote.node("EmptyLatentImage", return_call=True, width=64, height=64, batch_size=1)
                 await next_call
                 assert remote.epoch != old_epoch
             finally:

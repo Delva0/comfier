@@ -8,7 +8,14 @@ import weakref
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
-from .errors import Expired, InvalidReference, Released, SessionClosed, error_from_wire
+from .errors import (
+    Expired,
+    InvalidReference,
+    Released,
+    SessionClosed,
+    UnknownOutputLayout,
+    error_from_wire,
+)
 
 T = TypeVar("T")
 
@@ -65,8 +72,8 @@ class _OwnerCell:
 
 
 class _CallState:
-    def __init__(self, client, call_id, *, output_count=None, names=None, node_id=None, accepted=None,
-                 lifetime=None):
+    def __init__(self, client, call_id, *, output_count=None, declared_count=None, check_outputs=False, names=None,
+                 node_id=None, accepted=None, lifetime=None):
         self.client_ref = weakref.ref(client)
         self.call_id = call_id
         self.epoch = ""
@@ -75,6 +82,8 @@ class _CallState:
         self.node_id = node_id
         self.lifetime = lifetime if lifetime is not None else _InvocationLifetime(client, call_id)
         self.output_count = output_count
+        self.declared_count = declared_count
+        self.check_outputs = check_outputs
         self.names = names or {}
         self.status = "queued"
         self.done = asyncio.get_running_loop().create_future()
@@ -158,10 +167,11 @@ class _CallState:
             self.status = "failed"
             self.done.set_exception(error)
 
-    def wire_ref(self, slot):
+    def wire_ref(self, slot=None):
         client = self.client()
         return {"$ref": {"session": client.session_id, "epoch": self.epoch or client.epoch,
-                         "call_id": self.call_id, "slot": slot,
+                         "call_id": self.call_id,
+                         **({"whole": True} if slot is None else {"slot": slot}),
                          **({"node_id": self.node_id} if self.node_id is not None else {})}}
 
 
@@ -232,6 +242,24 @@ class RemoteRef(Generic[T]):
         raise TypeError("Pass remote references through inputs; do not pickle them into code or objects")
 
 
+class _OutputTuple(tuple):
+    def __new__(cls, outputs, *, state=None, graph_call=None):
+        result = super().__new__(cls, outputs)
+        result._state = state
+        result._graph_call = graph_call
+        return result
+
+    def __await__(self):
+        return self._ready().__await__()
+
+    async def _ready(self):
+        if self._graph_call is not None:
+            return await self._graph_call._ready()
+        await asyncio.shield(self._state.done)
+        outputs = [await output if isinstance(output, OutputFuture) else output for output in self]
+        return _OutputTuple(outputs, state=self._state)
+
+
 class Call(Generic[T]):
     def __init__(self, state):
         self._state = state
@@ -275,4 +303,8 @@ class Call(Generic[T]):
 
     async def _ready(self):
         await asyncio.shield(self._state.done)
-        return tuple([await self.output(i) for i in range(self._state.output_count)])
+        count = self._state.declared_count if self._state.check_outputs else self._state.output_count
+        if count is None:
+            raise UnknownOutputLayout("This node has no fixed output declaration; use declared_outputs=False")
+        outputs = [await self.output(i) for i in range(count)]
+        return _OutputTuple(outputs, state=self._state) if self._state.check_outputs else tuple(outputs)

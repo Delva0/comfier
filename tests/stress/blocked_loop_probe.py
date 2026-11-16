@@ -72,7 +72,7 @@ async def main(args):
                     assert time.monotonic() < deadline
                     await asyncio.sleep(.1)
             remote = await Client(url).start()
-            call = remote.node('IndependentEcho', value=12345)
+            call = remote.node('IndependentEcho', return_call=True, value=12345)
             ref = await call.output()
             assert ref.ownership == 'owned' and await ref.fetch() == 12345
             session, ref_id = remote.session_id, ref.id

@@ -29,7 +29,7 @@ user_owner = contextvars.ContextVar('acceptance_queued_user_owner', default=None
 async def zero_output_call(url):
     client = await Client(url).start()
     with client.graph() as graph:
-        client.node('IndependentOutput', value=92)
+        client.node('IndependentOutput', return_call=True, value=92)
     call = client.submit(graph)  # No declared workflow outputs: a zero-output public Call.
     assert await call == ()
     await asyncio.sleep(.05)  # The legitimate user await and its continuations have ended.
@@ -40,7 +40,7 @@ async def make_context_control(url, kind):
     client = await Client(url).start()
     client_weak, session = weakref.ref(client), client.session_id
     if kind == 'context_release':
-        call = client.node('IndependentEcho', value=93)
+        call = client.node('IndependentEcho', return_call=True, value=93)
         ref = await call.output()
         del call
         await asyncio.sleep(.05)
@@ -51,7 +51,7 @@ async def make_context_control(url, kind):
             user_owner.reset(token)
         return ref, client_weak, session
     with client.graph() as graph:
-        client.node('IndependentOutput', value=94)
+        client.node('IndependentOutput', return_call=True, value=94)
     call = client.submit(graph)
     assert await call == ()
     await asyncio.sleep(.05)

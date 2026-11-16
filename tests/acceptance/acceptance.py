@@ -125,9 +125,9 @@ async def main(args):
             assert info['native_reserve_vram_gib'] == args.expected_reserve_vram
         record('runtime_metadata_and_installed_source_identity', client_wheel_sha256=wheel_sha256, **info)
         started = time.monotonic()
-        first = remote.node('EmptyImage', width=64, height=64, batch_size=1, color=0x204080)
+        first = remote.node('EmptyImage', return_call=True, width=64, height=64, batch_size=1, color=0x204080)
         transformed = remote.python(lambda x: x * 0.5, inputs={'x': first.output()})
-        last = remote.node('ImageInvert', image=transformed.output())
+        last = remote.node('ImageInvert', return_call=True, image=transformed.output())
         submitted_seconds = time.monotonic() - started
         ref = await last.output()
         tensor = await ref.fetch()
@@ -148,7 +148,7 @@ async def main(args):
 
         with remote.graph() as graph:
             entry = graph.input('image', type='IMAGE')
-            middle, = await remote.node('ImageInvert', image=entry)
+            middle, = await remote.node('ImageInvert', return_call=True, image=entry)
             final = remote.python(delayed, args=(middle, 2.0))
             graph.output('image', final.output())
         run = remote.submit(graph, inputs={'image': first.output()})
@@ -259,18 +259,18 @@ async def test_model(remote, args, record):
     (args.output / 'native_prompt.json').write_text(json.dumps(raw, indent=2) + '\n')
 
     async def eager():
-        clip = remote.node('CLIPLoader', **raw['clip']['inputs'])
-        condition = remote.node('MiniMaxH3ImageConditioning', clip=clip.output(),
+        clip = remote.node('CLIPLoader', return_call=True, **raw['clip']['inputs'])
+        condition = remote.node('MiniMaxH3ImageConditioning', return_call=True, clip=clip.output(),
                                 prompt=prompt, width=2048, height=2048)
-        negative = remote.node('ConditioningZeroOut', conditioning=condition.output(0))
-        model = remote.node('UNETLoader', **raw['model']['inputs'])
-        sampled = remote.node('KSampler', model=model.output(), seed=426190, steps=6, cfg=1.0,
+        negative = remote.node('ConditioningZeroOut', return_call=True, conditioning=condition.output(0))
+        model = remote.node('UNETLoader', return_call=True, **raw['model']['inputs'])
+        sampled = remote.node('KSampler', return_call=True, model=model.output(), seed=426190, steps=6, cfg=1.0,
                               sampler_name='euler', scheduler='simple', positive=condition.output(0),
                               negative=negative.output(), latent_image=condition.output(1), denoise=1.0)
         # This Python call is a real in-memory latent dependency in the model path.
         passed = remote.python(lambda latent: latent, inputs={'latent': sampled.output()})
-        vae = remote.node('VAELoader', **raw['vae']['inputs'])
-        decoded = remote.node('VAEDecode', samples=passed.output(), vae=vae.output())
+        vae = remote.node('VAELoader', return_call=True, **raw['vae']['inputs'])
+        decoded = remote.node('VAEDecode', return_call=True, samples=passed.output(), vae=vae.output())
         return await (await decoded.output()).fetch()
 
     started = time.monotonic()

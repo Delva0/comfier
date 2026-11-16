@@ -28,7 +28,7 @@ async def main(args):
     port = site._server.sockets[0].getsockname()[1]
     client = Client(f"http://127.0.0.1:{port}")
     try:
-        call = client.node("NeverSubmitted", value=1)
+        call = client.node("NeverSubmitted", return_call=True, value=1)
         waiter = asyncio.create_task(client.start())
         await asyncio.wait_for(entered.wait(), 2)
         waiter.cancel()

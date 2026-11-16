@@ -312,7 +312,7 @@ async def client(args):
                     async with workload.Client(transport=RecordingTransport(url, meter)) as remote:
                         stage = 'submit_and_await_output'
                         try:
-                            call = remote.node('IndependentEcho', value=index)
+                            call = remote.node('IndependentEcho', return_call=True, value=index)
                             ref = await call.output()
                             stage = 'fetch'
                             assert await ref.fetch() == index

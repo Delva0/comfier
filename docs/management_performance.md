@@ -1,5 +1,7 @@
 # 管理候选的 H3 等待与性能
 
+历史快照（截至 `3d07322`，相关管理验收发布为 `11318c6`）：文中“当前”“待定”等表述均指该历史快照；现行 node 语义见 [SDK](design/sdk.md)。
+
 2026-11-16。本文记录独立 GPU 实测及另一名审阅者的离线复核。性能样本绑定 `f766394c…55fdb` wheel；`d9719429…c1d2c` 的普通磁盘发布与出图另见 [管理验收](management_acceptance.md)。它们不认证当前工作区中待定的输出 API。
 
 完整数值和来源摘要见 [结构化记录](../artifacts/management/2026-11-16-acceptance.json)。实际 H3 入口为 [冻结脚本](../artifacts/management/2026-11-16-h3/minimax_h3_remote.py)，不是以后修改的同名工作区文件。该脚本使用已测候选的 `Call` / `.output()` 接口；同目录保留其 source helper。

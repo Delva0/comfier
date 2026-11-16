@@ -49,8 +49,9 @@ async def main():
             await remote.comfyui.start()
 
         image = remote.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
-        inverted = remote.node("ImageInvert", image=image.output(0))
-        saved = remote.node("SaveImage", images=inverted.output(0), filename_prefix="comani/demo")
+        inverted = remote.node("ImageInvert", image=image)
+        saved = remote.node("SaveImage", images=inverted, filename_prefix="comani/demo",
+                            return_call=True)
         await saved
         metadata = await saved.metadata()
         item = metadata.ui["result"]["images"][0]
@@ -62,7 +63,9 @@ async def main():
 asyncio.run(main())
 ```
 
-`node/python/submit` 调用立即进入发送流程，返回 Call；`await call` 返回输出槽的 ready refs tuple，`await call.output(i)` 返回一个 ready ref。ready ref 本身不可 await，`await ref.fetch()` 才把精确对象取回本地。SaveImage 明确生成 8-bit PNG；fetch 不默认把浮点 Tensor 转成图片。
+`node()` 默认直接返回输出：单输出是一个可等待的输出，多输出是可解包、可等待的 tuple，零输出是 `None`。输出可立即传给下一个节点；需要就绪引用时再 `await`，需要本地对象时再 `await ref.fetch()`。调用立即进入发送流程，`await` 只等待，不触发提交。ready ref 本身不可 await。
+
+需要调用 ID、metadata 或控制句柄时加 `return_call=True`，取得 `Call`；`.python()` 和 `.submit()` 仍返回 `Call`。默认 `declared_outputs=True` 按节点声明提供输出槽，Python 在解包时检查接收数：普通解包可能在任务已入队后立即报错，`await` 写法完成后才检查，不会撤回调用。设为 `False` 则按本地解包数提前选择输出槽。完整形状、声明与实际结果的边界见 [SDK](docs/design/sdk.md)。SaveImage 明确生成 8-bit PNG；fetch 保留精确浮点 Tensor。
 
 `with remote.graph()` 只捕获 node/Python 计算调用，交给 ComfyUI 原生执行器；管理和 files 的 async 方法仍立即执行真实远端 I/O。无需节点包装代码、DSL 或另一个图编译器。
 

@@ -317,6 +317,8 @@ class ManagementOperation:
         if (self._handle.namespace == "comfyui" and self._handle.action in {"start", "stop", "restart"}
                 and result.runtime_epoch != self._client.epoch):
             await self._client._reset_compute()
+        if self._handle.namespace == "comfyui" and self._handle.action in {"start", "stop", "restart"}:
+            self._client._cache_node_metadata(result.extra.get("node_metadata"))
         return result
 
     async def log_page(self, *, after=0, follow=False, timeout=20.0, limit=256) -> LogPage:
@@ -408,7 +410,11 @@ class ComfyUI(_Namespace):
     namespace = "comfyui"
 
     async def info(self) -> ComfyUIInfo:
-        return await self._read("info")
+        result = await self._read("info")
+        if self._client.epoch and result.runtime_epoch != self._client.epoch:
+            await self._client._reset_compute()
+        self._client._cache_node_metadata(result.extra.get("node_metadata"))
+        return result
 
     async def config(self) -> ManagementMetadata:
         return await self._read("config")

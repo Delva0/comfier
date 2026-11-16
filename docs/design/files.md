@@ -9,8 +9,7 @@ async with Client(url, token=token) as remote:
     staged = await remote.files.upload("local.png")
     image = mask = None
     try:
-        loaded = remote.node("LoadImage", image=staged.native_name)
-        image, mask = await loaded
+        image, mask = await remote.node("LoadImage", image=staged.native_name)
         local_image = await image.fetch()
     finally:
         for ref in (image, mask):

@@ -20,7 +20,7 @@ Owned 与 borrowed 句柄都保留远端定位所需的 Client 会话能力，�
 ## 本地持有链
 
 ```text
-公开 Call ───────────────────────────────→ Client 会话
+显式保留的公开 Call ──────────────────────→ Client 会话
 公开 Graph / GraphRef / GraphInput → Graph → Client 会话
 OutputFuture / RemoteRef 别名 → 共享 owner cell → Client（未 release 时）
 owner cell → 轻量 producer state → invocation lifetime
@@ -28,6 +28,8 @@ owner cell → 轻量 producer state → invocation lifetime
 ```
 
 删除局部 Client 变量只减少一个本地别名；公开 Call、未 release 的输出 cell 或 Graph 仍是合法会话拥有者。Call 独立保留 Client，直到 Call 被回收，即使其全部输出已 release；当前没有 `Call.release()` API。Graph 及其端口沿既有 Graph→Client 关系保留会话。
+
+`node()` 默认直接返回输出，不要求为了保留输出而另存一个 Call；单输出及多输出 tuple 中的各槽沿同一 owner cell 规则持有会话。需要调用句柄时才显式 `return_call=True`。返回形状与检查规则见 [SDK](sdk.md#eager-调用)。
 
 相同逻辑输出的 Future 和 ready Ref 别名共享 owner cell。`ref.release()` / `future.release()` 幂等地撤销该 cell 的全部别名，并交还该 cell 对 Client 的强持有；它不撤销其他输出、Call 或 Graph 的独立拥有权。Output 不反向保留整个 Call，所以只保留一个输出不会因此保活其他槽的数据。
 

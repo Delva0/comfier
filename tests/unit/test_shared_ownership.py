@@ -41,7 +41,7 @@ def owner_server():
 
 async def returned_handle(server, kind):
     client = await Client(server.url).start()
-    call = client.node("Echo")
+    call = client.node("Echo", return_call=True)
     handle = call if kind == "call" else call.output()
     if kind == "ref":
         handle = await handle
@@ -104,11 +104,11 @@ async def test_retained_call_is_an_independent_owner_after_all_outputs_are_relea
         client = await Client(owner_server.url).start()
         if workflow:
             with client.graph() as graph:
-                captured = client.node("Echo")
+                captured = client.node("Echo", return_call=True)
                 graph.output("value", captured.output())
             call = client.submit(graph)
         else:
-            call = client.node("Echo")
+            call = client.node("Echo", return_call=True)
         return call, weakref.ref(client), client._lease, client.transport
 
     call, client_ref, lease, transport = await make_call()
@@ -141,7 +141,7 @@ async def test_explicitly_retained_graph_remains_a_public_session_owner(owner_se
     async def graph_and_ref():
         client = await Client(owner_server.url).start()
         with client.graph() as graph:
-            graph.output("value", client.node("Echo").output())
+            graph.output("value", client.node("Echo", return_call=True).output())
         ref = await client.submit(graph).output()
         return graph, ref, weakref.ref(client), client._lease, client.transport
 
@@ -169,7 +169,7 @@ async def test_explicit_close_revokes_live_pending_call_and_output_owners(owner_
 async def test_context_exit_revokes_a_returned_ready_ref(owner_server):
     async def scoped_ref():
         async with Client(owner_server.url) as client:
-            return await client.node("Echo").output(), client._lease
+            return await client.node("Echo", return_call=True).output(), client._lease
 
     ref, lease = await scoped_ref()
     assert lease.done.done() and not lease._thread.is_alive()
@@ -195,7 +195,7 @@ async def test_failed_public_call_traceback_does_not_create_a_hidden_client_owne
 
     async def fail_and_drop():
         client = await Client(owner_server.url).start()
-        call = client.node("Echo")
+        call = client.node("Echo", return_call=True)
         state_ref = weakref.ref(call._state)
         try:
             await call
@@ -291,7 +291,7 @@ async def test_pending_state_internal_callbacks_do_not_keep_application_client_c
     client = await Client(owner_server.url).start()
     token = marker.set(client)
     try:
-        call = client.node("Echo")
+        call = client.node("Echo", return_call=True)
         assert marker.get() is client
     finally:
         marker.reset(token)

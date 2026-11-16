@@ -56,7 +56,7 @@ class Expand(Constant):
         from comfy_execution.graph_utils import GraphBuilder
 
         graph = GraphBuilder()
-        child = graph.node("GateConstant", value=value)
+        child = graph.node("GateConstant", return_call=True, value=value)
         return {"result": (child.out(0),), "expand": graph.finalize()}
 
 

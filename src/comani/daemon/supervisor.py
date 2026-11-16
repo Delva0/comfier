@@ -111,6 +111,7 @@ class RuntimeSupervisor:
         self.process = None
         self.endpoint = None
         self.runtime_epoch = None
+        self._node_metadata = None
         self.state = "stopped"
         self.error = None
         self.logs = deque(maxlen=256)
@@ -145,7 +146,14 @@ class RuntimeSupervisor:
                 "state": self.state, "pid": self.process.pid if self.process and self.process.returncode is None else None,
                 "runtime_epoch": self.runtime_epoch, "installed": (Path(self.config.comfy_root) / "execution.py").is_file(),
                 "error": self.error, "runtime_bridge_digest": self.runtime_bridge_digest, "roots_generation": self.roots_generation,
-                "roots_state": "live" if self.state == "running" else "last-observed" if self._snapshot else "unknown"}
+                "roots_state": "live" if self.state == "running" else "last-observed" if self._snapshot else "unknown",
+                "node_metadata": self.observed_nodes()}
+
+    def observed_nodes(self):
+        if (self.state == "running" and self._node_metadata is not None
+                and self._node_metadata["epoch"] == self.runtime_epoch):
+            return self._node_metadata
+        return None
 
     async def configure(self, **fields):
         async with self.maintenance_lock:
@@ -380,8 +388,9 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                 if self.process.returncode is not None:
                     raise SupervisorError("RuntimeStartFailed", "Native runtime exited during startup; inspect its logs")
                 try:
-                    info = await asyncio.wait_for(self.runtime_rpc("runtime_info"), timeout=1)
+                    info = await asyncio.wait_for(self.runtime_rpc("runtime_info", {"include_node_metadata": True}), timeout=1)
                     self.runtime_epoch = info["epoch"]
+                    self._node_metadata = info.get("node_metadata")
                     self.state = "running"
                     await self.refresh_roots()
                     return await self.info()

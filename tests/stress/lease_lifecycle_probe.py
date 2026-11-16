@@ -83,7 +83,7 @@ async def eventually(predicate, timeout=4):
 
 
 async def owned(client, value):
-    call = client.node('IndependentEcho', value=value)
+    call = client.node('IndependentEcho', return_call=True, value=value)
     ref = await call.output()
     assert ref.ownership == 'owned' and await ref.fetch() == value
     return ref
@@ -193,7 +193,7 @@ async def main(args):
             else:
                 raise AssertionError('terminal session ref unexpectedly remained usable')
             try:
-                await asyncio.wait_for(remote.node('IndependentEcho', value=556).output(), 2)
+                await asyncio.wait_for(remote.node('IndependentEcho', return_call=True, value=556).output(), 2)
             except SessionClosed:
                 pass
             else:

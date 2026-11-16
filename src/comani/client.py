@@ -15,8 +15,16 @@ from functools import partial
 
 import aiohttp
 
+from ._outputs import _OutputProxy, declared_outputs
 from .code import prepare_code
-from .errors import InvalidReference, NotSubmitted, RemoteError, SessionClosed
+from .errors import (
+    Expired,
+    InvalidReference,
+    NotSubmitted,
+    RemoteError,
+    SessionClosed,
+    UnknownOutputLayout,
+)
 from .files import Files
 from .graph import Graph, GraphInput, GraphRef, _receiver
 from .management import Bash, ComfyUI, Models, Operations, Plugins
@@ -173,6 +181,7 @@ class Client:
         self._compute_opening = None
         self._recovery = None
         self._nodes = {PYTHON_NODE: {"outputs": ["*"]}}
+        self._node_metadata_epoch = None
         self._states = weakref.WeakValueDictionary()
         self._queue = asyncio.Queue()
         self._sender = None
@@ -282,6 +291,7 @@ class Client:
                     self._managed = True
                     self.handshake = self.management_handshake
                     self.session_id = self.handshake.get("session_id", self.session_id)
+                    self._cache_node_metadata(self.handshake.get("node_metadata"))
                     return
             await self._open_compute()
         except BaseException as error:
@@ -309,7 +319,6 @@ class Client:
 
     async def _reset_compute(self):
         """An explicit lifecycle change permits a fresh compute epoch on next use."""
-        from .errors import Expired
         if self._cleanup.session_id is not None:
             self._expire_compute(Expired("The runtime lifecycle changed; old references expired"))
         if self._lease is not None:
@@ -324,6 +333,7 @@ class Client:
         self._recovery = None
         self._uploaded.clear()
         self._nodes = {PYTHON_NODE: {"outputs": ["*"]}}
+        self._node_metadata_epoch = None
         self.session_id = self.management_handshake.get("session_id", self.session_id)
         self.handshake = self.management_handshake
         self.epoch = ""
@@ -342,7 +352,7 @@ class Client:
             self._cleanup.session_id = self.session_id
             self.epoch = self.handshake["epoch"]
             self._recovery = _ConnectionRecovery(self.transport, self.handshake, self.session_id)
-            self._nodes.update(self.handshake.get("nodes", {}))
+            self._cache_node_metadata({"epoch": self.epoch, "nodes": self.handshake.get("nodes", {})})
             interval = min(20.0, max(0.01, self.handshake.get("session_ttl", 120) / 3))
             if isinstance(self.transport, HTTPTransport) and self.handshake.get("session_id"):
                 self._lease = self.transport._start_heartbeat(self.session_id, interval, self._loop,
@@ -410,8 +420,26 @@ class Client:
 
     def _output_count(self, node_type):
         schema = self._nodes.get(node_type, {})
+        if schema.get("output_layout", "fixed") != "fixed":
+            return None
+        if "output_count" in schema:
+            count = schema["output_count"]
+            return count if type(count) is int and count >= 0 else None
         outputs = schema.get("outputs", schema.get("output"))
         return len(outputs) if isinstance(outputs, (list, tuple)) else schema.get("output_count")
+
+    def _cache_node_metadata(self, metadata):
+        if metadata is None:
+            self._nodes = {PYTHON_NODE: {"outputs": ["*"]}}
+            self._node_metadata_epoch = None
+            return
+        if not isinstance(metadata, dict) or not isinstance(metadata.get("nodes"), dict):
+            raise RemoteError("Daemon returned invalid node metadata")
+        epoch = metadata.get("epoch")
+        if not isinstance(epoch, str) or not epoch:
+            raise RemoteError("Daemon returned node metadata without a runtime epoch")
+        self._nodes = {PYTHON_NODE: {"outputs": ["*"]}, **metadata["nodes"]}
+        self._node_metadata_epoch = epoch
 
     async def _node_layout(self, node_type):
         """Read one node's layout from the attached runtime, without submitting it."""
@@ -426,15 +454,19 @@ class Client:
             raise InvalidReference("A graph receiver belongs to another client")
         return graph
 
-    def node(self, node_type, node_inputs=_NODE_INPUTS, /, **inputs):
+    def node(self, node_type, node_inputs=_NODE_INPUTS, /, *, return_call=False,
+             declared_outputs=True, **inputs):
+        if type(return_call) is not bool or type(declared_outputs) is not bool:
+            raise TypeError("return_call and declared_outputs must be bools")
         if node_inputs is _NODE_INPUTS:
-            return self._node(node_type, inputs)
+            return self._node(node_type, inputs, return_call=return_call, check=declared_outputs)
         if not isinstance(node_inputs, Mapping):
             raise TypeError("The second positional argument to node must be an input mapping")
         unknown = set(inputs) - {"extra_data"}
         if unknown:
             raise TypeError(f"Unknown node execution options: {sorted(unknown)}")
-        return self._node(node_type, dict(node_inputs), extra_data=inputs.get("extra_data"))
+        return self._node(node_type, dict(node_inputs), extra_data=inputs.get("extra_data"),
+                          return_call=return_call, check=declared_outputs)
 
     @staticmethod
     def _extra_data(value):
@@ -444,18 +476,29 @@ class Client:
             raise TypeError("extra_data must be a JSON-compatible mapping")
         return json.loads(json.dumps(dict(value), allow_nan=False))
 
-    def _node(self, node_type, inputs, artifacts=(), *, extra_data=None):
+    def _node(self, node_type, inputs, artifacts=(), *, extra_data=None, return_call=True, check=None):
         if not isinstance(node_type, str):
             raise TypeError("Node names must be original registry strings")
         extra_data = self._extra_data(extra_data)
         graph = self._capture()
+        count = self._output_count(node_type)
+        if check and not return_call and count is None:
+            raise UnknownOutputLayout("No fixed node declaration is cached; await comfyui.start() or comfyui.info(), or use declared_outputs=False")
         if graph is not None:
             if extra_data:
                 raise ValueError("Execution extra_data belongs to the whole native run; pass it to submit(graph, extra_data=...) after capture")
-            return graph.add(node_type, inputs, artifacts)
-        self._validate_live(inputs)
-        return self._enqueue("node", {"node_type": node_type, "inputs": inputs, "extra_data": extra_data},
-                             artifacts, output_count=self._output_count(node_type))
+            if check:
+                graph._bind_metadata_epoch(self._node_metadata_epoch)
+            call = graph.add(node_type, inputs, artifacts, check=check)
+        else:
+            self._validate_live(inputs)
+            call = self._enqueue("node", {"node_type": node_type, "inputs": inputs, "extra_data": extra_data},
+                                 artifacts, output_count=count, declared_count=count,
+                                 check_outputs=bool(check),
+                                 metadata_epoch=self._node_metadata_epoch if check else None)
+        if return_call:
+            return call
+        return declared_outputs(call, count, graph=graph) if check else _OutputProxy(call, graph=graph)
 
     def python(self, function=None, /, *, source=None, entry=None, inputs=None, args=()):
         artifact = prepare_code(function, source=source, entry=entry)
@@ -507,7 +550,7 @@ class Client:
     def _validate_live(self, value):
         if isinstance(value, (GraphRef, GraphInput)):
             raise NotSubmitted("Bind a graph port with run[port] before using it in eager calls")
-        if isinstance(value, (RemoteRef, OutputFuture)):
+        if isinstance(value, (RemoteRef, OutputFuture, _OutputProxy)):
             value._wire(self)
         elif isinstance(value, (tuple, list)):
             for item in value:
@@ -516,16 +559,22 @@ class Client:
             for item in value.values():
                 self._validate_live(item)
 
-    def _enqueue(self, kind, payload, artifacts, *, output_count=None, names=None):
+    def _enqueue(self, kind, payload, artifacts, *, output_count=None, declared_count=None,
+                 check_outputs=False, metadata_epoch=None, names=None):
         self._activate()
-        state = _CallState(self, uuid.uuid4().hex, output_count=output_count, names=names)
+        state = _CallState(self, uuid.uuid4().hex, output_count=output_count,
+                           declared_count=declared_count, check_outputs=check_outputs, names=names)
+        state.epoch = metadata_epoch or self.epoch
         call = Call(state)
         self._states[(state.call_id, None)] = state
         self._queue.put_nowait(_Submission(state, kind, payload, tuple(artifacts)))
         return call
 
     def _encode_special(self, value):
-        if isinstance(value, (RemoteRef, OutputFuture)):
+        if (isinstance(value, _OutputProxy)
+                and self.handshake.get("capabilities", {}).get("whole_call_refs") != 1):
+            raise RemoteError("This daemon does not support whole node-result inputs")
+        if isinstance(value, (RemoteRef, OutputFuture, _OutputProxy)):
             return value._wire(self)
         if isinstance(value, (GraphRef, GraphInput)):
             raise NotSubmitted("An unbound graph port is not a remote value")
@@ -557,6 +606,9 @@ class Client:
                 handshake, uploaded = client.handshake, client._uploaded
                 recovery = client._recovery
                 session_id = client.session_id
+                item.state.client()
+                if item.state.check_outputs and item.state.declared_count is None and item.kind == "node":
+                    item.state.declared_count = client._output_count(item.payload["node_type"])
                 if item.kind == "node":
                     spec = {"kind": "node", "node_type": item.payload["node_type"],
                             "inputs": {k: encode_tree(v, client._encode_special)

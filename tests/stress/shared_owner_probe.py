@@ -34,7 +34,7 @@ user_owner = contextvars.ContextVar('acceptance_pending_user_owner', default=Non
 async def make_one_handle(url, kind, value):
     client = await Client(url).start()
     client_weak, session = weakref.ref(client), client.session_id
-    call = client.node('IndependentSlow' if kind != 'ref' else 'IndependentEcho', value=value,
+    call = client.node('IndependentSlow' if kind != 'ref' else 'IndependentEcho', return_call=True, value=value,
                        **({'delay': .4} if kind != 'ref' else {}))
     await call._state.accepted  # No sender/payload retention is counted as a user owner.
     if kind == 'call':
@@ -86,7 +86,7 @@ def fixture_post(url, path, payload=None):
 
 async def make_aliases(url):
     client = await Client(url).start()
-    call = client.node('IndependentEcho', value=83)
+    call = client.node('IndependentEcho', return_call=True, value=83)
     first = call.output()
     ref = await first
     return (first, call.output(), ref), weakref.ref(client), client.session_id
@@ -127,7 +127,7 @@ async def release_aliases_case(url):
 
 async def make_call_and_ref(url):
     client = await Client(url).start()
-    call = client.node('IndependentEcho', value=84)
+    call = client.node('IndependentEcho', return_call=True, value=84)
     ref = await call.output()
     return call, ref, weakref.ref(client), client.session_id
 
@@ -152,7 +152,7 @@ async def call_release_case(url):
 
 async def make_two_slots(url):
     client = await Client(url).start()
-    call = client.node('IndependentPair', value=94)
+    call = client.node('IndependentPair', return_call=True, value=94)
     first, second = await call
     assert first.id != second.id
     return (first, second), weakref.ref(client), client.session_id
@@ -172,7 +172,7 @@ async def sibling_cell_case(url):
 
 async def explicit_close_case(url):
     client = await Client(url).start()
-    call = client.node('IndependentEcho', value=85)
+    call = client.node('IndependentEcho', return_call=True, value=85)
     future = call.output()
     ref = await future
     session = client.session_id
@@ -215,7 +215,7 @@ async def abandon_hung_wait(url):
     client = await Client(url).start()
     session = client.session_id
     fixture_post(url, '/_acceptance_hold_wait', {'session': session})
-    call = client.node('IndependentEcho', value=87)
+    call = client.node('IndependentEcho', return_call=True, value=87)
     future = call.output()
     await call._state.accepted
     await observations.eventually(lambda: session in observations.snapshot(url)['gated_waits_entered'])
@@ -242,7 +242,7 @@ async def abandon_context_hung_wait(url):
         assert user_owner.get() is client, 'SDK opening changed the active user Context'
         session = client.session_id
         fixture_post(url, '/_acceptance_hold_wait', {'session': session})
-        call = client.node('IndependentEcho', value=89)
+        call = client.node('IndependentEcho', return_call=True, value=89)
         future = call.output()
         await call._state.accepted
         assert user_owner.get() is client, 'SDK await changed the active user Context'
@@ -265,7 +265,7 @@ async def context_hung_wait_case(url):
 async def make_borrowed(url):
     client = await Client(url).start()
     with client.graph() as graph:
-        symbolic = client.node('IndependentEcho', value=88)
+        symbolic = client.node('IndependentEcho', return_call=True, value=88)
         graph.output('value', symbolic.output())
     run = client.submit(graph)
     ref = await run.output()

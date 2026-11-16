@@ -5,9 +5,10 @@ from __future__ import annotations
 import contextvars
 from dataclasses import dataclass
 
-from .errors import InvalidReference, NotSubmitted, UnknownOutputLayout
+from ._outputs import _OutputProxy
+from .errors import Expired, InvalidReference, NotSubmitted, UnknownOutputLayout
 from .protocol import encode_tree
-from .refs import Call
+from .refs import Call, _OutputTuple
 
 _receiver = contextvars.ContextVar("comani_graph_receiver", default=None)
 
@@ -33,15 +34,25 @@ class GraphRef:
     def fetch(self):
         raise NotSubmitted("Bind the graph reference to a run before fetching")
 
+    def __await__(self):
+        return self._ready().__await__()
+
+    async def _ready(self):
+        if _receiver.get() is not self.graph:
+            raise NotSubmitted("A graph reference only unwraps inside its graph; use run[graph_ref] after submit")
+        return self
+
     def __reduce__(self):
         raise TypeError("Pass graph references through node inputs, not pickled objects")
 
 
 class _GraphCall(Call):
-    def __init__(self, graph, node_id, output_count, *, names=None, refs=None, targets=None):
+    def __init__(self, graph, node_id, output_count, *, names=None, refs=None, targets=None, check=True):
         self.graph = graph
         self.node_id = node_id
         self.output_count = output_count
+        self.declared_count = output_count
+        self.check_outputs = check
         self.names = names or {}
         self.refs = refs
         self.target_ids = targets or ([node_id] if node_id is not None else [])
@@ -67,19 +78,23 @@ class _GraphCall(Call):
         return self._ready().__await__()
 
     async def _ready(self):
-        if _receiver.get() is not self.graph:
-            raise NotSubmitted("A captured call only unwraps inside its graph; use run[graph_ref] after submit")
-        # Declared layouts, including Python's single output, unwrap offline.
-        # An unknown native layout requires the actual runtime's schema.
-        if self.output_count is None and self.node_id is not None:
+        self._check_capture()
+        if self.check_outputs is False:
+            return _OutputProxy(self, graph=self.graph)
+        if self.declared_count is None and self.node_id is not None:
             node_type = self.graph.nodes[self.node_id]["class_type"]
-            self.output_count, schema = await self.graph.client._node_layout(node_type)
+            self.declared_count, schema = await self.graph.client._node_layout(node_type)
+            self.graph._bind_metadata_epoch(self.graph.client._node_metadata_epoch)
             if (schema.get("output_node", schema.get("is_output_node", False))
                     and self.node_id not in self.graph._automatic_targets):
                 self.graph._automatic_targets.append(self.node_id)
-        if self.output_count is None:
-            raise UnknownOutputLayout("This node has no static output layout; use call.output(slot)")
-        return tuple(self.output(i) for i in range(self.output_count))
+        if self.declared_count is None:
+            raise UnknownOutputLayout("This node has no fixed output declaration; use declared_outputs=False")
+        return _OutputTuple((self.output(i) for i in range(self.declared_count)), graph_call=self)
+
+    def _check_capture(self):
+        if _receiver.get() is not self.graph:
+            raise NotSubmitted("A captured call only unwraps inside its graph; use run[graph_ref] after submit")
 
 
 class Graph:
@@ -95,6 +110,13 @@ class Graph:
         self._token = None
         self._failed = False
         self._automatic_targets = []
+        self._metadata_epoch = None
+
+    def _bind_metadata_epoch(self, epoch):
+        if epoch is not None:
+            if self._metadata_epoch not in (None, epoch):
+                raise InvalidReference("Graph nodes observed different runtime epochs")
+            self._metadata_epoch = epoch
 
     def __enter__(self):
         if self.sealed or self._token is not None:
@@ -140,6 +162,8 @@ class Graph:
                 self.targets.append(node_id)
 
     def _validate_port(self, value):
+        if isinstance(value, _OutputProxy):
+            raise TypeError("Unpack unchecked node outputs before passing them as graph inputs")
         if isinstance(value, (GraphRef, GraphInput)) and value.graph is not self:
             raise InvalidReference("A graph port must be bound when composing another graph")
         if isinstance(value, (list, tuple)):
@@ -149,7 +173,7 @@ class Graph:
             for item in value.values():
                 self._validate_port(item)
 
-    def add(self, node_type, inputs, artifacts=()):
+    def add(self, node_type, inputs, artifacts=(), *, check=None):
         if self.sealed:
             raise ValueError("Graph is sealed")
         self._validate_port(inputs)
@@ -161,7 +185,7 @@ class Graph:
         count = self.client._output_count(node_type)
         if schema.get("output_node", schema.get("is_output_node", False)):
             self._automatic_targets.append(node_id)
-        return _GraphCall(self, node_id, count)
+        return _GraphCall(self, node_id, count, check=check)
 
     def compose(self, graph, bindings):
         if not graph.sealed or graph._failed:
@@ -170,6 +194,7 @@ class Graph:
         extra = set(bindings) - set(graph.inputs)
         if missing or extra:
             raise ValueError(f"Invalid workflow bindings: missing={sorted(missing)}, extra={sorted(extra)}")
+        self._bind_metadata_epoch(graph._metadata_epoch)
         remap = {old: str(len(self.nodes) + i + 1) for i, old in enumerate(graph.nodes)}
 
         def replace(value):
@@ -202,6 +227,8 @@ class Graph:
     def to_wire(self, client):
         if not self.sealed or self._failed:
             raise ValueError("Submit a successfully sealed graph")
+        if self._metadata_epoch is not None and self._metadata_epoch != client.epoch:
+            raise Expired("This graph's output declaration belongs to a previous runtime epoch")
 
         def special(value):
             self._validate_port(value)

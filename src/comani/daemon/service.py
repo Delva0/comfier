@@ -48,7 +48,7 @@ class CallState:
     done: asyncio.Future
     nodes: dict[str, asyncio.Future] = field(default_factory=dict)
     node_results: dict[str, dict] = field(default_factory=dict)
-    reservations: dict[tuple[str | None, int], int] = field(default_factory=dict)
+    reservations: dict[tuple[str | None, int | None], int] = field(default_factory=dict)
     loans: list[str] = field(default_factory=list)
     status: str = "accepted"
     task: asyncio.Task | None = None
@@ -151,7 +151,7 @@ class NativeRuntime:
 
     def _handshake(self, session):
         capabilities = {"bounded_wait": True, "binary_fetch": BINARY_FETCH_VERSION,
-                        "files": FILE_VERSION, "session_resume": 1}
+                        "files": FILE_VERSION, "session_resume": 1, "whole_call_refs": 1}
         if has_lz4():
             capabilities["binary_fetch_lz4"] = BINARY_FETCH_LZ4_VERSION
         return {"session_id": session, "resume_token": self.session_tokens.get(session), "submission_window": self._submission_window(session), "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "recovery_limits": {"max_sessions": self.recovery_policy.max_sessions, "max_objects": self.recovery_policy.max_objects, "max_call_records": self.recovery_policy.max_call_records, "submission_seconds": self.recovery_policy.submission_seconds, "expiry_running": self.recovery_policy.expiry_running}, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}
@@ -201,7 +201,7 @@ class NativeRuntime:
             if current is not None and current[1] == deadline:
                 self.submissions.pop(key, None)
 
-    async def runtime_info(self, **_):
+    async def runtime_info(self, include_node_metadata=False, **_):
         await self.start()
         import folder_paths
 
@@ -214,6 +214,8 @@ class NativeRuntime:
                 "pending": sum(state.status in {"accepted", "queued", "running"}
                                for state in self.calls.values()),
                 "sessions": len(self.session_seen),
+                **({"node_metadata": {"epoch": self.epoch, "nodes": self.adapter.node_types()}}
+                   if include_node_metadata else {}),
                 "roots": {"directories": directories, "categories": categories,
                           "custom_nodes": list(folder_paths.get_folder_paths("custom_nodes")),
                           "aliases": {name: folder_paths.map_legacy(name) for name in ("clip", "unet")}}}
@@ -348,6 +350,21 @@ class NativeRuntime:
         result = state.node_results.get(node_id)
         return result["outputs"][slot] if result is not None and slot < len(result["outputs"]) else None
 
+    def _dependency_refs(self, state, port):
+        if port[1] is None:
+            result = state.node_results.get(port[0] or "result")
+            return result["outputs"] if result is not None else ()
+        ref = self._port_ref(state, port)
+        return (ref,) if ref is not None else ()
+
+    @staticmethod
+    def _locator_port(locator):
+        if locator.get("whole") is True:
+            if "slot" in locator or locator.get("node_id") is not None:
+                raise ValueError("A whole-call reference cannot select an output slot or node")
+            return None, None
+        return locator.get("node_id"), locator["slot"]
+
     def _release_dependencies(self, state):
         if state.dependencies_released:
             return
@@ -356,9 +373,8 @@ class NativeRuntime:
         for producer, port in dependencies:
             with self.store.lock:
                 producer.reservations[port] = max(0, producer.reservations.get(port, 0) - 1)
-                ref = self._port_ref(producer, port)
-                if ref is not None:
-                    self.store.release(state.session, [ref["id"]], lease=True)
+                refs = self._dependency_refs(producer, port)
+                self.store.release(state.session, [ref["id"] for ref in refs], lease=True)
             self._collect_call(producer)
 
     def _collect_call(self, state):
@@ -416,12 +432,13 @@ class NativeRuntime:
             unique = {json.dumps(ref, sort_keys=True): ref for ref in walk_refs(spec)}
             for locator in unique.values():
                 producer = self._producer(session_id, locator)
-                port = (locator.get("node_id"), locator["slot"])
+                port = self._locator_port(locator)
+                if port[1] is None and producer.spec.get("kind") != "node":
+                    raise ValueError("Whole-call references require an eager node producer")
                 with self.store.lock:
                     producer.reservations[port] = producer.reservations.get(port, 0) + 1
                     state.dependencies.append((producer, port))
-                    ref = self._port_ref(producer, port)
-                    if ref is not None:
+                    for ref in self._dependency_refs(producer, port):
                         self.store.acquire(session_id, ref["id"])
             state.task = asyncio.create_task(self._admit(state))
         except BaseException:
@@ -436,6 +453,14 @@ class NativeRuntime:
         producer = self._producer(state.session, locator)
         node_id = locator.get("node_id")
         result = self._result(await asyncio.shield(producer.nodes[node_id] if node_id is not None else producer.done))
+        if locator.get("whole") is True:
+            outputs = result["outputs"]
+            if not outputs:
+                return None
+            if len(outputs) > 1:
+                return [tuple(value_from_data(self.store.get(state.session, ref["id"], locator.get("epoch"), pinned=True))
+                              for ref in outputs)]
+            return self.store.get(state.session, outputs[0]["id"], locator.get("epoch"), pinned=True)
         token = result["outputs"][locator["slot"]]["id"]
         return self.store.get(state.session, token, locator.get("epoch"), pinned=True)
 
@@ -471,7 +496,9 @@ class NativeRuntime:
         outputs = []
         for slot, data in enumerate(entry.outputs):
             is_list = slot < len(list_flags) and list_flags[slot]
-            leases = sum(count for port, count in state.reservations.items() if self._port(state, *port) == (node_id, slot))
+            leases = sum(count for port, count in state.reservations.items()
+                         if (port == (None, None) and state.spec.get("kind") == "node")
+                         or (port[1] is not None and self._port(state, *port) == (node_id, slot)))
             if state.spec.get("kind") == "workflow":
                 ref = self.store.borrow(state.session, cache, key, entry, slot, is_list=is_list, leases=leases)
             else:
@@ -506,7 +533,8 @@ class NativeRuntime:
         def decode(value):
             if isinstance(value, dict):
                 if "$ref" in value:
-                    return source(resolved[json.dumps(value["$ref"], sort_keys=True)])
+                    data = resolved[json.dumps(value["$ref"], sort_keys=True)]
+                    return None if data is None else source(data)
                 if "$graph_ref" in value:
                     ref = value["$graph_ref"]
                     return [ref["node_id"], ref["slot"]] if isinstance(ref, dict) else list(ref)
@@ -532,7 +560,8 @@ class NativeRuntime:
                 if "$dict" in value:
                     return {decode_container(k): decode_container(v) for k, v in value["$dict"]}
                 if "$ref" in value:
-                    return value_from_data(resolved[json.dumps(value["$ref"], sort_keys=True)])
+                    data = resolved[json.dumps(value["$ref"], sort_keys=True)]
+                    return None if data is None else value_from_data(data)
                 if "$input" in value:
                     name = value["$input"]
                     return decode_container(spec.get("bindings", {})[name["name"] if isinstance(name, dict) else name])

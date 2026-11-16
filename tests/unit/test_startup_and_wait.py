@@ -25,7 +25,7 @@ async def test_failed_start_closes_every_pool_and_sender(monkeypatch, entry):
             async with client:
                 pytest.fail("Failed startup must not enter the context")
         else:
-            await client.node("Echo", value=1)
+            await client.node("Echo", return_call=True, value=1)
     assert len(pools) == 3 and all(pool.closed for pool in pools)
     assert client.closed and client._sender.done()
     assert client._opening.done() and client._queue.empty()
@@ -71,7 +71,7 @@ async def test_bounded_wait_repolls_same_call_and_node_without_resubmission(peer
 
     runtime.handshake, runtime.wait_result = handshake, wait_result
     async with Client(transport=InProcessTransport(runtime)) as client:
-        call = client.node("Block", value="done")
+        call = client.node("Block", return_call=True, value="done")
         cancelled_waiter = asyncio.ensure_future(call.output())
         await eventually(lambda: len(polls) >= 2)
         cancelled_waiter.cancel()
@@ -82,7 +82,7 @@ async def test_bounded_wait_repolls_same_call_and_node_without_resubmission(peer
         ref, = await call
         assert await ref.fetch() == "done"
         with client.graph() as graph:
-            middle, = await client.node("Echo", value=1)
+            middle, = await client.node("Echo", return_call=True, value=1)
             graph.output("answer", middle)
         run = client.submit(graph)
         await run[middle]
@@ -108,7 +108,7 @@ async def test_bounded_wait_terminal_error_does_not_repoll(peer):
 
     runtime.handshake, runtime.wait_result = handshake, wait_result
     async with Client(transport=InProcessTransport(runtime)) as client:
-        call = client.node("Fail")
+        call = client.node("Fail", return_call=True)
         with pytest.raises(RemoteError, match="producer failed"):
             await call
         assert polls == [call.id]
@@ -123,4 +123,4 @@ async def test_unnegotiated_pending_is_an_error(peer):
 
     runtime.wait_result = invalid_wait
     with pytest.raises(RemoteError, match="without advertising"):
-        await client.node("Echo", value=1)
+        await client.node("Echo", return_call=True, value=1)

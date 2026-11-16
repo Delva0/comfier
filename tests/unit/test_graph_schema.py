@@ -55,8 +55,8 @@ async def test_first_graph_await_attaches_once_and_never_executes_capture():
     async with Client(transport=InProcessTransport(runtime)) as remote:
         assert not remote.epoch and runtime.compute_handshakes == 0
         with remote.graph() as graph:
-            pair = asyncio.ensure_future(remote.node("Pair", value=1))
-            echo = asyncio.ensure_future(remote.node("Echo", value=2))
+            pair = asyncio.ensure_future(remote.node("Pair", return_call=True, value=1))
+            echo = asyncio.ensure_future(remote.node("Echo", return_call=True, value=2))
             await runtime.attaching.wait()
             await asyncio.sleep(0)
             assert runtime.compute_handshakes == 1 and not runtime.submissions
@@ -64,7 +64,7 @@ async def test_first_graph_await_attaches_once_and_never_executes_capture():
             pair_refs, echo_refs = await asyncio.gather(pair, echo)
             assert len(pair_refs) == 2 and len(echo_refs) == 1
             assert all(isinstance(ref, GraphRef) for ref in (*pair_refs, *echo_refs))
-            assert await remote.node("Effect", value=3) == ()
+            assert await remote.node("Effect", return_call=True, value=3) == ()
             assert graph._automatic_targets == ["3"]
             graph.output("result", echo_refs[0])
         assert remote.epoch == runtime.epoch and not runtime.submissions and not runtime.effects
@@ -77,7 +77,7 @@ async def test_stopped_runtime_error_is_not_relabelled_as_unknown_arity():
     async with Client(transport=InProcessTransport(runtime)) as remote:
         with pytest.raises(RemoteError, match="stopped") as failure:
             with remote.graph():
-                await remote.node("Echo", value=1)
+                await remote.node("Echo", return_call=True, value=1)
         assert failure.value.details["code"] == "RuntimeStopped"
         assert runtime.compute_handshakes == 1 and not runtime.submissions
 
@@ -87,7 +87,7 @@ async def test_unknown_layout_remains_explicit_after_runtime_schema_is_available
     async with Client(transport=InProcessTransport(runtime)) as remote:
         with pytest.raises(UnknownOutputLayout):
             with remote.graph():
-                await remote.node("Dynamic")
+                await remote.node("Dynamic", return_call=True)
         assert remote.epoch == runtime.epoch
         assert runtime.compute_handshakes == 1 and not runtime.submissions
 
@@ -127,8 +127,8 @@ async def test_cancelling_graph_waiter_does_not_cancel_shared_runtime_attachment
     runtime.attach_gate.clear()
     async with Client(transport=InProcessTransport(runtime)) as remote:
         with remote.graph() as graph:
-            first = asyncio.ensure_future(remote.node("Echo", value=1))
-            second = asyncio.ensure_future(remote.node("Echo", value=2))
+            first = asyncio.ensure_future(remote.node("Echo", return_call=True, value=1))
+            second = asyncio.ensure_future(remote.node("Echo", return_call=True, value=2))
             await runtime.attaching.wait()
             first.cancel()
             with pytest.raises(asyncio.CancelledError):
@@ -146,18 +146,18 @@ async def test_failed_attachment_retries_after_another_client_starts_runtime(ret
     async with Client(transport=InProcessTransport(runtime)) as remote:
         with pytest.raises(RemoteError, match="stopped"):
             with remote.graph():
-                await remote.node("Echo", value=1)
+                await remote.node("Echo", return_call=True, value=1)
         assert runtime.compute_handshakes == 1 and not remote.epoch
         # The remote process is now available, without a lifecycle call on this Client.
         runtime.stopped = False
         if retry_entry == "graph":
             with remote.graph() as graph:
-                port, = await remote.node("Echo", value=2)
+                port, = await remote.node("Echo", return_call=True, value=2)
                 graph.output("result", port)
             assert not runtime.submissions
             await remote.submit(graph)
         else:
-            ref, = await remote.node("Echo", value=2)
+            ref, = await remote.node("Echo", return_call=True, value=2)
             assert await ref.fetch() == 2
         assert runtime.compute_handshakes == 2 and len(runtime.submissions) == 1
 
@@ -167,12 +167,12 @@ async def test_retried_attachment_is_singleflight_and_waiter_cancellation_is_loc
     async with Client(transport=InProcessTransport(runtime)) as remote:
         with pytest.raises(RemoteError, match="stopped"):
             with remote.graph():
-                await remote.node("Echo", value=0)
+                await remote.node("Echo", return_call=True, value=0)
         runtime.stopped = False
         runtime.attaching.clear()
         runtime.attach_gate.clear()
         with remote.graph() as graph:
-            waiters = [asyncio.ensure_future(remote.node("Echo", value=value)) for value in range(24)]
+            waiters = [asyncio.ensure_future(remote.node("Echo", return_call=True, value=value)) for value in range(24)]
             await runtime.attaching.wait()
             await asyncio.sleep(0)
             assert runtime.compute_handshakes == 2 and not runtime.submissions
@@ -190,13 +190,13 @@ async def test_retried_attachment_is_singleflight_and_waiter_cancellation_is_loc
 async def test_expired_successful_session_does_not_create_a_replacement_attachment():
     runtime = ManagedSchemaRuntime()
     async with Client(transport=InProcessTransport(runtime)) as remote:
-        old_ref, = await remote.node("Echo", value="original-session")
+        old_ref, = await remote.node("Echo", return_call=True, value="original-session")
         opening = remote._compute_opening
         remote._expire_compute(Expired("Runtime epoch changed"))
         remote._heartbeat_error = Expired("Runtime epoch changed")
         with pytest.raises(Expired):
             with remote.graph():
-                await remote.node("UnseenNative", value="must-not-replay")
+                await remote.node("UnseenNative", return_call=True, value="must-not-replay")
         with pytest.raises(Expired):
             await old_ref.fetch()
         assert remote._compute_opening is opening

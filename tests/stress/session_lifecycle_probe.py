@@ -29,7 +29,7 @@ async def main(args):
     started = time.perf_counter()
     try:
         async with Client(url) as original:
-            call = original.node("IndependentEcho", value=42)
+            call = original.node("IndependentEcho", return_call=True, value=42)
             ref = await call.output()
             assert await ref.fetch() == 42
             old = {"session_id": original.session_id, "ref_id": ref.id,
@@ -87,10 +87,10 @@ async def main(args):
             report["checks"].append("handshake proposing old ID minted a different ID; old token and input locator remain invalid")
 
             client = await Client(url).start()
-            source = client.node("IndependentEcho", value=81)
+            source = client.node("IndependentEcho", return_call=True, value=81)
             source_ref = await source.output()
             source_id = source_ref.id
-            slow = client.node("IndependentSlow", value=source_ref, delay=1.0)
+            slow = client.node("IndependentSlow", return_call=True, value=source_ref, delay=1.0)
             await slow._state.accepted
             deadline = time.monotonic() + 1
             state = runtime.calls[(client.session_id, slow.id)]

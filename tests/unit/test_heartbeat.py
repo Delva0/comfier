@@ -48,7 +48,8 @@ class LeaseServer:
             self.handshakes += 1
             session = uuid.uuid4().hex
             self.seen[session] = time.monotonic()
-            result = {"session_id": session, "epoch": "lease-test", "session_ttl": self.ttl}
+            result = {"session_id": session, "epoch": "lease-test", "session_ttl": self.ttl,
+                      "nodes": {"Echo": {"outputs": ["*"] * getattr(self, "output_count", 1)}}}
             if self.omit_session_id:
                 result.pop("session_id")
         elif method == "close_session":
@@ -130,7 +131,7 @@ async def test_http_lease_survives_blocked_business_loop_and_close_is_idempotent
     client = await Client(lease_server.url).start()
     lease = client._lease
     try:
-        ref = await client.node("Echo").output()
+        ref = await client.node("Echo", return_call=True).output()
         assert await ref.fetch() == 12345
         before = lease_server.heartbeats
         time.sleep(lease_server.ttl * 3)
@@ -192,7 +193,7 @@ async def test_terminal_heartbeat_error_stops_without_reopening_or_resubmitting(
         lease_server.drop_heartbeats = False
         await until(lambda: client.closed and lease.done.done())
         with pytest.raises(SessionClosed, match="lease expired"):
-            client.node("Echo")
+            client.node("Echo", return_call=True)
         assert lease_server.handshakes == 1 and lease_server.submissions == 0
         await until(lambda: client.transport._session is None)
     finally:
@@ -255,7 +256,7 @@ async def test_transient_heartbeat_failure_allows_business_rpcs_and_recovers(
     client = await Client(lease_server.url).start()
     lease = client._lease
     try:
-        ref = await client.node("Echo").output()
+        ref = await client.node("Echo", return_call=True).output()
         assert await ref.fetch() == 12345
         failing.set()
         await until(lambda: isinstance(lease.error, RemoteError))
@@ -264,7 +265,7 @@ async def test_transient_heartbeat_failure_allows_business_rpcs_and_recovers(
         assert await ref.fetch() == 12345
         assert lease_server.fetches == before + 1
         assert failure.__name__ in str(lease.error)
-        second = await client.node("Echo").output()
+        second = await client.node("Echo", return_call=True).output()
         assert await second.fetch() == 12345
         assert lease_server.submissions == 2 and lease_server.handshakes == 1
         # A real business connection failure must still reach the caller.
@@ -285,7 +286,7 @@ async def test_transient_keeper_error_does_not_mask_actual_expired_session_rpc(l
     client = await Client(lease_server.url).start()
     lease = client._lease
     try:
-        ref = await client.node("Echo").output()
+        ref = await client.node("Echo", return_call=True).output()
         lease_server.drop_heartbeats = True
         await until(lambda: isinstance(lease.error, RemoteError))
         await asyncio.sleep(lease_server.ttl * 2)
@@ -314,7 +315,7 @@ async def test_temporary_heartbeat_http_status_preserves_business_and_recovers(
     client = await Client(lease_server.url).start()
     lease = client._lease
     try:
-        ref = await client.node("Echo").output()
+        ref = await client.node("Echo", return_call=True).output()
         lease_server.heartbeat_response = status, payload
         await until(lambda: lease_server.heartbeat_rejections > 0 and lease.error is not None)
         assert not lease.terminal and not client.closed
@@ -325,7 +326,7 @@ async def test_temporary_heartbeat_http_status_preserves_business_and_recovers(
         before = lease_server.fetches
         assert await ref.fetch() == 12345
         assert lease_server.fetches == before + 1
-        next_ref = await client.node("Echo").output()
+        next_ref = await client.node("Echo", return_call=True).output()
         assert await next_ref.fetch() == 12345
         assert lease_server.handshakes == 1 and lease_server.submissions == 2
         before = lease_server.heartbeats
@@ -354,7 +355,7 @@ async def test_permanent_heartbeat_errors_keep_terminal_details_and_fail_pending
     client = await Client(lease_server.url).start()
     lease = client._lease
     try:
-        call = client.node("Echo")
+        call = client.node("Echo", return_call=True)
         await until(lambda: lease_server.submissions == 1)
         lease_server.heartbeat_response = status, payload
         await until(lambda: client.closed and lease.done.done())
@@ -364,7 +365,7 @@ async def test_permanent_heartbeat_errors_keep_terminal_details_and_fail_pending
         for key, value in details.items():
             assert failure.value.details[key] == value
         with pytest.raises(SessionClosed, match=message) as failure:
-            client.node("Echo")
+            client.node("Echo", return_call=True)
         for key, value in details.items():
             assert failure.value.details[key] == value
         assert lease_server.handshakes == lease_server.submissions == 1

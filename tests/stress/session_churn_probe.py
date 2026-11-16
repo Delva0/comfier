@@ -38,7 +38,7 @@ async def main(args):
 
     async def one_session(index):
         async with Client(url) as client:
-            call = client.node("IndependentEcho", value=index)
+            call = client.node("IndependentEcho", return_call=True, value=index)
             ref = await call.output()
             assert await ref.fetch() == index
 

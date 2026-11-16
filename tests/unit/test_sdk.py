@@ -28,19 +28,19 @@ from ._helpers import eventually
 
 async def test_unawaited_calls_execute_and_original_names_survive(peer):
     client, runtime = peer
-    call = client.node("Effect", **{"任意 输入名": 42})
+    call = client.node("Effect", return_call=True, **{"任意 输入名": 42})
     await eventually(lambda: bool(runtime.effects))
     assert runtime.effects == [{"任意 输入名": 42}]
     assert await call == ()
-    ref, = await client.node("原始 节点-name", **{"non-identifier key": "yes"})
+    ref, = await client.node("原始 节点-name", return_call=True, **{"non-identifier key": "yes"})
     assert await ref.fetch() == {"non-identifier key": "yes"}
 
 
 async def test_pending_dependency_does_not_block_unrelated_dispatch(peer):
     client, runtime = peer
-    a = client.node("Block", value="A")
-    c = client.node("Echo", value=a.output(0))
-    b = client.node("Echo", value="B")
+    a = client.node("Block", return_call=True, value="A")
+    c = client.node("Echo", return_call=True, value=a.output(0))
+    b = client.node("Echo", return_call=True, value="B")
     ref, = await b
     assert await ref.fetch() == "B"
     assert len(runtime.submissions) == 3 and c.status == "accepted"
@@ -51,15 +51,15 @@ async def test_pending_dependency_does_not_block_unrelated_dispatch(peer):
 
 async def test_dependency_failure_does_not_hang(peer):
     client, _ = peer
-    failed = client.node("Fail")
-    consumer = client.node("Echo", value=failed.output(0))
+    failed = client.node("Fail", return_call=True)
+    consumer = client.node("Echo", return_call=True, value=failed.output(0))
     with pytest.raises(RemoteError, match="producer failed"):
         await asyncio.wait_for(consumer, timeout=1)
 
 
 async def test_ready_ref_is_not_awaitable_and_literal_link_remains_data(peer):
     client, _ = peer
-    call = client.node("Echo", value=["node-id", 0])
+    call = client.node("Echo", return_call=True, value=["node-id", 0])
     future = call.output(0)
     ref, = await call
     assert await future is ref
@@ -71,7 +71,7 @@ async def test_ready_ref_is_not_awaitable_and_literal_link_remains_data(peer):
 
 async def test_call_future_aliases_share_gc_owner(peer):
     client, runtime = peer
-    call = client.node("Echo", value=123)
+    call = client.node("Echo", return_call=True, value=123)
     future = call.output(0)
     ref, = await call
     alias = await future
@@ -87,7 +87,7 @@ async def test_call_future_aliases_share_gc_owner(peer):
 
 async def test_dropped_pending_call_releases_unclaimed_outputs(peer):
     client, runtime = peer
-    call = client.node("Block", value="unused")
+    call = client.node("Block", return_call=True, value="unused")
     del call
     gc.collect()
     assert not runtime.forgotten
@@ -98,7 +98,7 @@ async def test_dropped_pending_call_releases_unclaimed_outputs(peer):
 
 async def test_explicit_release_invalidates_all_aliases(peer):
     client, runtime = peer
-    call = client.node("Echo", value=42)
+    call = client.node("Echo", return_call=True, value=42)
     ref, = await call
     ref.release()
     with pytest.raises(Released):
@@ -108,26 +108,26 @@ async def test_explicit_release_invalidates_all_aliases(peer):
 
 async def test_cross_session_inputs_are_rejected(peer):
     client, runtime = peer
-    ref, = await client.node("Echo", value=1)
+    ref, = await client.node("Echo", return_call=True, value=1)
     async with Client(transport=InProcessTransport(runtime)) as other:
         with pytest.raises(InvalidReference):
-            other.node("Echo", value=ref)
+            other.node("Echo", return_call=True, value=ref)
 
 
 async def test_capture_is_symbolic_run_bound_and_borrowed(peer):
     client, runtime = peer
     with client.graph() as graph:
         source = graph.input("image", type="IMAGE")
-        call = client.node("Echo", value=source)
+        call = client.node("Echo", return_call=True, value=source)
         output, = await call
-        assert isinstance(output, GraphRef) and not inspect.isawaitable(output)
+        assert isinstance(output, GraphRef) and await output is output
         graph.output("named result", output)
         graph.target(call)
         assert not runtime.submissions
     with pytest.raises(NotSubmitted):
         await call
     with pytest.raises(NotSubmitted):
-        client.node("Echo", value=output)
+        client.node("Echo", return_call=True, value=output)
     run = client.submit(graph, inputs={"image": ["looks-like-link", 0]})
     result, = await run
     middle = await run[output]
@@ -146,7 +146,7 @@ async def test_workflow_composition_remaps_internal_ports(peer):
     client, runtime = peer
     with client.graph() as inner:
         value = inner.input("x")
-        out, = await client.node("Echo", value=value)
+        out, = await client.node("Echo", return_call=True, value=value)
         inner.output("out", out)
     with client.graph() as outer:
         value = outer.input("source")
@@ -166,14 +166,14 @@ async def test_failed_capture_restores_live_receiver(peer):
             raise RuntimeError("stop")
     with pytest.raises(ValueError):
         client.submit(graph)
-    ref, = await client.node("Echo", value="live")
+    ref, = await client.node("Echo", return_call=True, value="live")
     assert await ref.fetch() == "live"
 
 
 async def test_unknown_layout_has_explicit_slot_escape(peer):
     client, _ = peer
     with client.graph() as graph:
-        call = client.node("UnknownSchema")
+        call = client.node("UnknownSchema", return_call=True)
         with pytest.raises(UnknownOutputLayout):
             await call
         graph.output("out", call.output(4))
@@ -182,19 +182,19 @@ async def test_unknown_layout_has_explicit_slot_escape(peer):
 async def test_explicit_pending_slots_allow_runtime_layout_to_grow(peer):
     client, _ = peer
     client._nodes["Pair"]["outputs"] = ["*"]
-    call = client.node("Pair", value="dynamic")
+    call = client.node("Pair", return_call=True, declared_outputs=False, value="dynamic")
     later_slot = call.output(1)
     ref = await later_slot
     assert await ref.fetch() == "dynamic"
     assert len(await call) == 2
     with client.graph() as graph:
-        captured = client.node("Pair", value=1)
+        captured = client.node("Pair", return_call=True, value=1)
         graph.output("explicit slot", captured.output(1))
 
 
 async def test_python_nested_refs_tuple_and_artifact_reuse(peer):
     client, runtime = peer
-    seed = client.node("Echo", value=3)
+    seed = client.node("Echo", return_call=True, value=3)
     def function(tree):
         return tree["a"][0] + 1, False, None
     result, = await client.python(function, inputs={"tree": {"a": [seed.output(0)]}})
@@ -260,8 +260,8 @@ async def test_auto_output_roots_keep_effects_without_forcing_every_node(peer):
     client, runtime = peer
     client._nodes["Effect"]["output_node"] = True
     with client.graph() as graph:
-        client.node("Echo", value="unused")
-        client.node("Effect", value="root")
+        client.node("Echo", return_call=True, value="unused")
+        client.node("Effect", return_call=True, value="root")
     await client.submit(graph)
     assert runtime.submissions[0][1]["graph"]["targets"] == ["2"]
 
@@ -298,7 +298,7 @@ async def test_intermediate_wait_waits_ack_not_whole_workflow(peer):
 
 async def test_pending_inputs_are_held_until_daemon_accepts_them(peer):
     client, runtime = peer
-    value, = await client.node("Echo", value=42)
+    value, = await client.node("Echo", return_call=True, value=42)
     key, cell = value.id, weakref.ref(value._cell)
     entered, gate = asyncio.Event(), asyncio.Event()
     original_submit = runtime.submit
@@ -309,7 +309,7 @@ async def test_pending_inputs_are_held_until_daemon_accepts_them(peer):
         return await original_submit(**params)
 
     runtime.submit = submit
-    consumer = client.node("Echo", value=value)
+    consumer = client.node("Echo", return_call=True, value=value)
     del value
     await entered.wait()
     gc.collect()
@@ -322,7 +322,7 @@ async def test_pending_inputs_are_held_until_daemon_accepts_them(peer):
 
 async def test_callable_captured_reference_is_rejected_with_inputs_hint(peer):
     client, _ = peer
-    value, = await client.node("Echo", value=2)
+    value, = await client.node("Echo", return_call=True, value=2)
 
     def accidentally_captured():
         return value
@@ -333,7 +333,7 @@ async def test_callable_captured_reference_is_rejected_with_inputs_hint(peer):
 
 async def test_canceling_one_waiter_does_not_cancel_remote_call(peer):
     client, runtime = peer
-    call = client.node("Block", value="still running")
+    call = client.node("Block", return_call=True, value="still running")
     waiter = asyncio.ensure_future(call)
     await asyncio.sleep(0)
     waiter.cancel()
@@ -346,7 +346,7 @@ async def test_canceling_one_waiter_does_not_cancel_remote_call(peer):
 
 async def test_close_without_wait_fails_queued_calls_and_drops_input_queue(peer):
     client, runtime = peer
-    call = client.node("Block", value=3)
+    call = client.node("Block", return_call=True, value=3)
     await eventually(lambda: bool(runtime.submissions))
     await client.close(wait=False)
     with pytest.raises(SessionClosed):
@@ -371,7 +371,7 @@ async def test_heartbeat_continues_during_a_long_call(peer):
 
     runtime.handshake, runtime.heartbeat = handshake, heartbeat
     async with Client(transport=InProcessTransport(runtime)) as client:
-        call = client.node("Block", value=1)
+        call = client.node("Block", return_call=True, value=1)
         await eventually(lambda: len(heartbeats) >= 2)
         assert call.status == "accepted"
         runtime.gate.set()
@@ -383,7 +383,7 @@ async def test_heartbeat_continues_during_a_long_call(peer):
 
 async def test_one_retained_slot_does_not_keep_other_owned_slots(peer):
     client, runtime = peer
-    future = client.node("Pair", value="both").output(1)
+    future = client.node("Pair", return_call=True, value="both").output(1)
     ref = await future
     assert await ref.fetch() == "both"
     await eventually(lambda: len(runtime.released) == 1)
@@ -403,7 +403,7 @@ async def test_failed_call_does_not_become_a_hidden_client_root(peer):
     client, _ = peer
 
     async def fail_and_drop():
-        call = client.node("Fail")
+        call = client.node("Fail", return_call=True)
         state = weakref.ref(call._state)
         try:
             await call
@@ -420,7 +420,7 @@ async def test_failed_call_does_not_become_a_hidden_client_root(peer):
 async def test_middle_borrow_keeps_invocation_metadata_until_last_reference(peer):
     client, runtime = peer
     with client.graph() as graph:
-        middle, = await client.node("Echo", value=3)
+        middle, = await client.node("Echo", return_call=True, value=3)
         graph.output("out", middle)
     run = client.submit(graph)
     call_id = run.id

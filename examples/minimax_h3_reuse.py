@@ -41,26 +41,28 @@ class Setup:
 async def setup(remote):
     """Keep unchanged inputs alive; native ComfyUI still controls VRAM/offload."""
     clip = remote.node('CLIPLoader', clip_name=h3.ENCODER, type='minimax', device='default')
-    condition = remote.node('MiniMaxH3ImageConditioning', clip=clip.output(),
+    condition = remote.node('MiniMaxH3ImageConditioning', clip=clip,
                             prompt=h3.PROMPT, width=h3.WIDTH, height=h3.HEIGHT)
-    negative = remote.node('ConditioningZeroOut', conditioning=condition.output(0))
+    positive, _ = condition
+    negative = remote.node('ConditioningZeroOut', conditioning=positive)
     model = remote.node('UNETLoader', unet_name=h3.MODEL, weight_dtype='default')
     vae = remote.node('VAELoader', vae_name=h3.VAE)
-    # A Call awaits to a tuple of ready refs. These refs themselves are not awaitable.
+    # The multi-output tuple is awaitable; a single output awaits to one ready ref.
     positive_ref, latent_ref = await condition
-    (negative_ref,), (model_ref,), (vae_ref,) = await asyncio.gather(negative, model, vae)
+    negative_ref, model_ref, vae_ref = await asyncio.gather(negative, model, vae)
     return Setup(model_ref, positive_ref, latent_ref, negative_ref, vae_ref)
 
 
 async def generate(remote, reused, seed, index, origin):
     """One independent eager image. No graph capture or implicit result cache."""
     started = time.monotonic()
+    # Retain Calls here because the benchmark records their invocation IDs.
     sampled = remote.node('KSampler', model=reused.model, positive=reused.positive,
                           negative=reused.negative, latent_image=reused.latent,
                           seed=seed, steps=h3.STEPS, cfg=1.0, sampler_name='euler',
-                          scheduler='simple', denoise=1.0)
+                          scheduler='simple', denoise=1.0, return_call=True)
     passed = remote.python(source=OPS, entry='identity', inputs={'value': sampled.output()})
-    decoded = remote.node('VAEDecode', samples=passed.output(), vae=reused.vae)
+    decoded = remote.node('VAEDecode', samples=passed.output(), vae=reused.vae, return_call=True)
     output = decoded.output()
     enqueued = time.monotonic()
     try:

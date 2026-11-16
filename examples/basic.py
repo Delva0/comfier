@@ -62,16 +62,17 @@ async def run(args):
         await remote.comfyui.start()
         image = remote.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
         adjusted = remote.python(source=Path(__file__), entry="half_image",
-                                 inputs={"image": image.output()})
+                                 inputs={"image": image})
         inverted = remote.node("ImageInvert", image=adjusted.output())
         with remote.graph() as workflow:
             image_in = workflow.input("image", type="IMAGE")
-            middle, = await remote.node("ImageInvert", image=image_in)
+            middle = remote.node("ImageInvert", image=image_in)
             restored = remote.node("ImageInvert", image=middle)
-            workflow.output("image", restored.output())
-        submitted = remote.submit(workflow, inputs={"image": inverted.output()})
+            workflow.output("image", restored)
+        submitted = remote.submit(workflow, inputs={"image": inverted})
         intermediate = await submitted[middle]
-        saved = remote.node("SaveImage", images=submitted.output("image"), filename_prefix="comani/basic")
+        saved = remote.node("SaveImage", images=submitted.output("image"),
+                            filename_prefix="comani/basic", return_call=True)
         await saved
         metadata = await saved.metadata()
         item = metadata.ui["result"]["images"][0]

@@ -84,7 +84,7 @@ async def main(args):
     control_task = asyncio.create_task(monitor())
     try:
         assert client.handshake["capabilities"]["bounded_wait"] is True
-        call = client.node("IndependentSlow", value=1234567, delay=args.delay)
+        call = client.node("IndependentSlow", return_call=True, value=1234567, delay=args.delay)
         await call._state.accepted
         call_id = call.id
         session_id = client.session_id
@@ -145,7 +145,7 @@ async def main(args):
         # Capability absent: keep one old-style read with no wait_seconds.
         hide_capability = True
         legacy = await Client(proxy_url).start()
-        legacy_call = legacy.node("IndependentSlow", value=7, delay=.05)
+        legacy_call = legacy.node("IndependentSlow", return_call=True, value=7, delay=.05)
         legacy_id = legacy_call.id
         assert await (await legacy_call.output()).fetch() == 7
         await legacy.close()

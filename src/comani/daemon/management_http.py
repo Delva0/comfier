@@ -104,7 +104,8 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
             result = {**window, "session_id": management_session,
                       "capabilities": {"management": 1, "files": FILE_VERSION, "files_resume": 1},
                       "file_transfer_epoch": app["file_transfers"].epoch,
-                      "file_limits": supervisor.file_limits()}
+                      "file_limits": supervisor.file_limits(),
+                      "node_metadata": supervisor.observed_nodes()}
         elif method in {"file_roots", "file_stat", "file_remove"}:
             await supervisor.get_file_store()
             result = await getattr(file_http, method)(files, **params)

@@ -27,8 +27,8 @@ async def main(args):
     url = f"http://127.0.0.1:{args.port}"
     client = await Client(url).start()
     try:
-        slow = client.node("IndependentSlow", value=42, delay=3.0)
-        calls = [slow] + [client.node("IndependentEcho", value=slow.output()) for _ in range(127)]
+        slow = client.node("IndependentSlow", return_call=True, value=42, delay=3.0)
+        calls = [slow] + [client.node("IndependentEcho", return_call=True, value=slow.output()) for _ in range(127)]
         await asyncio.sleep(.8)
         count = sum(s == client.session_id for s, _ in runtime.calls)
         first_done_before_probe = runtime.calls[(client.session_id, slow.id)].done.done()

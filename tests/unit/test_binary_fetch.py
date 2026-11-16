@@ -273,7 +273,7 @@ async def test_serialization_holds_source_locally_and_does_not_add_a_cache(monke
 
 async def test_inprocess_and_custom_transports_keep_existing_fetch_envelopes(peer):
     client, runtime = peer
-    ref = await client.node("Echo", value="existing envelope").output()
+    ref = await client.node("Echo", return_call=True, value="existing envelope").output()
     assert await ref.fetch() == "existing envelope"
     assert isinstance(client.transport, InProcessTransport)
     assert isinstance(await client.transport.request("fetch", session_id=client.session_id,

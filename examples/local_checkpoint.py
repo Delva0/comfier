@@ -37,19 +37,19 @@ async def main(args):
         if info.state != "running":
             await remote.comfyui.start()
         with remote.graph() as graph:
-            model, clip, vae = await remote.node("CheckpointLoaderSimple", ckpt_name=checkpoint)
+            model, clip, vae = remote.node("CheckpointLoaderSimple", ckpt_name=checkpoint)
             positive = remote.node("CLIPTextEncode", text=args.prompt, clip=clip)
             negative = remote.node("CLIPTextEncode", text="blurry, low quality, text, watermark",
                                    clip=clip)
             latent = remote.node("EmptyLatentImage", width=512, height=512, batch_size=1)
             sampled = remote.node(
                 "KSampler", model=model, seed=args.seed, steps=12, cfg=6.5,
-                sampler_name="euler", scheduler="normal", positive=positive.output(),
-                negative=negative.output(), latent_image=latent.output(), denoise=1.0,
+                sampler_name="euler", scheduler="normal", positive=positive,
+                negative=negative, latent_image=latent, denoise=1.0,
             )
-            decoded = remote.node("VAEDecode", samples=sampled.output(), vae=vae)
-            saved = remote.node("SaveImage", images=decoded.output(),
-                                filename_prefix="comani/checkpoint")
+            decoded = remote.node("VAEDecode", samples=sampled, vae=vae)
+            saved = remote.node("SaveImage", images=decoded,
+                                filename_prefix="comani/checkpoint", return_call=True)
             graph.target(saved)
         run = remote.submit(graph)
         await run

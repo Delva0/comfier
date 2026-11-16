@@ -85,7 +85,7 @@ async def probe():
         report["missed_capture"] = {"outcome": outcome}
         runtime.adapter._capture = original_capture
 
-        active = client.node("ProbeBlocked", value=9)
+        active = client.node("ProbeBlocked", return_call=True, value=9)
         deadline = time.monotonic() + 1
         while not started.is_set() and time.monotonic() < deadline:
             await asyncio.sleep(0.01)

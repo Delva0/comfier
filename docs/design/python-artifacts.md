@@ -2,7 +2,7 @@
 
 实现：[code.py](../../src/comani/code.py)、[参数 layout](../../src/comani/protocol.py)、[原生 Python 节点](../../src/comani/daemon/python_node.py)。
 
-`.python()` 准备代码 artifact 和参数端口，然后调用 driver 注册的 `ComaniPython` 原生节点。它复用 node 的 Call/输出/所有权规则，但包含代码准备与参数适配，并不只是改一个节点名称。
+`.python()` 准备代码 artifact 和参数端口，然后调用 driver 注册的 `ComaniPython` 原生节点。它仍返回 `Call`，复用底层调用、输出和所有权规则；`node()` 的默认直接输出模式不改变这个接口。Python 调用还包含代码准备与参数适配，并不只是改一个节点名称。
 
 ## 三种显式来源
 

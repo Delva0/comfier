@@ -223,9 +223,23 @@ class NativeAdapter:
         result = {}
         for name, node in self.nodes.NODE_CLASS_MAPPINGS.items():
             try:
-                result[name] = {"outputs": list(node.RETURN_TYPES), "output_node": bool(getattr(node, "OUTPUT_NODE", False)), "output_names": list(getattr(node, "RETURN_NAMES", ()) or ()), "output_is_list": list(getattr(node, "OUTPUT_IS_LIST", ()) or ())}
+                raw = node.RETURN_TYPES
+                fixed = type(raw) in (tuple, list)
+                layout = "fixed" if fixed else "unknown"
+                if isinstance(raw, (tuple, list)) and not fixed:
+                    layout = "dynamic"
+                schema = getattr(node, "SCHEMA", None)
+                if schema is not None and any(isinstance(output, self.execution._io.DynamicOutput)
+                                              for output in schema.outputs):
+                    fixed = False
+                    layout = "dynamic"
+                result[name] = {"outputs": list(raw), "output_layout": layout,
+                                "output_count": len(raw) if fixed else None,
+                                "output_node": bool(getattr(node, "OUTPUT_NODE", False)),
+                                "output_names": list(getattr(node, "RETURN_NAMES", ()) or ()),
+                                "output_is_list": list(getattr(node, "OUTPUT_IS_LIST", ()) or ())}
             except Exception:
-                result[name] = {"outputs": []}
+                result[name] = {"outputs": [], "output_layout": "unknown", "output_count": None}
         return result
 
     def close(self):
