@@ -217,7 +217,7 @@ class RuntimeSupervisor:
                                             transfer_limit=self.config.transfer_limit,
                                             transfer_owner_limit=self.config.transfer_owner_limit)
             else:
-                self.file_store.folder_paths = paths
+                self.file_store.update_paths(paths)
             self._snapshot, self.roots_generation = snapshot, generation
         self._snapshot_signature = self._paths_signature()
         return self.file_store

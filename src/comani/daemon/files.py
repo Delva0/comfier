@@ -58,6 +58,43 @@ class Metadata:
     revision: Revision
 
 
+class RootIdentity:
+    """Hold the accepted directory inode open without pinning its child entries."""
+
+    def __init__(self, store, root):
+        self.store, self.root = store, root
+        self.fd, self.closed = None, False
+        with store._lock:
+            store._root(root)
+            _directory(root.path, create=True)
+            try:
+                if hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW"):
+                    self.fd = os.open(root.path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+                self.identity = self._identity(os.fstat(self.fd) if self.fd is not None else root.path.lstat())
+            except BaseException:
+                self.close()
+                raise
+
+    @staticmethod
+    def _identity(value):
+        return value.st_dev, value.st_ino, value.st_uid, value.st_gid, value.st_mode
+
+    def check(self):
+        with self.store._lock:
+            self.store._root(self.root)
+            _directory(self.root.path)
+            value = self.root.path.lstat()
+            if (self.closed or self._identity(value) != self.identity
+                    or (self.fd is not None and self._identity(os.fstat(self.fd)) != self.identity)):
+                raise FileChangedError("The selected native root directory changed")
+
+    def close(self):
+        self.closed = True
+        if self.fd is not None:
+            os.close(self.fd)
+            self.fd = None
+
+
 def _linked(value):
     # Windows junctions and other reparse points need not be S_IFLNK.
     return (stat.S_ISLNK(value.st_mode)
@@ -252,6 +289,19 @@ class FileStore:
             root = next((value for value in self._roots.values() if value.id == root_id), None)
             return self._root(root)
 
+    def pin_root(self, root):
+        return RootIdentity(self, root)
+
+    def update_paths(self, folder_paths):
+        """Unchanged roots keep IDs; an observed removal permanently retires its ID."""
+        with self._lock:
+            self.folder_paths = folder_paths
+            for key, root in tuple(self._roots.items()):
+                try:
+                    self._root(root)
+                except ValueError:
+                    self._roots.pop(key, None)
+
     def _parent(self, root, relative_path, *, create=False):
         parts = _relative(relative_path)
         self._root(root)
@@ -312,7 +362,7 @@ class FileStore:
                 upload.write(chunk)
             return upload.commit(sha256)
 
-    def publish_staged(self, root, relative_path, stage, *, cancel=None):
+    def publish_staged(self, root, relative_path, stage, *, cancel=None, check_root=None):
         """Consume an internal verified stage, linking on its own filesystem.
 
         EXDEV alone uses a bounded, independently SHA-verified copy after a
@@ -337,6 +387,8 @@ class FileStore:
                 raise FileChangedError("Verified staging file changed while opening it")
             os.fsync(source.fileno())
             with self._lock:
+                if check_root is not None:
+                    check_root()
                 self._conflicts(root, relative_path)
                 parent = self._parent(root, relative_path, create=True)
                 target = parent / _relative(relative_path)[-1]
@@ -358,6 +410,8 @@ class FileStore:
                                 or value.st_nlink != 2):
                             raise FileChangedError("Staging file changed at publication")
                         self._metadata(root, relative_path, stage.sha256, value)
+                        if check_root is not None:
+                            check_root()
                         _unlink_owned(stage.path, identity)
                         info = self._metadata(root, relative_path, stage.sha256, _regular(target))
                     except BaseException:
@@ -374,7 +428,7 @@ class FileStore:
                     upload.write(chunk)
                 stage.check()
                 check_cancel()
-                info = upload.commit(stage.sha256)
+                info = upload.commit(stage.sha256, check_root=check_root)
             _unlink_owned(stage.path, identity)
             return info
 
@@ -491,11 +545,11 @@ class Upload:
             self.abort()
             raise
 
-    def commit(self, sha256):
+    def commit(self, sha256, *, check_root=None):
         with self._lock:
-            return self._commit(sha256)
+            return self._commit(sha256, check_root=check_root)
 
-    def _commit(self, sha256):
+    def _commit(self, sha256, *, check_root=None):
         try:
             if self._closed:
                 raise ValueError("Upload is already closed")
@@ -508,6 +562,8 @@ class Upload:
             expected = Revision.of(os.fstat(self._stream.fileno()))
             self._stream.close()
             with self.store._lock:
+                if check_root is not None:
+                    check_root()
                 parent = self.store._parent(self.root, self.relative_path)
                 value = parent.stat()
                 if (value.st_dev, value.st_ino) != self._parent_identity:
@@ -534,6 +590,8 @@ class Upload:
                     _unlink_owned(self._partial, self._identity)
                     info = self.store._metadata(self.root, self.relative_path,
                                                 digest, _regular(target))
+                    if check_root is not None:
+                        check_root()
                 except BaseException:
                     _unlink_owned(target, self._identity)
                     raise

@@ -41,7 +41,7 @@ Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须�
 2. 脚本选择确切 artifact 与原生 root/path。
 3. transport 获取到隔离 staging。
 4. 核对身份、长度、上游摘要/Git blob hash。
-5. 重查 roots generation、同名 shadow 和 create-only 目标，原子发布。
+5. 重验所选 root 的配置与目录身份、同名 shadow 和 create-only 目标，原子发布。
 
 `download(..., transport="auto"|"http"|"aria2"|"hf", connections=8)` 显式控制引擎。auto 对 HF 在目标解释器已装官方 hub 时优先 hub/Xet；有 SHA 且已有 aria2c 时可用 aria2 多连接，否则使用 HTTP。强制 hf/aria2 缺工具明确失败，不自动 pip 或 apt。官方 hub 在配置的目标解释器运行，复用该账号/缓存机制；现有 aria2c 二进制复用。
 
@@ -86,4 +86,4 @@ H3 的 UNET、text encoder、VAE 可能来自不同 provider 和不同 roots，�
 
 stage 身份、revision、独占 link 和私有目录检查遵循 [文件 I/O](files.md) 的既有权限边界，不隔离具有 daemon 同等文件权限的恶意 writer。revision 不是内容快照；不能据此声称拒绝同 UID 的所有同长度改写。实际低空间、普通磁盘大模型及保留反例的验收归属见 [管理验收](../management_acceptance.md)。
 
-根目录来自实际 folder_paths。运行时观测 live；停机用 last-observed；冷启动可由不导入 Torch/插件的路径 helper 发现原生路径配置。插件运行时注册的未知 category 不能凭空构造。配置变化需要重新发现，发布前检查 generation；稳定未变的 root tuple 保持稳定 ID。详细边界见 [文件 I/O](files.md)。
+根目录来自实际 folder_paths。运行时观测 live；停机用 last-observed；冷启动可由不导入 Torch/插件的路径 helper 发现原生路径配置。插件运行时注册的未知 category 不能凭空构造。配置变化需要重新发现。支持 no-follow 目录句柄的平台会在获取前保存所选 root 的设备、inode、owner/group 与 mode，发布前刷新原生配置并在发布锁内复查；其他 category 新增或同类 root 优先级变化不会使未变的目标目录失效，也不会重定向到另一目录。无法保持目录句柄的平台仍保守核对完整 generation。已观察到移除的 root ID 会退役，重新注册同一路径会产生新 ID；未变目录的 ID 保持稳定。目录内容与 mtime/ctime 不属于目录身份，现有 SHA、stage 独占、路径/link、shadow、parent 和 create-only 检查继续生效。这不是对同权限恶意 writer 的文件系统隔离。详细边界见 [文件 I/O](files.md)。

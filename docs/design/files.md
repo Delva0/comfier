@@ -56,7 +56,7 @@ for index, file in enumerate(files):
 
 ## 模型多根与命名
 
-模型类别和路径来自实际 ComfyUI `folder_paths` 配置，包括额外模型路径。运行中取得 live snapshot，停止后使用 last-observed；冷实例通过只加载原生路径配置的 helper 发现，既不导入 Torch，也不导入插件，不能凭空发现插件运行时新增类别。原生路径源码/YAML 变化触发重新发现，发布前核对 generation；路径/category/directory tuple 未变的 root 保持稳定 ID。上传到模型类别时，先取根并显式选择：
+模型类别和路径来自实际 ComfyUI `folder_paths` 配置，包括额外模型路径。运行中取得 live snapshot，停止后使用 last-observed；冷实例通过只加载原生路径配置的 helper 发现，既不导入 Torch，也不导入插件，不能凭空发现插件运行时新增类别。原生路径源码/YAML 变化触发重新发现，发布前复查所选 root 的配置；模型下载另按[模型发布规则](models.md)核对目标目录身份，避免无关配置变化造成重传。路径/category/directory tuple 未变的 root 保持稳定 ID；已观察移除的 ID 退役，重新注册同一路径会取得新 ID。上传到模型类别时，先取根并显式选择：
 
 ```python
 roots = await remote.files.roots(category="diffusion_models")

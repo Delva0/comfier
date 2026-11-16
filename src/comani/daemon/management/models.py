@@ -210,7 +210,7 @@ class ModelService:
             raise ManagementError("DestinationBusy", "Another operation is publishing this model path")
         self.resolver.retain(artifact)
         self._targets.add(key)
-        partial = staging_directory = None
+        partial = staging_directory = root_identity = None
         try:
             # Fail before provider traffic for conflicting destinations.
             try:
@@ -224,6 +224,7 @@ class ModelService:
                     return {"file": metadata_wire(store, existing.metadata), "artifact": self.resolver.public(artifact),
                             "sha256": existing.metadata.sha256, "verified_against": "sha256", "reused": True,
                             "native_visibility": "visible" if self.supervisor.state == "running" else "unknown"}
+            root_identity = await _io(store.pin_root, selected, _cancel_cleanup=lambda value: value.close())
             staging = Path(self.supervisor.config.workspace) / ".comani" / "staging"
             staging.mkdir(parents=True, exist_ok=True)
             staging_directory = Path(tempfile.mkdtemp(prefix="model-", dir=staging))
@@ -236,11 +237,10 @@ class ModelService:
                 context, artifact, partial, max_bytes, transport, connections, timeout)
             size, actual = stage.size, stage.sha256
             context.progress(phase="verifying", bytes=size, total=size)
-            await self.supervisor.get_file_store()
-            if generation != self.supervisor.roots_generation:
-                raise ManagementError("RootsChanged", "Native roots changed during acquisition; select the destination again")
+            await self._revalidate_root(store, root_identity, generation)
             context.progress(phase="publishing", bytes=size, total=size)
-            info = await self._publish_staged(store, selected, path, stage)
+            info = await self._publish_staged(store, selected, path, stage,
+                                              check_root=lambda: self._check_root(root_identity))
             result = {"file": metadata_wire(store, info), "artifact": self.resolver.public(artifact), "sha256": actual,
                       "verified_against": verified, "reused": False,
                       "native_visibility": "visible" if self.supervisor.state == "running" else "unknown",
@@ -258,11 +258,33 @@ class ModelService:
         finally:
             self._targets.discard(key)
             self.resolver.release(artifact)
+            if root_identity is not None:
+                root_identity.close()
             if staging_directory is not None:
                 await _io(shutil.rmtree, staging_directory)
 
+    async def _revalidate_root(self, store, identity, generation):
+        current = await self.supervisor.get_file_store()
+        try:
+            if current is not store:
+                raise ValueError("Native file store changed")
+            # Keep the previous conservative policy where a directory inode
+            # cannot be held open against replacement/reuse (e.g. Windows).
+            if identity.fd is None and generation != self.supervisor.roots_generation:
+                raise ValueError("Native roots changed without a directory identity handle")
+            await _io(self._check_root, identity)
+        except (ValueError, OSError):
+            raise ManagementError("RootsChanged", "Selected native root changed during acquisition; select the destination again") from None
+
     @staticmethod
-    async def _publish_staged(store, root, path, stage):
+    def _check_root(identity):
+        try:
+            identity.check()
+        except (ValueError, OSError):
+            raise ManagementError("RootsChanged", "Selected native root changed during acquisition; select the destination again") from None
+
+    @staticmethod
+    async def _publish_staged(store, root, path, stage, *, check_root=None):
         # Cross-filesystem copying remains cancellable between chunks. Always
         # drain the worker; if atomic publication already won, record its result
         # rather than report a cancelled operation with an unrecorded file.
@@ -272,7 +294,7 @@ class ModelService:
             completed["info"] = info
 
         worker = asyncio.create_task(_io(store.publish_staged, root, path, stage, cancel=stop,
-                                         _cancel_cleanup=remember))
+                                         check_root=check_root, _cancel_cleanup=remember))
         cancelled = False
         while True:
             try:
@@ -394,17 +416,18 @@ class ModelService:
         selected = store.root_by_id(root.get("id") if isinstance(root, dict) else root)
         if selected.category is None:
             raise ManagementError("InvalidArgument", "Select a native model category root")
+        generation = self.supervisor.roots_generation
         key = selected.category, path
         if any(category == key[0] and (name == path or name.startswith(path + "/") or path.startswith(name + "/"))
                for category, name in self._targets):
             raise ManagementError("DestinationBusy", "Another operation is publishing inside this snapshot destination")
         self._targets.add(key)
-        staging = None
+        staging = root_identity = None
         try:
             store._conflicts(selected, path)
+            root_identity = await _io(store.pin_root, selected, _cancel_cleanup=lambda value: value.close())
             parent = store._parent(selected, path, create=True)
             identity = (parent.stat().st_dev, parent.stat().st_ino)
-            generation = self.supervisor.roots_generation
             # Stage outside every native root on the same filesystem, so native
             # recursive filename scans cannot observe incomplete tree contents.
             native_roots = [Path(value).resolve() for paths, _ in store.folder_paths.folder_names_and_paths.values() for value in paths]
@@ -444,11 +467,9 @@ class ModelService:
                 results.append({"relative_path": relative, "sha256": stage.sha256, "size": stage.size,
                                 "verified_against": verified, "transport": engine, "artifact": self.resolver.public(artifact)})
                 context.partial(result)
-            await self.supervisor.get_file_store()
-            if generation != self.supervisor.roots_generation:
-                raise ManagementError("RootsChanged", "Native roots changed during snapshot acquisition")
+            await self._revalidate_root(store, root_identity, generation)
             with store._lock:
-                store._root(selected)
+                self._check_root(root_identity)
                 current = store._parent(selected, path)
                 if (current.stat().st_dev, current.stat().st_ino) != identity:
                     raise ManagementError("RootsChanged", "Snapshot parent directory changed")
@@ -471,6 +492,8 @@ class ModelService:
             return result
         finally:
             self._targets.discard(key)
+            if root_identity is not None:
+                root_identity.close()
             if staging is not None:
                 await _io(shutil.rmtree, staging)
 
