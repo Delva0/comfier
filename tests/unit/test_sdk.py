@@ -203,6 +203,31 @@ async def test_python_nested_refs_tuple_and_artifact_reuse(peer):
     assert len(runtime.artifacts) == 1
 
 
+@pytest.mark.parametrize("kind", ["node", "python", "graph"])
+@pytest.mark.parametrize("nested", [False, True])
+async def test_call_inputs_require_an_explicit_output(peer, kind, nested):
+    client, runtime = peer
+    source = client.node("Echo", value="kept", return_call=True)
+    value = {"tree": [(source,)]} if nested else source
+    if kind == "node":
+        invalid = client.node("Echo", value=value)
+    elif kind == "python":
+        invalid = client.python(lambda value: value, inputs={"value": value})
+    else:
+        with client.graph() as graph:
+            result = client.node("Echo", value=value)
+            graph.output("result", result)
+        invalid = client.submit(graph)
+    with pytest.raises(TypeError, match=r"Call.*call\.output.*RemoteRef.*await"):
+        await invalid
+    assert len(runtime.submissions) == 1
+
+    ready, = await source
+    valid = client.python(lambda tree: (tree["future"], tree["ready"]),
+                          inputs={"tree": {"future": source.output(), "ready": ready}})
+    assert await (await valid).fetch() == ("kept", "kept")
+
+
 async def test_graph_python_uploads_at_submit_and_lifts_ports(peer):
     client, runtime = peer
     with client.graph() as graph:

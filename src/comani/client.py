@@ -625,6 +625,11 @@ class Client:
         return call
 
     def _encode_special(self, value):
+        if isinstance(value, Call):
+            raise TypeError(
+                "A Call is an execution handle, not an input value; pass call.output(slot_or_name) "
+                "or a RemoteRef, or await the Call first if you only need an execution barrier"
+            )
         if (isinstance(value, _OutputProxy)
                 and self.handshake.get("capabilities", {}).get("whole_call_refs") != 1):
             raise RemoteError("This daemon does not support whole node-result inputs")
