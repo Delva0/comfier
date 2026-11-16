@@ -16,6 +16,43 @@ ComfyUI 和计算环境路径可以尚不存在；此时先执行下面的显式
 
 通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMANI_TOKEN 或 --token，非 loopback 绑定必须有 token。
 
+## 模型目录与代码更新分开
+
+同一实例保留磁盘时，重启计算、重启 daemon、替换 Comani wheel 都不要求重新下载模型。ComfyUI 的原地 Git 更新也不删除已有模型；把 ComfyUI 改装到另一个目录时，默认 `models/` 会随代码目录改变，旧文件可能仍在磁盘却不在新搜索路径里。
+
+部署时把模型和配置放在代码目录之外，使用 ComfyUI 原生的 `extra_model_paths`。例如先创建 `/server/comani-data/models/` 下需要的类别目录，再保存 `/server/comani-data/extra_model_paths.yaml`：
+
+```yaml
+persistent_models:
+  base_path: /server/comani-data
+  is_default: true
+  checkpoints: models/checkpoints
+  diffusion_models: models/diffusion_models
+  text_encoders: models/text_encoders
+  vae: models/vae
+  loras: models/loras
+```
+
+`is_default: true` 把这些目录放在原生优先级前面。只声明实际需要的类别；插件自注册的类别仍遵循插件自己的准备流程。把下面保存为 `/server/comani-data/runtime.json`，然后运行 `comani daemon --config /server/comani-data/runtime.json --no-start`：
+
+```json
+{
+  "comfy_root": "/server/ComfyUI",
+  "runtime_python": "/server/comfy-env/bin/python",
+  "workspace": "/server/comani-data",
+  "comfy_args": [
+    "--extra-model-paths-config",
+    "/server/comani-data/extra_model_paths.yaml"
+  ]
+}
+```
+
+之后停止计算并更新 core/wheel，或将 `comfy_root` 显式切换到已准备好的新代码目录，保留这份配置和模型目录。`configure(comfy_args=[...])` 会替换整个参数列表，增改设备参数时要保留上述配置参数。已有模型不会自动搬家；迁移旧部署时先停止计算，再由部署者移动或挂载原模型目录并核对文件，避免把含模型的旧目录一并删除。
+
+普通准备调用继续使用同一模型文件名与内容 SHA，并传 `reuse=True`。相同可见路径和 SHA 的文件会在源 GET 前复用；本地 SHA 检查仍有磁盘读取成本。新代码目录中出现同名但不同内容的高优先级文件会报冲突，不会用另一个根中的文件掩盖它。
+
+磁盘是否跨实例保留由部署平台决定。停止同一实例与销毁后另租一台是不同动作；独立目录配置不能让已销毁的磁盘恢复，也不能把本地盘变成跨主机共享盘。本地回归可运行 `python -m pytest tests/integration/test_model_persistence_story.py -q`：真实 CLI daemon、CPU ComfyUI 和计数 HTTP 源验证首次下载一次，计算重启、daemon 换进程和代码换目录后均零 GET，并读取同一小型 safetensors 的内容。
+
 ## 空白 CPU 环境
 
 先启动纯管理 daemon。在客户端把下面保存为 `prepare_cpu.py` 并运行，填写真实服务器路径；wheel 必须已经存在于服务器。新 venv 目录必须不存在。
