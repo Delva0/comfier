@@ -85,6 +85,8 @@ await comani.files.download(file, output_dir / "result.png")
 
 H3 Seed Hunter 默认生成三条不同 seed 的预览，再让调用者选择一个远端 AV latent 精修；`--choose 2 3` 只生成并精修已知的两个候选。Qwen 的 `--count` 增加不同 seed 的产品，Click/CutOut 的 `--repeat` 只作同 seed 缓存观察，不能计作新增独立产品。PerfectLooper 的 `seam-check-x2.mp4` 也是同一条真实生成闭环的两次播放，不能计作第二条生成结果。
 
+Click/CutOut 的 `--count` / `--repeat` 显式复用固定输入、选择和 prompt 的一次准备，首次成本记在 `profile.json` 顶层的 `prepare_*` 阶段，每轮采样、解码、合成和输出耗时另记在 `runs`；输入变化时新的调用重新准备，这是示例的显式复用，不是 SDK 内核提速。
+
 ## Score 的 CPU LLM 线程
 
 `--llm-threads N` 把 `-t N -tb N` 写入原生 `S2SLLMSettings.extra_args`，分别限制 llama.cpp 的推理和 batch 线程。省略参数保持原节点默认；不改变 ComfyUI、Torch 或 H3 的全局线程配置。

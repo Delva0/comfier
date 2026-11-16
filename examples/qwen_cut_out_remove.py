@@ -11,6 +11,8 @@ Add --download-models to acquire the five weights through the daemon.
 The desk-photo diagnostic used --change-threshold 0.08 --no-alpha-fill-holes
 --alpha-expand -2 --alpha-white-point 0.999. These are material-dependent alpha
 and edit-mask adjustments; they cannot guarantee perfect matting for every image.
+The selection, foreground, conditioning, latent and fixed composite inputs are
+prepared once. --count changes seeds; --repeat repeats sampling/downstream work.
 """
 
 import argparse
@@ -117,41 +119,53 @@ async def main(args):
                           f"held or carried, and the shadow and reflection left behind. No part of "
                           f"{args.object} may remain. Fill the space with {args.fill}. "
                           "Keep everything else exactly the same.")
+                # Explicitly reuse only values independent of the sampling seed.
+                # Each invocation rebuilds them for its own input/object/prompt.
+                started = time.perf_counter()
+                find = comani.node("CLIPTextEncode", clip=sam_clip, text=args.object)
+                selection, _ = comani.node("SAM3_Detect", model=sam, image=image, conditioning=find,
+                                           threshold=0.5, refine_iterations=2, individual_masks=False)
+                alpha, alpha_inverse = comani.node(
+                    "AUSBOSS_NODES_RefineMask", mask=selection, expand=args.alpha_expand, blur=1.0,
+                    fill_holes=args.alpha_fill_holes, smooth=3, black_point=0.0,
+                    white_point=args.alpha_white_point,
+                    edge_refine="off", preview=False,
+                )
+                _, outside = comani.node(
+                    "AUSBOSS_NODES_RefineMask", mask=selection, expand=8, blur=0.0,
+                    fill_holes=True, smooth=3, black_point=0.0, white_point=1.0,
+                    edge_refine="off", preview=False,
+                )
+                black = comani.node("EmptyImage", width=64, height=64, batch_size=1, color=0)
+                foreground = comani.node("ImageCompositeMasked", destination=image, source=black,
+                                         mask=outside, x=0, y=0, resize_source=True)
+                # JoinImageWithAlpha uses ComfyUI's MASK convention: alpha=1 means transparent.
+                foreground = comani.node("JoinImageWithAlpha", image=foreground, alpha=alpha_inverse)
+                debug_masks = {}
+                if args.debug_images:
+                    debug_masks.update(selection=comani.node("MaskToImage", mask=selection),
+                                       alpha=comani.node("MaskToImage", mask=alpha))
+                await asyncio.gather(foreground, *debug_masks.values())
+                phases.append({"phase": "prepare_segment_cutout", "seconds": time.perf_counter() - started})
+                started = time.perf_counter()
+                positive, negative, latent = comani.node(
+                    "TextEncodeQwenImage21", clip=clip, vae=vae, prompt=prompt,
+                    negative_prompt="", resolution=0, **{"images.image_1": image},
+                )
+                blurred_source = comani.node("ImageBlur", image=image, blur_radius=15, sigma=5.0)
+                object_area, _ = comani.node(
+                    "AUSBOSS_NODES_RefineMask", mask=selection, expand=40, blur=16.0,
+                    fill_holes=True, smooth=0, black_point=0.0, white_point=1.0,
+                    edge_refine="off", preview=False,
+                )
+                await asyncio.gather(positive, negative, latent, blurred_source, object_area)
+                phases.append({"phase": "prepare_encode_composite", "seconds": time.perf_counter() - started})
                 for index in range(args.count * args.repeat):
                     seed = args.seed + index // args.repeat
                     run_started = time.perf_counter()
                     run = {"index": index + 1, "seed": seed, "cache_repeat": index % args.repeat + 1, "phases": []}
                     report["runs"].append(run)
                     stages = run["phases"]
-                    started = time.perf_counter()
-                    find = comani.node("CLIPTextEncode", clip=sam_clip, text=args.object)
-                    selection, _ = comani.node("SAM3_Detect", model=sam, image=image, conditioning=find,
-                                               threshold=0.5, refine_iterations=2, individual_masks=False)
-                    alpha, alpha_inverse = comani.node(
-                        "AUSBOSS_NODES_RefineMask", mask=selection, expand=args.alpha_expand, blur=1.0,
-                        fill_holes=args.alpha_fill_holes, smooth=3, black_point=0.0,
-                        white_point=args.alpha_white_point,
-                        edge_refine="off", preview=False,
-                    )
-                    _, outside = comani.node(
-                        "AUSBOSS_NODES_RefineMask", mask=selection, expand=8, blur=0.0,
-                        fill_holes=True, smooth=3, black_point=0.0, white_point=1.0,
-                        edge_refine="off", preview=False,
-                    )
-                    black = comani.node("EmptyImage", width=64, height=64, batch_size=1, color=0)
-                    foreground = comani.node("ImageCompositeMasked", destination=image, source=black,
-                                             mask=outside, x=0, y=0, resize_source=True)
-                    # JoinImageWithAlpha uses ComfyUI's MASK convention: alpha=1 means transparent.
-                    foreground = comani.node("JoinImageWithAlpha", image=foreground, alpha=alpha_inverse)
-                    await foreground
-                    stages.append({"phase": "segment_cutout", "seconds": time.perf_counter() - started})
-                    started = time.perf_counter()
-                    positive, negative, latent = comani.node(
-                        "TextEncodeQwenImage21", clip=clip, vae=vae, prompt=prompt,
-                        negative_prompt="", resolution=0, **{"images.image_1": image},
-                    )
-                    await asyncio.gather(positive, negative, latent)
-                    stages.append({"phase": "encode", "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
                     sampled = comani.node(
                         "KSampler", model=model, positive=positive, negative=negative, latent_image=latent,
@@ -167,7 +181,6 @@ async def main(args):
                     stages.append({"phase": "decode", "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
                     # The original workflow also includes shadows/reflections in its change mask.
-                    blurred_source = comani.node("ImageBlur", image=image, blur_radius=15, sigma=5.0)
                     blurred_edit = comani.node("ImageBlur", image=generated, blur_radius=15, sigma=5.0)
                     difference1 = comani.node("ImageBlend", image1=blurred_source, image2=blurred_edit,
                                               blend_factor=1.0, blend_mode="difference")
@@ -183,11 +196,6 @@ async def main(args):
                         fill_holes=True, smooth=0, black_point=0.0, white_point=1.0,
                         edge_refine="off", preview=False,
                     )
-                    object_area, _ = comani.node(
-                        "AUSBOSS_NODES_RefineMask", mask=selection, expand=40, blur=16.0,
-                        fill_holes=True, smooth=0, black_point=0.0, white_point=1.0,
-                        edge_refine="off", preview=False,
-                    )
                     edit_mask = comani.node("MaskComposite", destination=changed_area, source=object_area,
                                            x=0, y=0, operation="add")
                     background = comani.node("ImageCompositeMasked", destination=image, source=generated,
@@ -196,10 +204,9 @@ async def main(args):
                     stages.append({"phase": "keep_rest", "seconds": time.perf_counter() - started})
                     outputs = {"foreground": foreground, "background": background}
                     if args.debug_images:
-                        outputs.update(source=image, generated=generated,
-                                       selection=comani.node("MaskToImage", mask=selection),
-                                       alpha=comani.node("MaskToImage", mask=alpha),
-                                       edit_mask=comani.node("MaskToImage", mask=edit_mask))
+                        outputs.update(source=image, generated=generated)
+                        outputs.update(debug_masks)
+                        outputs["edit_mask"] = comani.node("MaskToImage", mask=edit_mask)
                     for name, output in outputs.items():
                         started = time.perf_counter()
                         saved = comani.node("SaveImage", images=output,
@@ -214,7 +221,8 @@ async def main(args):
                                        "seconds": time.perf_counter() - started})
                         print(target, flush=True)
                     run["wall_seconds"] = time.perf_counter() - run_started
-                    run["cache_note"] = "--repeat reuses this seed; repeated time includes native cache reuse."
+                    run["cache_note"] = ("Fixed input/mask/conditioning prepared once; --repeat repeats this seed's "
+                                         "sampling and downstream work, including native cache reuse.")
             finally:
                 await comani.files.remove(uploaded)
     except Exception as error:
@@ -242,7 +250,8 @@ if __name__ == "__main__":
     parser.add_argument("--alpha-white-point", type=float, default=1.0,
                         help="foreground alpha white point; source default1.0")
     parser.add_argument("--count", type=int, default=1, help="new products at seed, seed+1, ...; models stay loaded")
-    parser.add_argument("--repeat", type=int, default=1, help="same-seed cache diagnostic per product; does not add products")
+    parser.add_argument("--repeat", type=int, default=1,
+                        help="same-seed sampling/downstream cache diagnostic; fixed preparation runs once")
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/qwen-cutout"))
     parser.add_argument("--debug-images", action="store_true")
     parser.add_argument("--download-models", action="store_true")

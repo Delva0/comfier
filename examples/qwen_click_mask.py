@@ -9,6 +9,8 @@ python examples/qwen_click_mask.py --input desk.png --point 400 300 \
     --prompt "Replace the cup with a glass of orange juice." --output-dir artifacts/click
 Add --download-models to acquire the four weights through the daemon.
 --output-dir is a root; each invocation creates and prints a new run-* subdirectory.
+The input, selection, crop, conditioning and masked latent are prepared once.
+--count changes seeds; --repeat repeats sampling and downstream work for a seed.
 """
 
 import argparse
@@ -107,36 +109,43 @@ async def main(args):
                 # Pixel coordinates refer to the uploaded image, without a browser or hover request.
                 touches = json.dumps({"v": 1, "items": [
                     {"t": "tap", "op": 1, "x": x, "y": y} for x, y in args.point]})
+                # Keep these Futures for this fixed input/selection/prompt. A new
+                # invocation prepares them again when any of those inputs change.
+                started = time.perf_counter()
+                mask, _cutout, _names = comani.node(
+                    "AUSBOSS_NODES_MaskByTouch", image=image, model=sam, clip=sam_clip,
+                    touches=touches, grow=16, soften=0.0, smooth=0, fill_holes=True,
+                    if_nothing="stop the run", free_vram=True, invert=False, ask="", fine_edges="off",
+                )
+                await mask
+                phases.append({"phase": "prepare_segment", "seconds": time.perf_counter() - started})
+                started = time.perf_counter()
+                crop, crop_mask, stitcher = comani.node(
+                    "AUSBOSS_NODES_CropForInpaint", image=image, mask=mask, context_factor=1.6,
+                    blend_pixels=8, output_multiple=32, target_megapixels=args.megapixels,
+                    rescale_algorithm="bicubic", keep_inside=True,
+                )
+                sample_mask = comani.node("GrowMask", mask=crop_mask, expand=8, tapered_corners=True)
+                positive, negative, _ = comani.node(
+                    "TextEncodeQwenImage21", clip=clip, vae=vae,
+                    prompt=args.prompt + " Keep everything else exactly the same.",
+                    negative_prompt="", resolution=0, **{"images.image_1": crop},
+                )
+                latent = comani.node("VAEEncode", pixels=crop, vae=vae)
+                latent = comani.node("SetLatentNoiseMask", samples=latent, mask=sample_mask)
+                debug_inputs = {}
+                if args.debug_images:
+                    debug_inputs.update(source=image, crop=crop,
+                                        selection=comani.node("MaskToImage", mask=mask),
+                                        sample_mask=comani.node("MaskToImage", mask=sample_mask))
+                await asyncio.gather(positive, negative, latent, *debug_inputs.values())
+                phases.append({"phase": "prepare_crop_encode", "seconds": time.perf_counter() - started})
                 for index in range(args.count * args.repeat):
                     seed = args.seed + index // args.repeat
                     run_started = time.perf_counter()
                     run = {"index": index + 1, "seed": seed, "cache_repeat": index % args.repeat + 1, "phases": []}
                     report["runs"].append(run)
                     stages = run["phases"]
-                    started = time.perf_counter()
-                    mask, _cutout, _names = comani.node(
-                        "AUSBOSS_NODES_MaskByTouch", image=image, model=sam, clip=sam_clip,
-                        touches=touches, grow=16, soften=0.0, smooth=0, fill_holes=True,
-                        if_nothing="stop the run", free_vram=True, invert=False, ask="", fine_edges="off",
-                    )
-                    await mask
-                    stages.append({"phase": "segment", "seconds": time.perf_counter() - started})
-                    started = time.perf_counter()
-                    crop, crop_mask, stitcher = comani.node(
-                        "AUSBOSS_NODES_CropForInpaint", image=image, mask=mask, context_factor=1.6,
-                        blend_pixels=8, output_multiple=32, target_megapixels=args.megapixels,
-                        rescale_algorithm="bicubic", keep_inside=True,
-                    )
-                    sample_mask = comani.node("GrowMask", mask=crop_mask, expand=8, tapered_corners=True)
-                    positive, negative, _ = comani.node(
-                        "TextEncodeQwenImage21", clip=clip, vae=vae,
-                        prompt=args.prompt + " Keep everything else exactly the same.",
-                        negative_prompt="", resolution=0, **{"images.image_1": crop},
-                    )
-                    latent = comani.node("VAEEncode", pixels=crop, vae=vae)
-                    latent = comani.node("SetLatentNoiseMask", samples=latent, mask=sample_mask)
-                    await asyncio.gather(positive, negative, latent)
-                    stages.append({"phase": "crop_encode", "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
                     sampled = comani.node(
                         "KSampler", model=model, positive=positive, negative=negative,
@@ -156,10 +165,8 @@ async def main(args):
                     stages.append({"phase": "stitch", "seconds": time.perf_counter() - started})
                     outputs = {"edited": edited}
                     if args.debug_images:
-                        outputs.update(source=image, crop=crop,
-                                       selection=comani.node("MaskToImage", mask=mask),
-                                       sample_mask=comani.node("MaskToImage", mask=sample_mask),
-                                       blend_mask=comani.node("MaskToImage", mask=blend))
+                        outputs.update(debug_inputs)
+                        outputs["blend_mask"] = comani.node("MaskToImage", mask=blend)
                     for name, output in outputs.items():
                         started = time.perf_counter()
                         saved = comani.node("SaveImage", images=output,
@@ -174,7 +181,8 @@ async def main(args):
                                        "seconds": time.perf_counter() - started})
                         print(target, flush=True)
                     run["wall_seconds"] = time.perf_counter() - run_started
-                    run["cache_note"] = "--repeat reuses this seed; repeated time includes native cache reuse."
+                    run["cache_note"] = ("Fixed input/mask/conditioning prepared once; --repeat repeats this seed's "
+                                         "sampling and downstream work, including native cache reuse.")
             finally:
                 await comani.files.remove(uploaded)
     except Exception as error:
@@ -194,7 +202,8 @@ if __name__ == "__main__":
     parser.add_argument("--steps", type=int, default=25)
     parser.add_argument("--megapixels", type=float, default=1.5)
     parser.add_argument("--count", type=int, default=1, help="new products at seed, seed+1, ...; models stay loaded")
-    parser.add_argument("--repeat", type=int, default=1, help="same-seed cache diagnostic per product; does not add products")
+    parser.add_argument("--repeat", type=int, default=1,
+                        help="same-seed sampling/downstream cache diagnostic; fixed preparation runs once")
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/qwen-click-mask"))
     parser.add_argument("--debug-images", action="store_true")
     parser.add_argument("--download-models", action="store_true")
