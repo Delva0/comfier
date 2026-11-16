@@ -49,6 +49,8 @@ Provider→daemon 断流与 SDK→daemon 断流不同：SDK 恢复观察同一�
 
 有上游 SHA 必须匹配；只有本地 digest 时不声称经过上游摘要认证。`reuse=True` 也实际核对现有文件内容/身份，不仅凭名字或 size 跳过。发布采用 files 的路径、root、shadow 与 create-only 规则，并使 native filename-list cache 失效；不表示模型已经加载。
 
+单文件下载和 `snapshot(publish="files")` 的获取结果在私有、daemon 所有且独占的 staging 中完成内容校验。同文件系统发布直接以原子 create-only hard link 采用该 inode，再移除 stage 名字，不再复制整份 payload。只有实际 `EXDEV` 才回退到有界复制，先检查目标空间，并独立核对复制后的完整 SHA256；其他 link 错误不通过复制绕过。取消会等待活动磁盘工作收尾；若已经越过发布点，结果保留已发布文件的 metadata。
+
 ## HF manifest 与 snapshot
 
 ```python
@@ -78,6 +80,8 @@ H3 的 UNET、text encoder、VAE 可能来自不同 provider 和不同 roots，�
 
 ## 磁盘与限额
 
-默认 `max_file_bytes=None` 不添加任意单文件上限；实例可显式配置单文件 policy。snapshot 的 `max_total_bytes=None` 是独立的可选总 staging 限额，不把单文件限额当总额，也没有隐藏的 64 GiB 上限。已知大小先检查实际可用磁盘；途中 ENOSPC 报 DiskFull。上游缓存、staging、模型最终目录及跨文件系统复制仍可能同时占磁盘，成功不能由供应商磁盘报价推定。
+默认 `max_file_bytes=None` 不添加任意单文件上限；实例可显式配置单文件 policy。snapshot 的 `max_total_bytes=None` 是独立的可选总 staging 限额，不把单文件限额当总额，也没有隐藏的 64 GiB 上限。已知大小先检查实际可用磁盘；途中 ENOSPC 报 DiskFull。同文件系统的上述发布不再分配第二份 payload；跨文件系统仍需完整目标空间。HF Hub 等引擎自身的 acquisition cache 与 payload 峰值没有因此消失，成功不能由供应商磁盘报价推定。
+
+stage 身份、revision、独占 link 和私有目录检查遵循 [文件 I/O](files.md) 的既有权限边界，不隔离具有 daemon 同等文件权限的恶意 writer。revision 不是内容快照；不能据此声称拒绝同 UID 的所有同长度改写。实际低空间、普通磁盘大模型及保留反例的验收归属见 [管理验收](../management_acceptance.md)。
 
 根目录来自实际 folder_paths。运行时观测 live；停机用 last-observed；冷启动可由不导入 Torch/插件的路径 helper 发现原生路径配置。插件运行时注册的未知 category 不能凭空构造。配置变化需要重新发现，发布前检查 generation；稳定未变的 root tuple 保持稳定 ID。详细边界见 [文件 I/O](files.md)。

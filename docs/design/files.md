@@ -60,6 +60,8 @@ model = remote.node("UNETLoader", unet_name=model_file.native_name, weight_dtype
 
 HTTP 上传和下载按 1 MiB chunk 读取文件；磁盘操作放到 I/O executor。正常成功路径单遍读取并计算 SHA256，不无条件预哈希、不整文件缓冲。上传验证大小与内容后，将同目录 `.part` 原子发布。create-only 发布需要同文件系统 hard link，否则报 `UnsupportedFileSystem`。已存在文件不会因上传失败被覆盖。
 
+模型获取还有一个内部的已核验 stage 发布路径：私有、daemon 所有且独占的 stage 在同文件系统上直接 hard link 到 create-only 目标，完成后移除 stage 名字；实际 `EXDEV` 才使用有界复制并重新核对 SHA256。这个内部证明对象不接受任意外部 stage 路径，也没有新增公共 RPC 文件选择器。它消除模型发布的第二份整文件分配，不改变上述客户端 upload 的提交规则；跨文件系统空间和 HF acquisition cache 仍需另行计算，见 [模型设计](models.md)。
+
 下载在服务端单遍读取并计算 SHA256，客户端验证长度、SHA256 和完整结束事实后才发布本地目标。默认 hard link create-only；`overwrite=True` 用原子 replace。源文件 revision 在打开和读取结束时检查；传入已有 RemoteFile 还核对其 revision 和已知 SHA256。revision 是 device/inode/size/mtime/ctime 的乐观变化检测，不是强快照或对具有同等文件权限的并发写入者的隔离。
 
 `RuntimeConfig.max_file_bytes=None` 默认不添加任意大小限额，可通过显式 config/CLI/API 设置；握手 file_limits 公布有效 policy。模型 snapshot 的 max_total_bytes 是独立总 staging 限额，见 [模型设计](models.md)。实际磁盘和网络约束仍适用。

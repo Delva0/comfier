@@ -341,9 +341,12 @@ class NativeRuntime:
         return node_id, slot
 
     def _port_ref(self, state, port):
-        node_id, slot = self._port(state, *port)
+        try:
+            node_id, slot = self._port(state, *port)
+        except (IndexError, KeyError):
+            return None
         result = state.node_results.get(node_id)
-        return result["outputs"][slot] if result is not None else None
+        return result["outputs"][slot] if result is not None and slot < len(result["outputs"]) else None
 
     def _release_dependencies(self, state):
         if state.dependencies_released:

@@ -40,8 +40,8 @@ Comani 用一个 Python 入口管理远端实例并调用原生 ComfyUI。管理
 
 ## 当前边界与证据
 
-管理、恢复、模型与文件续传已在源码中实现；源码实现、作者回归、独立验收和最终 wheel 身份是不同事实。当前未提交整合版不能借用旧 wheel 的认证。新独立 CPU/故障及 GPU/WAN 验收应明确记录自身代码和构建身份。
+管理、恢复、模型与文件续传已在源码中实现；源码实现、作者回归、独立验收和最终 wheel 身份是不同事实。[本轮管理验收](../management_acceptance.md) 按已测候选分别记录独立 CPU、stage 发布、GPU/WAN 和性能证据，不把其后的未定 API 工作区改动归入已测 wheel。
 
-历史资料保持原有结果：`64a73a6e…` 的 [启动与保活报告](../../tests/acceptance/HEARTBEAT_REPORT.md)、[压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)、[GPU/H3 远端报告](../remote_acceptance.md) 及 [files/binary/LZ4 性能记录](../performance.md)。原来的失败与资源限制仍按各报告解读；改写后的示例尚未因此获得新的 GPU 数值证明。
+历史资料保持原有结果：`64a73a6e…` 的 [启动与保活报告](../../tests/acceptance/HEARTBEAT_REPORT.md)、[压力报告](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md)、[GPU/H3 远端报告](../remote_acceptance.md) 及 [files/binary/LZ4 性能记录](../performance.md)。原来的失败与资源限制仍按各报告解读；本轮实际执行的冻结示例、图片和新性能结果另列于管理验收，不能替换历史归属。
 
 本轮不扩充旧的 39 项 CLI 候选，不建立通用调度器/DSL、历史任务数据库、跨 daemon 崩溃 exactly-once 或隐式环境修复。必要 CLI 仅用于启动管理 daemon 与计算桥接；使用管理 API 完成实例内的工作。

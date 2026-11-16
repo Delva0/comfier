@@ -1,0 +1,836 @@
+{
+  "schema_version": 1,
+  "record_date": "2026-11-16",
+  "date_timezone": "Asia/Shanghai",
+  "status": "TESTED_MANAGEMENT_CANDIDATE_RECORD_FINAL_RELEASE_PENDING",
+  "scope": "R01-R25 management, recovery, files/LZ4, rewritten examples and root-to-cli-to-daemon entry structure across three attributed candidate stages. Stable product39 matches the cleanup wheel; deferred API research is archived outside that product scope.",
+  "excluded": {
+    "optional_CLI_expansions": 39,
+    "node_return_API": "Deferred research and unaccepted API payload archived outside the stable product tree. Actual-result shaping or declaration-count checks have no final accepted product implementation. These tested candidates retain Call/.output() behavior.",
+    "output_count_parameters_or_new_wrapper_types": "No N/indices/expected_count/expected_outputs or new Outputs/Completion delivery is claimed."
+  },
+  "tested_generations": {
+    "baseline": {
+      "checkpoint_commit": "a9c3bf9999ee38e3c2d586451b04650749044df6",
+      "wheel_sha256": "f766394cb4598d76046f1dae8d55857076feb4013d60964cbf8821a4ecd55fdb",
+      "source_manifest_sha256": "a6dfaede5c4673ac3ed979be93365e4f82ba7d13871a352ed2ffd7191623624a",
+      "production_scope_sha256": "4b748debb83db3053368aa84fd676c2a88892a94218ffccb85e31f19c44838c4"
+    },
+    "stage_publication": {
+      "wheel_sha256": "d97194297dbf0e3e4c5ba75cce9d962a1377b19b67c0cd580ffcef8c5dec1d2c",
+      "source_manifest_sha256": "d7b9ed838534351113a32e1d3333c8f8e4a11c69e6f302ace4e38e2bb46409e8",
+      "manifest_files": 202,
+      "package_python_files": 39,
+      "changed_product_sha256": {
+        "src/comani/daemon/files.py": "3c2c1b27ae1af4e22c9157dd3f038c4d19acceaffd7772a514f12e1b6f3a76e4",
+        "src/comani/daemon/management/models.py": "e7cf0e3d2a512f67658928c3376510d1d85e552de8a9cfa9ee9aece3fae29dcc"
+      }
+    },
+    "missing_output_cleanup": {
+      "wheel_sha256": "1b1701ef4937647a32def481f73c7117afe334a7fed0fe202129a02577d599f0",
+      "based_on_wheel_sha256": "d97194297dbf0e3e4c5ba75cce9d962a1377b19b67c0cd580ffcef8c5dec1d2c",
+      "product_python_manifest_sha256": "912ac792713a7db18aa9d393497b2c89017fb7d54eae20a6f71e94f7ed7aebc6",
+      "package_python_files": 39,
+      "only_product_change_from_stage": "src/comani/daemon/service.py",
+      "service_sha256": "2f5292c0b70699769f08140ed677bf606c8443a1243ce821bc4145592b31ac0e",
+      "new_regression_test": "tests/unit/test_missing_output_cleanup.py",
+      "new_regression_test_sha256": "e995374a894d791c296d45c9e3d8b3ccf2d3b10cf01044fe08956a3120550453",
+      "METADATA_and_entrypoints_equal_stage_candidate": true
+    },
+    "current_worktree_is_stage_candidate": false,
+    "current_stable_product_39_modules_match_cleanup_wheel": true,
+    "unaccepted_API_payload_isolated_not_cancelled_or_delivered": true,
+    "README_sha256_in_tested_METADATA": "2f3ff5f85741441130e2fbc842a1d92409f508ac0fef505744bbf33fc462cabb"
+  },
+  "local_acceptance": {
+    "baseline_CPU": {
+      "passed": 409,
+      "GPU_deselected": 2,
+      "seconds": 158.09,
+      "wheel_sha256": "f766394cb4598d76046f1dae8d55857076feb4013d60964cbf8821a4ecd55fdb"
+    },
+    "baseline_policy": {
+      "independent_groups_passed": 7,
+      "generation": "baseline production scope; not claimed rerun on stage candidate"
+    },
+    "stage_CPU": {
+      "passed": 431,
+      "GPU_deselected": 2,
+      "seconds": 162.39,
+      "ruff": "PASS",
+      "wheel_identity_and_original_offline_graph_tests_included": true,
+      "wheel_sha256": "d97194297dbf0e3e4c5ba75cce9d962a1377b19b67c0cd580ffcef8c5dec1d2c"
+    },
+    "missing_output_cleanup": {
+      "status": "SCOPED_INDEPENDENT_LOCAL_GATE_PASS",
+      "wheel_sha256": "1b1701ef4937647a32def481f73c7117afe334a7fed0fe202129a02577d599f0",
+      "baseline_expected_native_defect_observations": 10,
+      "fixed_real_native_checks": 26,
+      "focused_passed": 78,
+      "complete_CPU_passed": 441,
+      "GPU_deselected": 2,
+      "skipped": 0,
+      "full_CPU_seconds": 186.19113471299988,
+      "ruff": "PASS for changed service file and new independent regression test",
+      "source_wheel_isolated_install_identity": true,
+      "native_consumer_original_error_preserved": true,
+      "missing_output_does_not_skip_other_dependency_cleanup": true,
+      "candidate_background_unhandled_exceptions": 0,
+      "candidate_sessions_calls_entries_requests_submissions_tokens_zero": true,
+      "owned_runtime_worker_sweeper_thread_pool_closed": true,
+      "new_GPU_WAN_model_inference_or_performance_acceptance": false
+    },
+    "stage_publication": {
+      "status": "LOCAL_GATE_PASS_WITH_EXISTING_TRUST_BOUNDARY",
+      "private_tmpfs_bytes": 16777216,
+      "payload_bytes": 8388608,
+      "available_bytes": 1048576,
+      "same_inode_and_blocks": true,
+      "publication_payload_reads": 0,
+      "Upload_payload_writes": 0,
+      "real_EXDEV_copy_SHA_and_space_rejection": true,
+      "cancellation_drained": true,
+      "HTTP_download_and_files_snapshot": true,
+      "actual_native_filename_cache_invalidated": true
+    },
+    "attribution": "Provider/Manager/Git/bootstrap/policy results retained from baseline where relevant module hashes match. Earlier independent recovery is source-stage evidence, not all rerun on the stage wheel.",
+    "examples": {
+      "AST_checks": 6,
+      "CLI_help_checks": 5,
+      "pure_source_helper": 1,
+      "basic_real_CPU": true,
+      "H3_real_GPU": "separate final GPU evidence; not a numerical certification of every example"
+    }
+  },
+  "GPU": {
+    "status": "SCOPED_REMOTE_CHECKS_PASS_WITH_EXPLICIT_LIMITATIONS",
+    "final_report_sha256": "0f528a12f60a593d25fcc2cf74eaf8685ba1d746e99c0492e0ee7ef9715215fa",
+    "final_report_created_UTC": "2026-11-15T17:17:45.358073+00:00",
+    "wheel_sha256": "d97194297dbf0e3e4c5ba75cce9d962a1377b19b67c0cd580ffcef8c5dec1d2c",
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "torch": "2.10.0+cu130",
+    "ComfyUI_commit": "eee59185ff4f43ae2d9ad122b245619d27d9daad",
+    "ordinary_disk": {
+      "advertised_GiB": 60,
+      "Civitai_model_id": 3045867,
+      "Civitai_version_id": 3462708,
+      "Civitai_file_id": 3365259,
+      "size": 20979337386,
+      "sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8",
+      "same_acquisition_and_target_inode": true,
+      "minimum_available_bytes": 17420972032,
+      "minimum_free_below_one_more_payload": true
+    },
+    "H3": {
+      "seed": 426190,
+      "width": 2048,
+      "height": 2048,
+      "steps": 6,
+      "modes": [
+        "eager",
+        "captured_graph",
+        "native_api"
+      ],
+      "all_modes_exact_decoded_pixels_equal": true,
+      "exact_pixels_equal_baseline_same_seed": true,
+      "decoded_pixel_sha256": "fc5b595e40fb195f426d4817c38226fca815b819bbe34ae0aaf7bdfe20d12280"
+    },
+    "models": [
+      {
+        "filename": "minimax_H3_image_pruned_INT8.safetensors",
+        "size": 20979337386,
+        "sha256": "4647bdf553a32aa4ae55d9eb28322be42d32611d333c19a097d2845ae8a9b7a8"
+      },
+      {
+        "filename": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "size": 15687142551,
+        "sha256": "35a88d51044231fe332301d7a62aa81e3f2cba62febeb446e2c1e3e0ef76f2c6"
+      },
+      {
+        "filename": "minimax_h3_image_vae_fp16.safetensors",
+        "size": 1168505312,
+        "sha256": "d80e9c2e5cfc9844869961ff5a58c9a9e52182df6bfb30b26018dd7f348721af"
+      }
+    ],
+    "baseline_GPU_assertions": {
+      "wheel_sha256": "f766394cb4598d76046f1dae8d55857076feb4013d60964cbf8821a4ecd55fdb",
+      "passed": 2,
+      "skipped": 1,
+      "seconds": 113.37,
+      "passed_scope": [
+        "Original real-CUDA node-to-Python-to-node native parity test",
+        "Independently adapted H3 public pipeline eager/native exact float parity: CPU float32 shape [1,2048,2048,3], max absolute error 0"
+      ],
+      "skipped_scope": "Original generic CheckpointLoader GPU test lacked a compatible monolithic checkpoint fixture; separated H3 weights are not that fixture",
+      "all_original_GPU_tests_passed": false,
+      "freshly_repeated_on_stage_candidate": false
+    },
+    "stage_direct_checks": {
+      "manager_target_worker_exact_Python_modules": 39,
+      "client_and_manager_Torch_free": true,
+      "manager_libtorch_mappings": false,
+      "ordinary_disk_21GB_publication": true,
+      "new_native_PNG_modes": 3,
+      "management_survived_worker_stop": true,
+      "all_baseline_faults_repeated": false
+    },
+    "deployment": {
+      "official_template_id": 325864,
+      "image_tag": "vastai/comfy:v0.44.0-cuda-13.2-py312",
+      "immutable_image_digest_exposed": false,
+      "Python": "3.12.15",
+      "driver": "595.99.02",
+      "CPU": "AMD EPYC 7702",
+      "reserve_vram_GiB": 4,
+      "custom_nodes": true,
+      "new_plugin_lifecycle_certification": false
+    }
+  },
+  "WAN": {
+    "wheel_sha256": "f766394cb4598d76046f1dae8d55857076feb4013d60964cbf8821a4ecd55fdb",
+    "status": "SCOPED_CONTROLLED_FAULT_CHECKS_PASS",
+    "fault_scope": "Controlled forwarding proxy broke socket forwarding for 2 seconds on the real remote HTTPS WAN path; not a global host NIC outage or mid-sampler GPU-kernel interruption",
+    "management_operation_effect_count": 1,
+    "fresh_Client_reattached_same_operation": true,
+    "compute_call_effect_count": 1,
+    "compute_scope": "Source Python call with 5 seconds of native-worker work",
+    "file_bytes": 8388608,
+    "file_sha256": "a6dde2cafbec0c2ab8a832edbbc00508efe66a4325de21d74c91c1c208de03de",
+    "upload": {
+      "same_transfer_identity": true,
+      "server_confirmed_resume_offset": 0,
+      "exact_final_SHA": true,
+      "nonzero_prefix_recovery_proven": false,
+      "seconds": 10.016366880001442
+    },
+    "download": {
+      "same_transfer_identity": true,
+      "nonzero_Range_206_resume": true,
+      "exact_final_SHA": true,
+      "seconds": 9.359026530997653
+    },
+    "restart_old_ref_expired": true,
+    "three_model_reuses_content_verified": true,
+    "all_faults_freshly_repeated_on_stage_candidate": false
+  },
+  "performance": {
+    "wheel_sha256": "f766394cb4598d76046f1dae8d55857076feb4013d60964cbf8821a4ecd55fdb",
+    "independent_review": "offline review of actual GPU-agent measurements; reviewer did not rerun GPU",
+    "conditions": {
+      "warmup_seed": 501000,
+      "new_seeds": [
+        501001,
+        501002
+      ],
+      "width": 2048,
+      "height": 2048,
+      "steps": 6,
+      "reserve_vram_GiB": 4,
+      "custom_nodes": true,
+      "model_files_already_present": true,
+      "OS_driver_JIT_cache_cleared": false,
+      "fresh_worker_is_not_cold_disk": true,
+      "baseline_workspace_used_tmpfs_workaround": true,
+      "mode_blocks_randomized": false
+    },
+    "no_observer_samples": [
+      {
+        "mode": "eager",
+        "fresh_worker_ready_s": 100.702792,
+        "new_seed_rows": [
+          {
+            "compute_ready_seconds": 6.571646,
+            "save_seconds": 1.2376,
+            "stat_seconds": 0.265955,
+            "download_seconds": 2.436063,
+            "total_seconds": 10.653521,
+            "seed": 501001
+          },
+          {
+            "compute_ready_seconds": 7.028185,
+            "save_seconds": 1.186592,
+            "stat_seconds": 0.283608,
+            "download_seconds": 1.881501,
+            "total_seconds": 10.510886,
+            "seed": 501002
+          }
+        ],
+        "threads": [
+          255,
+          128
+        ]
+      },
+      {
+        "mode": "captured_graph",
+        "fresh_worker_ready_s": 111.676949,
+        "new_seed_rows": [
+          {
+            "compute_ready_seconds": 5.112366,
+            "save_seconds": 1.278349,
+            "stat_seconds": 0.567762,
+            "download_seconds": 6.861062,
+            "total_seconds": 13.950602,
+            "seed": 501001
+          },
+          {
+            "compute_ready_seconds": 4.450621,
+            "save_seconds": 1.220801,
+            "stat_seconds": 0.28134,
+            "download_seconds": 5.108316,
+            "total_seconds": 11.199364,
+            "seed": 501002
+          }
+        ],
+        "threads": [
+          255,
+          128
+        ]
+      },
+      {
+        "mode": "native_api",
+        "fresh_worker_ready_s": 116.79368,
+        "new_seed_rows": [
+          {
+            "compute_ready_seconds": 4.712176,
+            "save_seconds": 1.4111,
+            "stat_seconds": 0.28297,
+            "download_seconds": 2.916378,
+            "total_seconds": 9.451197,
+            "seed": 501001
+          },
+          {
+            "compute_ready_seconds": 4.281452,
+            "save_seconds": 1.408438,
+            "stat_seconds": 0.539389,
+            "download_seconds": 3.203258,
+            "total_seconds": 9.569062,
+            "seed": 501002
+          }
+        ],
+        "threads": [
+          255,
+          128
+        ]
+      }
+    ],
+    "observed_hot_eager_vs_capture": {
+      "sample_count_each": 1,
+      "runtime_observer_adds_gpu_sync": false,
+      "client_ready_delta_s": 2.501317,
+      "node_wall_deltas_s": {
+        "ConditioningZeroOut": 0.014985,
+        "KSampler": 0.956446,
+        "MiniMaxH3ImageConditioning": 1.516939,
+        "VAEDecode": 0.013644
+      },
+      "node_wall_delta_sum_s": 2.502014,
+      "interpretation": "Accounting from separate observed fresh-worker blocks, not pure SDK/RPC overhead or isolated GPU kernel timings."
+    },
+    "thread32_no_observer_samples": [
+      {
+        "repeat": 0,
+        "before": {
+          "intraop": 255,
+          "interop": 128
+        },
+        "after": {
+          "intraop": 32,
+          "interop": 32
+        },
+        "affinity_count": 255,
+        "fresh_worker_ready_s": 36.726782,
+        "hot_ready_s": [
+          5.763967,
+          4.594285
+        ]
+      },
+      {
+        "repeat": 1,
+        "before": {
+          "intraop": 255,
+          "interop": 128
+        },
+        "after": {
+          "intraop": 32,
+          "interop": 32
+        },
+        "affinity_count": 255,
+        "fresh_worker_ready_s": 32.196586,
+        "hot_ready_s": [
+          4.717592,
+          4.642612
+        ]
+      }
+    ],
+    "separate_cold_profiles": {
+      "default": {
+        "ready_s": 114.921048,
+        "nodes": [
+          {
+            "label": "VAELoader",
+            "seconds": 3.802096,
+            "cpu_seconds": 114.488644,
+            "forwards": 0
+          },
+          {
+            "label": "CLIPLoader",
+            "seconds": 32.142261,
+            "cpu_seconds": 968.826654,
+            "forwards": 0
+          },
+          {
+            "label": "MiniMaxH3ImageConditioning",
+            "seconds": 48.090985,
+            "cpu_seconds": 1438.672429,
+            "forwards": 0
+          },
+          {
+            "label": "ConditioningZeroOut",
+            "seconds": 0.004676,
+            "cpu_seconds": 0.858611,
+            "forwards": 0
+          },
+          {
+            "label": "UNETLoader",
+            "seconds": 4.775901,
+            "cpu_seconds": 144.63394,
+            "forwards": 0
+          },
+          {
+            "label": "KSampler",
+            "seconds": 20.183032,
+            "cpu_seconds": 325.681607,
+            "forwards": 6
+          },
+          {
+            "label": "VAEDecode",
+            "seconds": 1.900224,
+            "cpu_seconds": 8.410223,
+            "forwards": 0
+          }
+        ]
+      },
+      "32_32": {
+        "ready_s": 30.084106,
+        "nodes": [
+          {
+            "label": "VAELoader",
+            "seconds": 0.293761,
+            "cpu_seconds": 6.864427,
+            "forwards": 0
+          },
+          {
+            "label": "CLIPLoader",
+            "seconds": 0.831446,
+            "cpu_seconds": 8.998441,
+            "forwards": 0
+          },
+          {
+            "label": "MiniMaxH3ImageConditioning",
+            "seconds": 9.482565,
+            "cpu_seconds": 118.675393,
+            "forwards": 0
+          },
+          {
+            "label": "ConditioningZeroOut",
+            "seconds": 0.000562,
+            "cpu_seconds": 0.000863,
+            "forwards": 0
+          },
+          {
+            "label": "UNETLoader",
+            "seconds": 0.145776,
+            "cpu_seconds": 3.232073,
+            "forwards": 0
+          },
+          {
+            "label": "KSampler",
+            "seconds": 15.779228,
+            "cpu_seconds": 83.485951,
+            "forwards": 6
+          },
+          {
+            "label": "VAEDecode",
+            "seconds": 2.133483,
+            "cpu_seconds": 3.889373,
+            "forwards": 0
+          }
+        ]
+      }
+    },
+    "CPU_quota_cores": 30.6,
+    "pristine_Torch_intra_inter": [
+      255,
+      128
+    ],
+    "OMP_MKL_32_only_intra_inter": [
+      32,
+      128
+    ],
+    "dedicated_worker_thread_config_in_tested_wheel": false,
+    "PNG_download": {
+      "bytes": 4870305,
+      "samples": [
+        {
+          "total_s": 7.167314,
+          "http_requests": 4,
+          "data_headers_s": 0.774051,
+          "data_application_read_span_s": 5.183844,
+          "other_http_headers_sum_s": 1.191734
+        },
+        {
+          "total_s": 4.585244,
+          "http_requests": 4,
+          "data_headers_s": 0.507615,
+          "data_application_read_span_s": 3.154444,
+          "other_http_headers_sum_s": 0.910145
+        }
+      ],
+      "loopback_download_s": 0.034818,
+      "loopback_stat_s": 0.005387,
+      "boundary": "SDK HTTP headers and application body-read boundaries; not packet capture or physical wire bytes"
+    },
+    "not_established": [
+      "Exact root cause of historical 150-second run",
+      "Universal optimum thread count",
+      "Stable hot throughput improvement from 32/32",
+      "Pure Comani tax versus separate official HTTP server",
+      "Reliable GPU utilization or peak VRAM from this observer",
+      "Stable LZ4 or max2 pipeline speedup",
+      "Cold disk performance or current d971 performance from f766 measurements"
+    ]
+  },
+  "public_reproduction": {
+    "API_generation": "Call/.output(); deferred node-return proposal is not required",
+    "script": "2026-11-16-h3/minimax_h3_remote.py",
+    "script_sha256": "63000339532ef98ccaac5cf78e88497fa1a7224810d29bd2a9ce1fa2f4543256",
+    "source_helper": "2026-11-16-h3/minimax_h3_source_ops.py",
+    "source_helper_sha256": "a1117d39027b0ee864c646a477323d8c3088f1248102f407b3e9823f71754693",
+    "image": "2026-11-16-h3/eager.png",
+    "image_sha256": "c837ea2c21879784695d206fd9f4b08fb21fd066ae86a589e4574317aaffc417"
+  },
+  "cleanup": {
+    "official_verification_UTC": "2026-11-15T17:08:56.791976+00:00",
+    "owned_instance_destroyed_and_absent": true,
+    "official_instance_count": 0,
+    "local_stage_QA_owned_daemons_alive": 0,
+    "local_rental_watchdog_exited": true,
+    "watchdog_exit_verified_UTC": "2026-11-15T17:09:27.283195+00:00",
+    "rental_created_UTC": "2026-11-15T15:38:06.916522+00:00",
+    "rental_lifetime_seconds_upper_bound": 5449.875454
+  },
+  "quoted_cost_estimate_not_invoice": {
+    "currency": "USD",
+    "hourly_offer": 0.4733333333333334,
+    "compute_duration_upper_bound": 0.7165576985814816,
+    "inbound_offer_rate_per_reported_GB": 0.028645833333333332,
+    "known_provider_payload_bytes": 79793660021,
+    "actual_invoice_obtained": false,
+    "limits": "Compute duration times quoted hourly rate is not total billed cost. Other image/tool traffic, framing, retries and invoice units/rounding are excluded. Lowest hourly GPU selection does not prove lowest total cost."
+  },
+  "requirements": [
+    {
+      "id": "R01",
+      "requirement": "Independent management and one runtime child",
+      "evidence": [
+        "deployment",
+        "policy"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R02",
+      "requirement": "Single endpoint and bounded compute proxy",
+      "evidence": [
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R03",
+      "requirement": "Management-only Client and lazy compute attach",
+      "evidence": [
+        "deployment",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R04",
+      "requirement": "Explicit lifecycle and maintenance",
+      "evidence": [
+        "policy",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R05",
+      "requirement": "Authenticated same-session/epoch recovery",
+      "evidence": [
+        "recovery",
+        "stage-local",
+        "GPU-final"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R06",
+      "requirement": "Stable call identity/digest/window dedup",
+      "evidence": [
+        "recovery",
+        "stage-local",
+        "GPU-final"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R07",
+      "requirement": "Keeper and offline release/close",
+      "evidence": [
+        "recovery",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R08",
+      "requirement": "One-hour configurable grace and finish/discard",
+      "evidence": [
+        "recovery",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R09",
+      "requirement": "Bounded sessions/objects/calls",
+      "evidence": [
+        "recovery",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R10",
+      "requirement": "Independent bounded Operations",
+      "evidence": [
+        "deployment",
+        "policy",
+        "recovery",
+        "GPU-final"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R11",
+      "requirement": "Independent bash",
+      "evidence": [
+        "deployment",
+        "policy"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R12",
+      "requirement": "Target interpreter/core/readback",
+      "evidence": [
+        "deployment",
+        "policy"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R13",
+      "requirement": "Registry and Git plugins",
+      "evidence": [
+        "deployment",
+        "policy"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R14",
+      "requirement": "Native roots and shared create-only files",
+      "evidence": [
+        "deployment",
+        "policy",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R15",
+      "requirement": "Provider resolution and exact file selection",
+      "evidence": [
+        "deployment",
+        "GPU-final"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R16",
+      "requirement": "Provider byte recovery/SHA/atomic publication",
+      "evidence": [
+        "provider-fault-reuse",
+        "stage-local",
+        "GPU-final"
+      ],
+      "state": "verified_with_attributed_candidate_scope_and_limits"
+    },
+    {
+      "id": "R17",
+      "requirement": "HF manifest/snapshot/transports/publication",
+      "evidence": [
+        "deployment",
+        "stage-local"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R18",
+      "requirement": "Client file byte resume",
+      "evidence": [
+        "deployment",
+        "recovery",
+        "stage-local",
+        "GPU-final"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R19",
+      "requirement": "Native eager/Python/graph/metadata",
+      "evidence": [
+        "stage-local",
+        "GPU-final",
+        "cleanup-independent",
+        "cleanup-integration"
+      ],
+      "state": "verified_with_attributed_candidate_scope_and_limits"
+    },
+    {
+      "id": "R20",
+      "requirement": "Necessary CLI structure",
+      "evidence": [
+        "deployment",
+        "policy"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R21",
+      "requirement": "All examples rewritten",
+      "evidence": [
+        "deployment",
+        "GPU-final"
+      ],
+      "state": "verified_with_attributed_candidate_scope_and_limits"
+    },
+    {
+      "id": "R22",
+      "requirement": "Independent aggregate acceptance",
+      "evidence": [
+        "stage-local",
+        "GPU-final",
+        "cleanup-independent",
+        "cleanup-integration"
+      ],
+      "state": "aggregate_final_delivery_pending"
+    },
+    {
+      "id": "R23",
+      "requirement": "Docs/freeze/installed identity/publication",
+      "evidence": [
+        "stage-identity",
+        "cleanup-gate",
+        "cleanup-integration"
+      ],
+      "state": "aggregate_final_delivery_pending"
+    },
+    {
+      "id": "R24",
+      "requirement": "Manager/target isolation and bridge",
+      "evidence": [
+        "deployment",
+        "policy",
+        "stage-identity"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    },
+    {
+      "id": "R25",
+      "requirement": "Single public command and dependency direction",
+      "evidence": [
+        "deployment",
+        "policy",
+        "stage-identity"
+      ],
+      "state": "implemented_and_locally_verified_in_reported_scope"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "deployment",
+      "sha256": "3535a01d5536b227c1217e8b8c6c5626a5e9853aff10b0e9353d5dab178954cd"
+    },
+    {
+      "id": "policy",
+      "sha256": "e4837acebfa4306b2c8dabd6fa427d30891ecbbb5dbbdee2a673e35250b28b57"
+    },
+    {
+      "id": "recovery",
+      "sha256": "5e390be94ff0bf454a4c63a457ea4a28e2644af94c0240f1b790fa2553ab59dc"
+    },
+    {
+      "id": "provider-fault-reuse",
+      "sha256": "cdbe1d59a0ecd49af048b2b50afe60a163b7576c88afe4cb6b87d0d4537f39b8"
+    },
+    {
+      "id": "stage-local",
+      "sha256": "c16340ca8bb0296f110b2f9d68bb5827e909d0ed29ccc1af165c8ebd19abb6a9"
+    },
+    {
+      "id": "stage-identity",
+      "sha256": "660c998f25168bab7f338b45eeebf9caea62b0bd682d7d090b24e52b5a276fec"
+    },
+    {
+      "id": "performance-independent-review",
+      "sha256": "53291f48d662695e8a2b85ea9e498c9e1dfbef0548835400051f4ab5e1f5dd8b"
+    },
+    {
+      "id": "performance-reviewed-summary",
+      "sha256": "597487ec525a1a975db41064985cdc613e17810ee0c54e6f4ef8c90ba2d0bb7b"
+    },
+    {
+      "id": "GPU-final",
+      "sha256": "0f528a12f60a593d25fcc2cf74eaf8685ba1d746e99c0492e0ee7ef9715215fa"
+    },
+    {
+      "id": "cleanup-independent",
+      "sha256": "d4b4e9899f610a21a53af58f6de4f456900bdfe401aee9c0f23654c0cd3ec458"
+    },
+    {
+      "id": "cleanup-gate",
+      "sha256": "a9f3fc617e0f5754b2396ea39e9699987c40f394249d1831510a62716fe46700"
+    },
+    {
+      "id": "cleanup-integration",
+      "sha256": "b70b7ee88b868f684862d7564011ff0f5cd4edc6c1c75a0ae3b21229bb25e303"
+    }
+  ],
+  "limits": [
+    "Same-UID arbitrary same-revision stage rewrite is not isolated; the failed independent counterexample is retained.",
+    "Cross-FS publication still allocates a complete target; HF acquisition cache peak is unchanged.",
+    "Actual filesystem validation is Linux/WSL, not Windows/NTFS certification.",
+    "Public provider metadata/small files, actual large artifact, and private/gated/LFS/Xet account coverage are separate facts.",
+    "Default offline grace is one hour; expiry probes used shortened grace.",
+    "No pip/script rollback, cross-daemon-crash durable exactly-once, universal root matrix, maximum-capacity or universal speedup certification."
+  ],
+  "remaining_release_gates": [
+    "Fresh independent review of cleanup-updated public documentation/artifacts and overall release scope",
+    "Final delivery tree/package freeze including documentation; stable product39 matches the cleanup wheel, while API research remains OPEN and archived",
+    "Authorized exact staging/commit/push and remote commit verification; R22/R23 and the API goal are not complete"
+  ],
+  "sanitization": "Explicit numeric/boolean/hash/name allowlist; no private endpoints, credentials, signed URLs, operation handles, raw logs, tensors or pickle payloads."
+}

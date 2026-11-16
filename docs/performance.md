@@ -1,3 +1,5 @@
+2026-11-16 范围说明：本页下文完整保留 2026-11-15 的历史候选、计时和失败记录。新的管理架构、普通磁盘 stage 发布、冻结 H3 脚本与 GPU/WAN 身份见 [管理验收](management_acceptance.md)，线程配置、冷热边界及 eager/capture 差值分析见 [本轮性能审阅](management_performance.md)。这些新记录不认证当前工作区中待定的输出 API。
+
 # 性能：计算、结果取回与持续生成
 
 2026-11-15 的最终实测结论是：**冻结候选的 files、兼容传输与真实 H3 生成通过；健康 RTX 4090 的热采样稳定，但 max-2 流水和 LZ4 均未证明稳定端到端提速。** 实际 HTTPS 入口的 gzip JSON 比 binary identity 和 LZ4 更小，不能把移除 base64 直接等同于节省 WAN 流量。

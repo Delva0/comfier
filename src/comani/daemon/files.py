@@ -10,6 +10,7 @@ from __future__ import annotations
 import errno
 import hashlib
 import os
+import shutil
 import stat
 import threading
 import uuid
@@ -112,6 +113,74 @@ def _unlink_owned(path, identity):
     if (value.st_dev, value.st_ino) != identity:
         raise FileChangedError("Refusing to remove a replaced transfer file")
     path.unlink()
+
+
+def _stage_owner(value, *, directory=False):
+    if callable(getattr(os, "getuid", None)):
+        if value.st_uid != os.getuid() or value.st_mode & (0o077 if directory else 0o022):
+            raise ValueError("Publication requires a private, daemon-owned staging directory and file")
+
+
+@dataclass(frozen=True)
+class VerifiedStage:
+    """Internal proof from a completed scan of one operation-owned stage file.
+
+    This is not a public file selector. Stage directories are private mkdtemp
+    directories, and cache symlinks/shared hard links cannot be adopted.
+    """
+
+    path: Path
+    revision: Revision
+    sha256: str
+    parent_identity: tuple[int, int]
+
+    @property
+    def size(self):
+        return self.revision.size
+
+    def check(self):
+        parent = _directory(self.path.parent).stat()
+        _stage_owner(parent, directory=True)
+        value = _regular(self.path)
+        _stage_owner(value)
+        if ((parent.st_dev, parent.st_ino) != self.parent_identity
+                or value.st_nlink != 1 or Revision.of(value) != self.revision):
+            raise FileChangedError("Verified staging file changed or is no longer exclusively owned")
+        return value
+
+
+def verify_staged(path, *, size=None, sha256=None, chunk_size=1024 * 1024):
+    """Hash a private regular stage once and bind its identity to that digest."""
+    path = Path(path).absolute()
+    parent = _directory(path.parent).stat()
+    _stage_owner(parent, directory=True)
+    before = _regular(path)
+    _stage_owner(before)
+    if before.st_nlink != 1:
+        raise ValueError("A stage file must have one exclusive link, not a shared cache inode")
+    if size is not None and (type(size) is not int or size < 0 or before.st_size != size):
+        raise ValueError("Staged file size does not match the verified acquisition")
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                         | getattr(os, "O_BINARY", 0))
+    with os.fdopen(descriptor, "rb") as stream:
+        revision = Revision.of(before)
+        if Revision.of(os.fstat(stream.fileno())) != revision:
+            raise FileChangedError("Staging file changed while opening it")
+        digest, received = hashlib.sha256(), 0
+        while chunk := stream.read(chunk_size):
+            received += len(chunk)
+            if received > before.st_size:
+                raise FileChangedError("Staging file grew during verification")
+            digest.update(chunk)
+        if (received != before.st_size or Revision.of(os.fstat(stream.fileno())) != revision
+                or Revision.of(_regular(path)) != revision):
+            raise FileChangedError("Staging file changed during verification")
+    actual = digest.hexdigest()
+    if sha256 is not None and actual != sha256:
+        raise ValueError("Staged file SHA256 does not match")
+    stage = VerifiedStage(path, revision, actual, (parent.st_dev, parent.st_ino))
+    stage.check()
+    return stage
 
 
 class FileStore:
@@ -242,6 +311,72 @@ class FileStore:
             for chunk in chunks:
                 upload.write(chunk)
             return upload.commit(sha256)
+
+    def publish_staged(self, root, relative_path, stage, *, cancel=None):
+        """Consume an internal verified stage, linking on its own filesystem.
+
+        EXDEV alone uses a bounded, independently SHA-verified copy after a
+        destination-space check. No RPC accepts this internal stage object.
+        """
+        if not isinstance(stage, VerifiedStage):
+            raise TypeError("Publication requires an internally verified stage")
+        if self.max_file_size is not None and stage.size > self.max_file_size:
+            raise ValueError("Declared file size exceeds the configured file limit")
+
+        def check_cancel():
+            if cancel is not None and cancel.is_set():
+                raise InterruptedError("Staged publication was cancelled before commit")
+
+        identity = stage.revision.device, stage.revision.inode
+        check_cancel()
+        stage.check()
+        descriptor = os.open(stage.path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+                             | getattr(os, "O_BINARY", 0))
+        with os.fdopen(descriptor, "rb") as source:
+            if Revision.of(os.fstat(source.fileno())) != stage.revision:
+                raise FileChangedError("Verified staging file changed while opening it")
+            os.fsync(source.fileno())
+            with self._lock:
+                self._conflicts(root, relative_path)
+                parent = self._parent(root, relative_path, create=True)
+                target = parent / _relative(relative_path)[-1]
+                stage.check()
+                check_cancel()
+                try:
+                    os.link(stage.path, target, follow_symlinks=False)
+                except OSError as error:
+                    if error.errno != errno.EXDEV:
+                        raise
+                else:
+                    try:
+                        value = _regular(target)
+                        # Adding/removing our link changes ctime, so compare
+                        # the content revision plus exact inode and link count.
+                        if ((value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns)
+                                != (stage.revision.device, stage.revision.inode,
+                                    stage.size, stage.revision.mtime_ns)
+                                or value.st_nlink != 2):
+                            raise FileChangedError("Staging file changed at publication")
+                        self._metadata(root, relative_path, stage.sha256, value)
+                        _unlink_owned(stage.path, identity)
+                        info = self._metadata(root, relative_path, stage.sha256, _regular(target))
+                    except BaseException:
+                        _unlink_owned(target, identity)
+                        raise
+                    self._invalidate(root)
+                    return info
+            # Do not hold the store lock during a cross-filesystem bulk copy.
+            if shutil.disk_usage(parent).free < stage.size:
+                raise OSError(errno.ENOSPC, "Insufficient destination space for cross-filesystem publication")
+            with self.begin_upload(root, relative_path, size=stage.size) as upload:
+                while chunk := source.read(self.chunk_size):
+                    check_cancel()
+                    upload.write(chunk)
+                stage.check()
+                check_cancel()
+                info = upload.commit(stage.sha256)
+            _unlink_owned(stage.path, identity)
+            return info
 
     def open_download(self, root, relative_path, *, checksum=True):
         with self._lock:

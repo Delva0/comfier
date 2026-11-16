@@ -11,6 +11,7 @@ import re
 import shutil
 import stat
 import tempfile
+import threading
 from pathlib import Path
 
 import aiohttp
@@ -18,19 +19,11 @@ import aiohttp
 from comani.files import _io
 
 from ..file_http import metadata_wire
-from ..files import Revision, _relative
+from ..files import Revision, _relative, verify_staged
 from .operations import ManagementError
 from .providers import provider_headers
 from .tools import python_metadata
 from .transports import external_download, select_transport
-
-
-def digest_file(path):
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        while chunk := stream.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def verify_git_blob(path, expected):
@@ -131,9 +124,10 @@ class ModelService:
                         if response.status == 416:
                             match = re.fullmatch(r"bytes \*/(\d+)", response.headers.get("Content-Range", ""))
                             if (expected_hash and match and offset == int(match[1])
-                                    and (known_total is None or offset == known_total)
-                                    and await asyncio.to_thread(digest_file, target) == expected_hash.lower()):
-                                return offset, expected_hash.lower(), "sha256"
+                                    and (known_total is None or offset == known_total)):
+                                stage = await _io(verify_staged, target, size=offset)
+                                if stage.sha256 == expected_hash.lower():
+                                    return stage, "sha256"
                             target.write_bytes(b"")
                             validator, known_total = None, expected_size
                             context.log("Range was not satisfiable; restarting and revalidating\n")
@@ -186,10 +180,10 @@ class ModelService:
                             raise aiohttp.ClientPayloadError("Incomplete range response")
                         if known_total is not None and received != known_total:
                             raise aiohttp.ClientPayloadError("Incomplete response")
-                        actual = await asyncio.to_thread(digest_file, target)
-                        if expected_hash and actual != expected_hash.lower():
+                        stage = await _io(verify_staged, target, size=received)
+                        if expected_hash and stage.sha256 != expected_hash.lower():
                             raise ManagementError("ChecksumMismatch", "Model SHA256 differs from the provider digest")
-                        return received, actual, "sha256" if expected_hash else None
+                        return stage, "sha256" if expected_hash else None
             except (aiohttp.ClientError, TimeoutError):
                 if attempt == 3:
                     raise ManagementError("ProviderDisconnected", "Provider transfer failed after bounded retries") from None
@@ -240,24 +234,15 @@ class ModelService:
             max_bytes = store.max_file_size
             if _max_bytes is not None:
                 max_bytes = _max_bytes if max_bytes is None else min(max_bytes, _max_bytes)
-            size, actual, verified, selected_transport = await self._acquire(
+            stage, verified, selected_transport = await self._acquire(
                 context, artifact, partial, max_bytes, transport, connections, timeout)
+            size, actual = stage.size, stage.sha256
             context.progress(phase="verifying", bytes=size, total=size)
             await self.supervisor.get_file_store()
             if generation != self.supervisor.roots_generation:
                 raise ManagementError("RootsChanged", "Native roots changed during acquisition; select the destination again")
-            upload = store.begin_upload(selected, path, size=size)
-            try:
-                self._space(selected.path, size)
-                with partial.open("rb") as source:
-                    while chunk := source.read(store.chunk_size):
-                        await _io(upload.write, chunk)
-                context.progress(phase="publishing", bytes=size, total=size)
-                # The final publication and recording are one event-loop turn;
-                # cancellation cannot publish a file yet report no result.
-                info = upload.commit(actual)
-            finally:
-                upload.abort()
+            context.progress(phase="publishing", bytes=size, total=size)
+            info = await self._publish_staged(store, selected, path, stage)
             result = {"file": metadata_wire(store, info), "artifact": artifact, "sha256": actual,
                       "verified_against": verified, "reused": False,
                       "native_visibility": "visible" if self.supervisor.state == "running" else "unknown",
@@ -278,6 +263,34 @@ class ModelService:
             if staging_directory is not None:
                 await _io(shutil.rmtree, staging_directory)
 
+    @staticmethod
+    async def _publish_staged(store, root, path, stage):
+        # Cross-filesystem copying remains cancellable between chunks. Always
+        # drain the worker; if atomic publication already won, record its result
+        # rather than report a cancelled operation with an unrecorded file.
+        stop, completed = threading.Event(), {}
+
+        def remember(info):
+            completed["info"] = info
+
+        worker = asyncio.create_task(_io(store.publish_staged, root, path, stage, cancel=stop,
+                                         _cancel_cleanup=remember))
+        cancelled = False
+        while True:
+            try:
+                return await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                stop.set()
+                cancelled = True
+                if worker.done():
+                    if "info" in completed:
+                        return completed["info"]
+                    raise
+            except InterruptedError:
+                if cancelled:
+                    raise asyncio.CancelledError from None
+                raise
+
     async def _acquire(self, context, artifact, target, max_bytes, transport, connections, timeout):
         hf_available = False
         if artifact.get("provider") == "huggingface" and transport in {"auto", "hf"}:
@@ -289,11 +302,12 @@ class ModelService:
         selected = select_transport(artifact, transport, hf_available=hf_available)
         context.progress(phase="downloading", transport=selected)
         if selected == "http":
-            size, actual, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
+            stage, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
             if artifact.get("git_sha1"):
                 await _io(verify_git_blob, target, artifact["git_sha1"])
                 verified = verified or "git-sha1"
-            return size, actual, verified, selected
+            stage.check()
+            return stage, verified, selected
         expected = artifact.get("sha256")
         if expected is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
             raise ManagementError("InvalidArgument", "Expected SHA256 must contain 64 hexadecimal characters")
@@ -310,13 +324,14 @@ class ModelService:
                 "reason": exc.code, "exit_code": exc.details.get("exit_code"),
                 "diagnostic": exc.details.get("diagnostic", "")})
             target.write_bytes(b"")
-            size, actual, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
+            stage, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
             if artifact.get("git_sha1"):
                 await _io(verify_git_blob, target, artifact["git_sha1"])
                 verified = verified or "git-sha1"
-            return size, actual, verified, "http"
-        size = target.stat().st_size
-        actual = await asyncio.to_thread(digest_file, target)
+            stage.check()
+            return stage, verified, "http"
+        stage = await _io(verify_staged, target)
+        size, actual = stage.size, stage.sha256
         if (max_bytes is not None and size > max_bytes) or (artifact.get("provider") != "civitai" and artifact.get("size") is not None and size != artifact["size"]):
             raise ManagementError("ArtifactChanged", "Downloaded bytes differ from the resolved length",
                                   {"actual_size": size, "expected_size": artifact.get("size")})
@@ -326,7 +341,8 @@ class ModelService:
         if artifact.get("git_sha1"):
             await _io(verify_git_blob, target, artifact["git_sha1"])
             verified = verified or "git-sha1"
-        return size, actual, verified, selected
+        stage.check()
+        return stage, verified, selected
 
     async def snapshot(self, context, *, manifest, root, path, publish, transport="auto",
                        connections=8, timeout=None, max_total_bytes=None):
@@ -415,16 +431,17 @@ class ModelService:
                     if max_total_bytes is not None:
                         remaining = max_total_bytes - total_bytes
                         max_bytes = remaining if max_bytes is None else min(max_bytes, remaining)
-                    size, actual, verified, engine = await self._acquire(
+                    stage, verified, engine = await self._acquire(
                         context, artifact, temporary, max_bytes, transport, connections, timeout)
                 finally:
                     self.resolver.release(artifact)
                 destination = tree / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
+                stage.check()
                 temporary.replace(destination)
                 await _io(shutil.rmtree, transfer_directory)
-                total_bytes += size
-                results.append({"relative_path": relative, "sha256": actual, "size": size,
+                total_bytes += stage.size
+                results.append({"relative_path": relative, "sha256": stage.sha256, "size": stage.size,
                                 "verified_against": verified, "transport": engine, "artifact": artifact})
                 context.partial(result)
             await self.supervisor.get_file_store()

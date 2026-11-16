@@ -6,8 +6,9 @@
 - [模型](design/models.md) 与 [文件 I/O](design/files.md)：远端解析、HF/Civitai/HTTP获取、snapshot发布、本地文件流和自动字节续传。
 - [SDK/graph](design/sdk.md)、[runtime](design/runtime.md)、[所有权](design/ownership.md)、[协议](design/protocol.md) 和 [Python artifacts](design/python-artifacts.md)。
 - [运行与开发](design/development.md)：管理启动、完整CPU示例和单一H3主入口，路径/版本/本地依赖明确选择。
+- [管理架构与恢复验收](management_acceptance.md)：本轮已测 wheel、stage 发布、GPU/WAN 与性能证据的精确归属，以及仍待完成的交付门。
 
-本轮管理/恢复/示例已在源码中实现，最终独立验收与wheel身份须使用对应的新证据。旧报告保留其实际成功/失败和构建身份：
+本轮管理/恢复/示例的独立结果按上述验收报告中的候选身份核对；它不认证其后工作区中的未定 API 改动。旧报告保留其实际成功/失败和构建身份：
 
 | 历史资料 | 范围 |
 | --- | --- |
