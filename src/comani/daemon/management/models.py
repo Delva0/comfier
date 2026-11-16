@@ -191,18 +191,40 @@ class ModelService:
                 await asyncio.sleep(min(0.25 * 2 ** attempt, 2))
         raise ManagementError("ProviderDisconnected", "Provider could not provide a verifiable complete file")
 
-    async def download(self, context, *, artifact, root, path=None, reuse=False, timeout=None,
+    @staticmethod
+    def _download_root(store, root, category, path):
+        if (root is None) == (category is None):
+            raise ManagementError("InvalidArgument", "Select exactly one native model root or category")
+        if category is not None:
+            if not isinstance(category, str) or not category:
+                raise ManagementError("InvalidArgument", "Expected a native model category")
+            try:
+                roots = store.roots(category=category)
+            except (KeyError, ValueError):
+                raise ManagementError("InvalidArgument", "Unknown or unavailable native model category") from None
+            if not roots:
+                raise ManagementError("InvalidArgument", "The native model category has no configured roots")
+            # Match ComfyUI get_full_path: the first file in native search
+            # order wins. Do not search later roots for a matching digest;
+            # ordinary conflict, SHA and path-safety checks still apply.
+            return next((selected for selected in roots if (selected.path / path).is_file()), roots[0])
+        root_id = root.get("id") if isinstance(root, dict) else root
+        selected = store.root_by_id(root_id)
+        if selected.category is None:
+            raise ManagementError("InvalidArgument", "Select a native model category root")
+        return selected
+
+    async def download(self, context, *, artifact, root=None, category=None, path=None, reuse=False, timeout=None,
                        transport="auto", connections=8, _max_bytes=None):
+        if (root is None) == (category is None):
+            raise ManagementError("InvalidArgument", "Select exactly one native model root or category")
         artifact = await self.resolver.prepare(artifact)
         if type(reuse) is not bool:
             raise ManagementError("InvalidArgument", "reuse must be a boolean")
         path = path or artifact.get("filename")
         _relative(path)
         store = await self.supervisor.get_file_store()
-        root_id = root.get("id") if isinstance(root, dict) else root
-        selected = store.root_by_id(root_id)
-        if selected.category is None:
-            raise ManagementError("InvalidArgument", "Select a native model category root")
+        selected = await _io(self._download_root, store, root, category, path)
         generation = self.supervisor.roots_generation
         key = selected.category, path
         if any(category == key[0] and (name == path or name.startswith(path + "/") or path.startswith(name + "/"))

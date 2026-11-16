@@ -607,14 +607,25 @@ class Models(_Namespace):
     async def list(self, *, category=None, root: FileRoot | None = None, prefix=None):
         return await self._read("list", category=category, root=root, prefix=prefix)
 
-    async def begin_download(self, artifact: ModelArtifact | Mapping | str, *, root: FileRoot,
+    async def begin_download(self, artifact: ModelArtifact | Mapping | str, *,
+                             root: FileRoot | None = None, category: str | None = None,
                              path=None, reuse=False, timeout=None, transport="auto", connections=8) -> ManagementOperation:
-        return await self._begin("download", artifact=artifact, root=root, path=path,
+        destination = {"root": root}
+        if category is not None:
+            destination["category"] = category
+        return await self._begin("download", artifact=artifact, **destination, path=path,
                                  reuse=reuse, timeout=timeout, transport=transport, connections=connections)
 
-    async def download(self, artifact: ModelArtifact | Mapping | str, *, root: FileRoot,
+    async def download(self, artifact: ModelArtifact | Mapping | str, *,
+                       root: FileRoot | None = None, category: str | None = None,
                        path=None, reuse=False, timeout=None, transport="auto", connections=8) -> RemoteFile:
-        return await (await self.begin_download(artifact, root=root, path=path,
+        """Acquire into exactly one explicit root or native model category.
+
+        Category selection follows ComfyUI's search order: reuse the visible
+        existing path after SHA256 verification, or publish to the first root.
+        An earlier conflicting file is never bypassed to reuse a later match.
+        """
+        return await (await self.begin_download(artifact, root=root, category=category, path=path,
             reuse=reuse, timeout=timeout, transport=transport, connections=connections)).result()
 
     async def begin_snapshot(self, manifest: ModelManifest | Mapping, *, root: FileRoot, path: str,

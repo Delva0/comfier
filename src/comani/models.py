@@ -55,7 +55,8 @@ def list(*, category=None, root: FileRoot | None = None, prefix=None) -> Corouti
 def begin_download(
     artifact: ModelArtifact | Mapping | str,
     *,
-    root: FileRoot,
+    root: FileRoot | None = None,
+    category: str | None = None,
     path=None,
     reuse=False,
     timeout=None,
@@ -66,6 +67,7 @@ def begin_download(
         ("models", "begin_download"),
         artifact,
         root=root,
+        category=category,
         path=path,
         reuse=reuse,
         timeout=timeout,
@@ -77,17 +79,25 @@ def begin_download(
 def download(
     artifact: ModelArtifact | Mapping | str,
     *,
-    root: FileRoot,
+    root: FileRoot | None = None,
+    category: str | None = None,
     path=None,
     reuse=False,
     timeout=None,
     transport="auto",
     connections=8,
 ) -> Coroutine[Any, Any, RemoteFile]:
+    """Acquire into an explicit root or a category's native lookup order.
+
+    A category reuses the first visible file at the selected relative path only
+    when reuse=True and its SHA256 matches; otherwise new files use its first
+    native root. The returned RemoteFile identifies the actual destination.
+    """
     return _invoke_async(
         ("models", "download"),
         artifact,
         root=root,
+        category=category,
         path=path,
         reuse=reuse,
         timeout=timeout,

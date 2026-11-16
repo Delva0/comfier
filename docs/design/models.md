@@ -16,18 +16,20 @@ matches = [file for file in source.files if file.source.get("path") == "weights/
 if len(matches) != 1:
     raise ValueError("Select exactly one requested file")
 artifact = matches[0]
-roots = await remote.files.roots(category="diffusion_models")
-selected = [root for root in roots if root.path == SERVER_MODEL_ROOT]
-if len(selected) != 1:
-    raise ValueError("Choose one actual remote root")
 file = await remote.models.download(
-    artifact, root=selected[0], path="model.safetensors", reuse=True,
+    artifact, category="diffusion_models", path="model.safetensors", reuse=True,
     transport="auto", connections=8,
 )
 model = remote.node("UNETLoader", unet_name=file.native_name, weight_dtype="default")
 ```
 
-示例的 repo、revision、server root 由调用方指定，不是客户端文件路径。HF 返回的实际 commit 固定在 ModelSource/ModelArtifact，文件包括 size、SHA256 或 Git blob hash 等可得证据。resolve 接受 HF URL 或 repo_id/revision/path Mapping；Civitai 接受模型/版本 URL 或 model_id/version_id/file_id。普通 HTTP(S) URL 的下载推荐直接传给远端 models.download，无需 provider metadata 查询。
+示例的 repo、revision、原生 category 和相对 path 由调用方指定，不是客户端文件路径。HF 返回的实际 commit 固定在 ModelSource/ModelArtifact，文件包括 size、SHA256 或 Git blob hash 等可得证据。resolve 接受 HF URL 或 repo_id/revision/path Mapping；Civitai 接受模型/版本 URL 或 model_id/version_id/file_id。普通 HTTP(S) URL 的下载推荐直接传给远端 models.download，无需 provider metadata 查询。
+
+`download` 和 `begin_download` 必须在 `root=` 与 `category=` 中明确选择一个。`category` 是实际 ComfyUI 模型类别，由调用者按 Loader 的要求提供；不会从 provider、文件名或内容猜测类型。daemon 使用既有原生目录快照和查找顺序，支持原生别名（如 `unet` → `diffusion_models`、`clip` → `text_encoders`）。目标相对路径已有文件时选择原生查找首先可见的文件；只有显式 `reuse=True` 且 SHA256 一致才复用。前一目录的同名文件摘要不符会返回 `ChecksumMismatch`，不会跳过它到后面的目录寻找相同摘要。没有现有文件时发布到该类别第一个原生根，仍遵循路径、shadow 和 create-only 检查。
+
+需要明确写入某个原生目录时，仍先用 `remote.files.roots(category=...)` 选出实际 `FileRoot`，然后传 `root=selected_root`；其原有语义和安全检查不变，不能同时传 `category`。返回的 `RemoteFile.root` 包含实际目录、规范类别和原生优先级。类别未知或没有配置目录时明确失败，不创建猜测目录；单文件类别选择不扩展到 `snapshot` 或本地文件上传。
+
+类别选择不会为发现目录而启动 worker，也不会遍历所有节点的 `INPUT_TYPES`。目录来自运行中 live、停止后 last-observed 的快照；冷实例仍由既有路径 helper 读取原生路径配置。只在插件运行时注册、尚未观测到的类别仍不可用，应先按该插件的正常准备步骤注册/观测后再下载。现有显式 root 的带外下载能力不依赖运行中的 worker。
 
 Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`comani.models.versions(source)` 是本地 provider 查询；categories() 和 list(category=..., root=..., prefix=...) 才查询远端。list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
 
@@ -38,7 +40,7 @@ Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须�
 ## 分层职责与 transport
 
 1. Provider 解析 repo/version/file，固定不可变 revision。
-2. 脚本选择确切 artifact 与原生 root/path。
+2. 脚本选择确切 artifact、原生 category/path 或显式 root/path；daemon 按原生规则确定目录。
 3. transport 获取到隔离 staging。
 4. 核对身份、长度、上游摘要/Git blob hash。
 5. 重验所选 root 的配置与目录身份、同名 shadow 和 create-only 目标，原子发布。
