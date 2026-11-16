@@ -23,8 +23,14 @@ import cloudpickle
 from comani._codec import has_lz4
 from comani.errors import PackageConflict, error_to_wire
 from comani.files import FILE_CHUNK_SIZE, FILE_VERSION, _io
-from comani.protocol import (BINARY_FETCH_LZ4_VERSION, BINARY_FETCH_VERSION,
-                             SUBMIT_BATCH_VERSION, SUBMIT_BATCH_MAX_CALLS, SUBMIT_BATCH_MAX_BYTES)
+from comani.protocol import (
+    BINARY_FETCH_LZ4_VERSION,
+    BINARY_FETCH_VERSION,
+    CALL_OBSERVATION_VERSION,
+    SUBMIT_BATCH_MAX_BYTES,
+    SUBMIT_BATCH_MAX_CALLS,
+    SUBMIT_BATCH_VERSION,
+)
 
 from . import file_http
 from .adapter import NativeAdapter, native_python_inputs
@@ -54,6 +60,7 @@ class CallState:
     status: str = "accepted"
     task: asyncio.Task | None = None
     error: dict | None = None
+    metadata: dict = field(default_factory=dict)
     dependencies: list = field(default_factory=list)
     dependencies_released: bool = False
     captured: set[str] = field(default_factory=set)
@@ -153,7 +160,7 @@ class NativeRuntime:
     def _handshake(self, session):
         capabilities = {"bounded_wait": True, "binary_fetch": BINARY_FETCH_VERSION,
                         "files": FILE_VERSION, "session_resume": 1, "whole_call_refs": 1,
-                        "submit_batch": SUBMIT_BATCH_VERSION}
+                        "submit_batch": SUBMIT_BATCH_VERSION, "call_observation": CALL_OBSERVATION_VERSION}
         if has_lz4():
             capabilities["binary_fetch_lz4"] = BINARY_FETCH_LZ4_VERSION
         return {"session_id": session, "resume_token": self.session_tokens.get(session), "submission_window": self._submission_window(session), "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "recovery_limits": {"max_sessions": self.recovery_policy.max_sessions, "max_objects": self.recovery_policy.max_objects, "max_call_records": self.recovery_policy.max_call_records, "submission_seconds": self.recovery_policy.submission_seconds, "expiry_running": self.recovery_policy.expiry_running}, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}
@@ -638,7 +645,9 @@ class NativeRuntime:
                 self._emit("running", state)
                 def callback(node_id, entry, cache, key):
                     self._capture(state, node_id, entry, cache, key)
-                result = await self.loop.run_in_executor(self.pool, lambda: self.adapter.run(graph, targets, bindings, callback, prompt_id=state.call_id, session_id=state.session, extra_data=state.spec.get("extra_data")))
+                def observe(native_result):
+                    state.metadata = self._metadata(native_result)
+                result = await self.loop.run_in_executor(self.pool, lambda: self.adapter.run(graph, targets, bindings, callback, prompt_id=state.call_id, session_id=state.session, extra_data=state.spec.get("extra_data"), observe=observe))
                 # Native callbacks are posted before the executor completion.
                 await asyncio.sleep(0)
                 self._finish(state, result)
@@ -713,6 +722,7 @@ class NativeRuntime:
                 "ui": ui if type(ui) is dict else {}}
 
     def _finish(self, state, native_result):
+        state.metadata = self._metadata(native_result)
         for name, future in state.nodes.items():
             if not future.done():
                 future.set_result({"$error": {"type": "NodeSkipped", "message": f"Node {name!r} was not executed (unselected or lazy branch)"}})
@@ -725,13 +735,13 @@ class NativeRuntime:
                 result = self._result(state.nodes[node_id].result())
                 names[item["name"]] = len(outputs)
                 outputs.append(result["outputs"][slot])
-            metadata = self._metadata(native_result)
+            metadata = state.metadata
             native = {"prompt_id": metadata["prompt_id"], "executed": metadata["executed"],
                       "history": {"outputs": metadata["ui"]}}
             final = {"outputs": outputs, "names": names, "native": native}
         else:
             final = dict(self._result(state.nodes["result"].result()))
-        final["metadata"] = self._metadata(native_result)
+        final["metadata"] = state.metadata
         if not state.done.done():
             state.done.set_result(final)
         state.status = "succeeded"
@@ -758,8 +768,13 @@ class NativeRuntime:
             self._trim_spec(state)
             self._collect_call(state)
 
-    async def wait_result(self, session_id, call_id, node_id=None, wait_seconds=None, **_):
+    async def wait_result(self, session_id, call_id, node_id=None, wait_seconds=None,
+                          observation=False, **_):
         self._session(session_id)
+        if type(observation) is not bool:
+            raise TypeError("observation must be a bool")
+        if observation and node_id is not None:
+            raise ValueError("Call observation describes the whole invocation; omit node_id")
         if wait_seconds is not None and not (
             isinstance(wait_seconds, (int, float))
             and not isinstance(wait_seconds, bool)
@@ -767,7 +782,12 @@ class NativeRuntime:
             and math.isfinite(wait_seconds)
         ):
             raise ValueError("wait_seconds must be a finite number greater than 0 and no more than 60")
-        state = self.calls[(session_id, call_id)]
+        try:
+            state = self.calls[(session_id, call_id)]
+        except KeyError:
+            if not observation:
+                raise
+            raise RecoveryError("CallExpired", "The call is unavailable in this session") from None
         future = state.done if node_id is None else state.nodes[node_id]
         if wait_seconds is None:
             result = await asyncio.shield(future)
@@ -776,6 +796,10 @@ class NativeRuntime:
                 result = await asyncio.wait_for(asyncio.shield(future), timeout=wait_seconds)
             except TimeoutError:
                 return {"pending": True}
+        if observation:
+            self._session(session_id, touch=False)
+            return {"status": state.status, "error": copy.deepcopy(state.error),
+                    "metadata": copy.deepcopy(state.metadata or self._metadata({}))}
         # Terminal node/session errors are interpreted outside the wait timeout
         # handler. A failed producer can never be mistaken for another poll.
         return self._result(result)

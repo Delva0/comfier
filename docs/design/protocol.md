@@ -39,6 +39,8 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 
 旧服务器没有声明能力时不发送新参数，仍使用单次等待。bounded-wait避免一般反代的单请求读取超时；真正断线由独立的恢复协议处理，不把任意错误当pending。恢复只重用原身份观察，不重提另一计算。
 
+精确整数 `capabilities.call_observation=1` 支持 `wait_result(observation=True)`：只观察整个 invocation（不接受 `node_id`），仍遵守 `wait_seconds` 的终态等待规则。终态返回 `{status, error, metadata}`，其中 error 是原生终态的 `{type, message}` 或 null，metadata 为安全 JSON UI 投影；不返回 outputs/ref、不申请对象 lease。默认 `observation=False` 的成功输出及失败抛错语义保持原样。SDK 仅在显式 `metadata/files/file(allow_failed=True)` 且调用失败时使用此模式；成功仍复用已有本地 metadata。查询受原 session/计算代际权限与回收边界约束；其他 session 或已清理调用只得到 CallExpired，已关闭会话仍报 SessionClosed。没有新增调用发现、永久历史或跨代重接能力。
+
 临时 Cloudflare Quick Tunnel 另有 200 个并发在途请求限制。结果等待会占用其中的额度，即使每轮只有 20 秒；客户端连接池分离不能突破代理总限额。需要按实际部署控制并发等待量，或选用具备合适容量的入口；核心 RPC 不依赖某个代理产品。
 
 [当前安装复测](../../tests/stress/CURRENT_HEAD_PRESSURE_REPORT.md) 记录真实 native 调用运行 140.010 秒，经过 125 秒读取超时代理，一次 submit、六次 pending、十次查询/终态复读及稳定的最终引用，并检查取消与 close 前清理。这段 140 秒测量绑定 885b8cd 基线；当前 HTTP 独立保活的压力与生命周期结果另见 [启动与保活验收](../../tests/acceptance/HEARTBEAT_REPORT.md)。历史[真实远端 HTTPS 验证](../../artifacts/remote/60662518-20261114/long-wait.json) 的 130 秒调用及完整模型结果另见 [远端报告](../remote_acceptance.md)。

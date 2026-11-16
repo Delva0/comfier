@@ -169,7 +169,7 @@ class NativeAdapter:
             owner, key = self._cache_location(node_id)
             self.capture(node_id, entry, owner, key)
 
-    def run(self, graph: dict, targets: list[str], bindings: dict, capture, *, prompt_id=None, session_id="", extra_data=None):
+    def run(self, graph: dict, targets: list[str], bindings: dict, capture, *, prompt_id=None, session_id="", extra_data=None, observe=None):
         self.boot()
         self.bound = bindings
         self.capture = capture
@@ -178,6 +178,9 @@ class NativeAdapter:
         prompt_id = prompt_id or str(uuid.uuid4())
         self.prompt_id = prompt_id
         self.executor.success = True
+        # Validation or an early executor exception must not expose the previous
+        # invocation's UI as if this invocation had produced it.
+        self.executor.history_result = {}
         try:
             asyncio.run(self._execute(graph, targets, prompt_id, extra_data or {}))
             if not self.executor.success:
@@ -188,11 +191,16 @@ class NativeAdapter:
                 raise CallFailed(detail.get("exception_message", "Native execution failed"))
             return {"history": self.executor.history_result, "executed": sorted(self.executed), "prompt_id": prompt_id}
         finally:
-            self.bound = {}
-            self.capture = None
-            owner = self.executor.caches.outputs
-            if hasattr(owner, "_comani_entry_versions"):
-                owner._comani_entry_versions = {key: version for key, version in owner._comani_entry_versions.items() if key in owner.cache}
+            try:
+                if observe is not None:
+                    observe({"history": self.executor.history_result,
+                             "executed": sorted(self.executed), "prompt_id": prompt_id})
+            finally:
+                self.bound = {}
+                self.capture = None
+                owner = self.executor.caches.outputs
+                if hasattr(owner, "_comani_entry_versions"):
+                    owner._comani_entry_versions = {key: version for key, version in owner._comani_entry_versions.items() if key in owner.cache}
 
     async def _execute(self, graph, targets, prompt_id, extra_data):
         # validate_prompt discovers only OUTPUT_NODE roots. Eager calls and

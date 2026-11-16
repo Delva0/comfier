@@ -98,10 +98,13 @@ class _GraphCall(Call):
         if _receiver.get() is not self.graph:
             raise NotSubmitted("A captured call only unwraps inside its graph; use run[graph_ref] after submit")
 
-    async def files(self, *, node_id=None, key=None):
+    async def metadata(self, *, allow_failed=False):
+        raise NotSubmitted("Submit this graph before reading its native metadata")
+
+    async def files(self, *, node_id=None, key=None, allow_failed=False):
         raise NotSubmitted("Submit this graph before reading its native files")
 
-    async def file(self, *, node_id=None, key=None):
+    async def file(self, *, node_id=None, key=None, allow_failed=False):
         raise NotSubmitted("Submit this graph before reading its native files")
 
 

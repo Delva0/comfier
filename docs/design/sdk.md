@@ -120,7 +120,7 @@ run = remote.submit(workflow, inputs=bindings, extra_data=metadata, return_call=
 
 构图时，单个节点或嵌套 `submit` 的非空执行 metadata 会立即报 `ValueError`；统一放到构图结束后的最外层 `remote.submit(..., extra_data=...)`。普通 capture 不增加步骤。这里的 API 节点是调用外部服务的原生后端节点类别，不是 SDK 新增的固定节点名。
 
-完成后 `await call.metadata()` 返回普通本地 `CallMetadata(call_id, prompt_id, executed, ui)`，不需 fetch，不拥有远端对象。它只投影必要的原生 UI/history outputs，排除原 prompt、extra_data 和 history.meta；不序列化 opaque 对象/Tensor。单节点 UI key 为 `result`，workflow UI key 为实际 graph node ID。
+完成后 `await call.metadata()` 返回普通本地 `CallMetadata(call_id, prompt_id, executed, ui, status, error)`，不需 fetch，不拥有远端对象。它只投影必要的原生 UI/history outputs，排除原 prompt、extra_data 和 history.meta；不序列化 opaque 对象/Tensor。单节点 UI key 为 `result`，workflow UI key 为实际 graph node ID。`status` 是整个提交的终态（`succeeded`、`failed` 或 `cancelled`），`error` 为失败时的本地 JSON `{type, message}`，成功为 `None`；它们不是各 UI 节点的成功状态，`executed` 也不证明其中每个节点成功。
 
 ```python
 saved = remote.node("SaveImage", images=image, filename_prefix="comani/result", return_call=True)
@@ -130,6 +130,19 @@ await remote.files.download(file, "result.png")
 ```
 
 `Call.files(*, node_id=None, key=None)` 等待原调用完成，将标准 filename/subfolder/type 描述符解析并 stat 为 RemoteFile tuple；使用原 Call 的 Client，与当前模块上下文无关。所有执行 Call/workflow run 都有该方法；只有标准 UI 文件描述符会产生文件，没有则 files() 返回空 tuple。`file()` 要求恰好一个，零个或多个均报含实际数量的 ValueError，提示使用 files()。Tensor、模型或普通字符串返回值不会自动成为文件；capture 内尚未 submit 的 Call 调用会报 NotSubmitted。node_id 选择某节点，不存在时报 KeyError；同时给 key 时，该节点缺少该字段也报 KeyError。仅给 key 则跨节点筛选对应 UI 字段，没有匹配时返回空 tuple。原始 metadata 不变；不下载 payload、不 fetch Tensor。
+
+`metadata()`、`files()`、`file()` 默认在整个提交失败时抛原错。显式传 `allow_failed=True` 才在终态失败后读取原生已报告的 UI/文件事实；此选项不改变 `await call`、导出或 Output 的失败语义：
+
+```python
+try:
+    await run
+except comani.RemoteError:
+    metadata = await run.metadata(allow_failed=True)
+    assert metadata.status == "failed"  # 有已完成文件也不代表整图成功。
+    completed_files = await run.files(allow_failed=True)
+```
+
+这仍等待终态，不提供执行中的快照。UI 可包含本次读取到的原生缓存 UI，不承诺文件由本次重新创建；没有报告 UI 也不能证明没有发生其他副作用。安全投影会省略 opaque、非有限数、循环及过深/过大部分，文件后来删除或改变时 `files()` 的 stat 仍如实报错。观察不 fetch、pin 或恢复 tensor/模型，borrowed 引用仍会随原生缓存驱逐失效。未受理的本地准备错误、已关闭/过期会话及已清理调用均保留真实错误；旧 runtime 没有声明观察能力时，失败观察明确报不支持。关联事实沿用活 Call/session 的既有回收边界，不提供新 Client 按 ID 找回、跨计算重启恢复或永久历史。
 
 SaveImage 的 PNG 是明确的 8-bit 文件输出；`fetch()` 保持完整浮点 Tensor，不隐式压成 PNG。直接取图片不需要 source wrapper 来读取 UI 或写临时文件。
 

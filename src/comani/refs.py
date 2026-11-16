@@ -12,10 +12,12 @@ from .errors import (
     Expired,
     InvalidReference,
     Released,
+    RemoteError,
     SessionClosed,
     UnknownOutputLayout,
     error_from_wire,
 )
+from .protocol import CALL_OBSERVATION_VERSION
 
 T = TypeVar("T")
 
@@ -25,12 +27,14 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class CallMetadata:
-    """Local native UI facts, without the submitted prompt or hidden extra_data."""
+    """Invocation outcome and local native UI facts, without prompt/extra_data."""
 
     call_id: str
     prompt_id: str | None = None
     executed: tuple[str, ...] = ()
     ui: dict = field(default_factory=dict)
+    status: str = "succeeded"
+    error: dict | None = None
 
 
 def _drop_owner(client_ref, record):
@@ -280,19 +284,44 @@ class Call(Generic[T]):
     def status(self):
         return self._state.status
 
-    async def metadata(self) -> CallMetadata:
-        """Wait for this producer and return local JSON UI/execution metadata."""
-        await asyncio.shield(self._state.done)
-        return self._state.metadata
+    async def metadata(self, *, allow_failed: bool = False) -> CallMetadata:
+        """Wait for completion; optionally observe a failed invocation's UI facts."""
+        if type(allow_failed) is not bool:
+            raise TypeError("allow_failed must be a bool")
+        if not allow_failed:
+            await asyncio.shield(self._state.done)
+            return self._state.metadata
+        # A local preparation/admission failure has no authoritative remote call.
+        await asyncio.shield(self._state.accepted)
+        try:
+            await asyncio.shield(self._state.done)
+        except Exception:
+            pass
+        else:
+            return self._state.metadata
+        client = self._state.client()
+        version = client.handshake.get("capabilities", {}).get("call_observation")
+        if type(version) is not int or version != CALL_OBSERVATION_VERSION:
+            raise RemoteError("This runtime does not support failed-call metadata observation")
+        params = {"session_id": client.session_id, "call_id": self.id,
+                  "observation": True, "wait_seconds": 20.0}
+        while True:
+            payload = await client._recovery.request("wait_result", **params)
+            if payload.get("pending") is True:
+                continue
+            metadata = payload["metadata"]
+            return CallMetadata(self.id, metadata.get("prompt_id"),
+                                tuple(metadata.get("executed", ())), metadata.get("ui", {}),
+                                payload["status"], payload.get("error"))
 
-    async def files(self, *, node_id=None, key=None) -> tuple[RemoteFile, ...]:
-        """Resolve native UI files through this call's original Client."""
-        metadata = await self.metadata()
+    async def files(self, *, node_id=None, key=None, allow_failed: bool = False) -> tuple[RemoteFile, ...]:
+        """Stat native UI files; allow_failed observes them after execution failure."""
+        metadata = await self.metadata(allow_failed=allow_failed)
         return await self._state.client().files.from_ui(metadata.ui, node_id=node_id, key=key)
 
-    async def file(self, *, node_id=None, key=None) -> RemoteFile:
+    async def file(self, *, node_id=None, key=None, allow_failed: bool = False) -> RemoteFile:
         """Return exactly one native UI file; reject missing or multiple files."""
-        files = await self.files(node_id=node_id, key=key)
+        files = await self.files(node_id=node_id, key=key, allow_failed=allow_failed)
         if len(files) != 1:
             raise ValueError(f"Expected exactly one native UI file, found {len(files)}; use files()")
         return files[0]
