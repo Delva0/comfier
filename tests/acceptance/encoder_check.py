@@ -27,7 +27,7 @@ async def main(args):
         call = remote.node('MiniMaxH3ImageConditioning', return_call=True, clip=clip.output(), prompt=example.PROMPT,
                            width=example.WIDTH, height=example.HEIGHT)
         details = await (await remote.python(describe, inputs={
-            'conditioning': call.output(0), 'latent': call.output(1)}).output()).fetch()
+            'conditioning': call.output(0), 'latent': call.output(1)}, return_call=True).output()).fetch()
         assert details['conditioning_finite']
         result = {'passed': True, 'seconds': time.monotonic() - started, 'clip_call_id': clip.id,
                   'conditioning_call_id': call.id, **details}

@@ -193,9 +193,7 @@ class ModelService:
 
     async def download(self, context, *, artifact, root, path=None, reuse=False, timeout=None,
                        transport="auto", connections=8, _max_bytes=None):
-        if not isinstance(artifact, dict) or "files" in artifact:
-            raise ManagementError("InvalidArgument", "Select one concrete artifact from resolve().files")
-        artifact = self.resolver.bind(artifact)
+        artifact = await self.resolver.prepare(artifact)
         if type(reuse) is not bool:
             raise ManagementError("InvalidArgument", "reuse must be a boolean")
         path = path or artifact.get("filename")
@@ -223,7 +221,7 @@ class ModelService:
                 with await asyncio.to_thread(store.open_download, selected, path) as existing:
                     if existing.metadata.sha256 != artifact["sha256"].lower():
                         raise ManagementError("ChecksumMismatch", "Existing file differs from the selected artifact")
-                    return {"file": metadata_wire(store, existing.metadata), "artifact": artifact,
+                    return {"file": metadata_wire(store, existing.metadata), "artifact": self.resolver.public(artifact),
                             "sha256": existing.metadata.sha256, "verified_against": "sha256", "reused": True,
                             "native_visibility": "visible" if self.supervisor.state == "running" else "unknown"}
             staging = Path(self.supervisor.config.workspace) / ".comani" / "staging"
@@ -243,7 +241,7 @@ class ModelService:
                 raise ManagementError("RootsChanged", "Native roots changed during acquisition; select the destination again")
             context.progress(phase="publishing", bytes=size, total=size)
             info = await self._publish_staged(store, selected, path, stage)
-            result = {"file": metadata_wire(store, info), "artifact": artifact, "sha256": actual,
+            result = {"file": metadata_wire(store, info), "artifact": self.resolver.public(artifact), "sha256": actual,
                       "verified_against": verified, "reused": False,
                       "native_visibility": "visible" if self.supervisor.state == "running" else "unknown",
                       "transport": selected_transport}
@@ -442,7 +440,7 @@ class ModelService:
                 await _io(shutil.rmtree, transfer_directory)
                 total_bytes += stage.size
                 results.append({"relative_path": relative, "sha256": stage.sha256, "size": stage.size,
-                                "verified_against": verified, "transport": engine, "artifact": artifact})
+                                "verified_against": verified, "transport": engine, "artifact": self.resolver.public(artifact)})
                 context.partial(result)
             await self.supervisor.get_file_store()
             if generation != self.supervisor.roots_generation:

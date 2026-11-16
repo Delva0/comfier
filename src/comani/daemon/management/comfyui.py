@@ -7,15 +7,11 @@ from pathlib import Path
 from .operations import ManagementError
 from .processes import run_process
 from .tools import (
-    COMFY_CLI_REVISION,
-    MANAGER_VERSION,
     comfy_cli,
     git_fact,
     python_metadata,
     tool_env,
 )
-
-COMFY_UI_REVISION = "eee59185ff4f43ae2d9ad122b245619d27d9daad"
 
 
 async def select_target(supervisor, context, action, version, commit):
@@ -24,7 +20,7 @@ async def select_target(supervisor, context, action, version, commit):
             raise ManagementError("InvalidArgument", "Select either a version or a complete ComfyUI commit")
         return None, commit.lower()
     if version is None and action == "install":
-        return None, COMFY_UI_REVISION
+        version = "nightly"
     cwd = supervisor.config.workspace
     if version == "latest":
         from .providers import ProviderResolver
@@ -110,7 +106,7 @@ async def change(supervisor, context, action, *, version=None, commit=None,
             args += ["--version", selected_version]
         if action == "install" and selected_version is None:
             # Typer's commit callback observes ctx.params before the version's
-            # default is populated. The fixed CLI needs this explicit ordering.
+            # default is populated. Keep the explicit ordering for this API.
             args += ["--version", "nightly", "--commit", expected_commit]
         if action == "install":
             if skip_torch:
@@ -200,39 +196,83 @@ async def create_environment(supervisor, context, *, path, python=None, timeout=
         return result
 
 
-async def prepare_tools(supervisor, context, *, cli_revision=COMFY_CLI_REVISION,
-                        manager_version=MANAGER_VERSION, hub_version=None, timeout=None):
-    """An explicit installation request, never part of daemon/runtime startup."""
-    if cli_revision is not None and not re.fullmatch(r"[0-9a-f]{40}", cli_revision):
-        raise ManagementError("InvalidArgument", "Select an exact comfy-cli commit")
-    for version in (manager_version, hub_version):
+async def prepare_tools(supervisor, context, *, cli_revision=None, cli_version=None,
+                        manager_version=None, hub_version=None, skip_cli=False,
+                        skip_manager=False, timeout=None):
+    """Ensure explicitly requested tools, preserving installed choices by default.
+
+    Missing CLI/Manager packages use their normal release channel. An installed
+    core's manager_requirements.txt takes precedence when adding a missing Manager.
+    None means reuse-or-install; skipping a tool is an explicit boolean choice.
+    """
+    if any(type(value) is not bool for value in (skip_cli, skip_manager)):
+        raise ManagementError("InvalidArgument", "Tool skip switches must be booleans")
+    if cli_revision is not None:
+        if (not isinstance(cli_revision, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", cli_revision)
+                or ".." in cli_revision):
+            raise ManagementError("InvalidArgument", "Select a comfy-cli Git revision, tag or branch")
+        if cli_version is not None or skip_cli:
+            raise ManagementError("InvalidArgument", "Select one CLI source or skip_cli")
+    if skip_cli and cli_version is not None or skip_manager and manager_version is not None:
+        raise ManagementError("InvalidArgument", "A skipped tool cannot have an explicit version")
+    for version in (cli_version, manager_version, hub_version):
         if version is not None and (not isinstance(version, str) or not re.fullmatch(r"[0-9][\w.+-]*", version)):
-            raise ManagementError("InvalidArgument", "Management/provider packages require exact versions")
-    requirements = []
-    if cli_revision:
-        requirements.append("comfy-cli @ git+https://github.com/Comfy-Org/comfy-cli.git@" + cli_revision)
-    if manager_version:
-        requirements.append("comfyui-manager==" + manager_version)
-    if hub_version:
-        requirements.append("huggingface-hub==" + hub_version)
-    if not requirements:
-        raise ManagementError("InvalidArgument", "Select at least one management/provider tool")
+            raise ManagementError("InvalidArgument", "Tool release selections require concrete versions")
     async with supervisor.maintenance_lock:
         supervisor.assert_stopped()
         before = await python_metadata(supervisor.config.runtime_python)
+        installed = before["packages"]
         env = tool_env(supervisor.config, before)
-        command = await run_process(context, [supervisor.config.runtime_python, "-m", "pip", "install", *requirements],
-                                    cwd=supervisor.config.workspace, env=env, timeout=timeout)
+        requirements, selected = [], {}
+        if not skip_cli:
+            selected["comfy-cli"] = "git" if cli_revision else "release" if cli_version else "installed-or-release"
+            if cli_revision:
+                requirements.append("comfy-cli @ git+https://github.com/Comfy-Org/comfy-cli.git@" + cli_revision)
+            elif cli_version:
+                requirements.append("comfy-cli==" + cli_version)
+            elif "comfy-cli" not in installed:
+                requirements.append("comfy-cli")
+        if not skip_manager:
+            selected["comfyui-manager"] = "explicit" if manager_version else "installed"
+            if manager_version:
+                requirements.append("comfyui-manager==" + manager_version)
+            elif "comfyui-manager" not in installed:
+                manager_requirements = Path(supervisor.config.comfy_root) / "manager_requirements.txt"
+                if manager_requirements.is_file():
+                    requirements += ["-r", str(manager_requirements)]
+                    selected["comfyui-manager"] = "core-requirements"
+                else:
+                    requirements.append("comfyui-manager")
+                    selected["comfyui-manager"] = "release"
+        if hub_version:
+            requirements.append("huggingface-hub==" + hub_version)
+            selected["huggingface-hub"] = "explicit"
+        if not selected:
+            raise ManagementError("InvalidArgument", "Select at least one management/provider tool")
+        command = None
+        if requirements:
+            command = await run_process(context, [supervisor.config.runtime_python, "-m", "pip", "install", *requirements],
+                                        cwd=supervisor.config.workspace, env=env, timeout=timeout)
         after = await python_metadata(supervisor.config.runtime_python)
         check = await run_process(context, [supervisor.config.runtime_python, "-m", "pip", "check"],
                                   cwd=supervisor.config.workspace, env=env, timeout=60)
         packages = after["packages"]
-        matches = ((not cli_revision or packages.get("comfy-cli", {}).get("direct_url", {}).get("vcs_info", {}).get("commit_id") == cli_revision)
-                   and (not manager_version or packages.get("comfyui-manager", {}).get("version") == manager_version)
-                   and (not hub_version or packages.get("huggingface-hub", {}).get("version") == hub_version))
+        matches = all(name in packages for name in selected)
+        cli = packages.get("comfy-cli", {})
+        if cli_revision:
+            vcs = cli.get("direct_url", {}).get("vcs_info", {})
+            matches = matches and bool(vcs.get("commit_id"))
+            if re.fullmatch(r"[0-9a-fA-F]{40}", cli_revision):
+                matches = matches and vcs.get("commit_id", "").lower() == cli_revision.lower()
+            else:
+                matches = matches and vcs.get("requested_revision") == cli_revision
+        for name, version in (("comfy-cli", cli_version), ("comfyui-manager", manager_version),
+                              ("huggingface-hub", hub_version)):
+            if version:
+                matches = matches and packages.get(name, {}).get("version") == version
         result = {"before": before, "after": after, "command": command, "dependency_check": check,
-                  "partial_changes": before != after, "restart_required": True}
+                  "selection": selected, "partial_changes": before != after, "restart_required": True}
         context.partial(result)
-        if command["exit_code"] or check["exit_code"] or not matches:
-            raise ManagementError("ToolPreparationFailed", "Tool versions/dependency postconditions failed", result)
+        if (command is not None and command["exit_code"]) or check["exit_code"] or not matches:
+            raise ManagementError("ToolPreparationFailed", "Tool selection/dependency postconditions failed", result)
         return result

@@ -43,7 +43,7 @@ def blocked(value, delay=0.5):
 async def test_http_call_runs_without_await_and_keeps_one_object_slot(native_http):
     runtime, url = native_http
     async with Client(url) as remote:
-        call = remote.python(lambda: {"items": [1, 2], "pair": (3, 4)})
+        call = remote.python(lambda: {"items": [1, 2], "pair": (3, 4)}, return_call=True)
         await eventually(lambda: call.status in {"completed", "failed"})
         value, = await call
         assert isinstance(value, RemoteRef)
@@ -54,8 +54,8 @@ async def test_http_call_runs_without_await_and_keeps_one_object_slot(native_htt
 async def test_http_submission_remains_responsive_with_pending_dependency(native_http):
     runtime, url = native_http
     async with Client(url) as remote:
-        first = remote.python(delayed, args=(7, 0.4))
-        dependent = remote.python(lambda value: value + 1, inputs={"value": first.output()})
+        first = remote.python(delayed, args=(7, 0.4), return_call=True)
+        dependent = remote.python(lambda value: value + 1, inputs={"value": first.output()}, return_call=True)
         await eventually(lambda: (remote.session_id, dependent.id) in runtime.calls)
         assert not runtime.calls[(remote.session_id, first.id)].done.done()
         assert await (await dependent.output()).fetch() == 8
@@ -64,10 +64,10 @@ async def test_http_submission_remains_responsive_with_pending_dependency(native
 async def test_sync_native_work_does_not_block_submit_or_heartbeat(native_http):
     runtime, url = native_http
     async with Client(url) as remote:
-        first = remote.python(blocked, args=(4, 0.6))
+        first = remote.python(blocked, args=(4, 0.6), return_call=True)
         await eventually(lambda: runtime.calls.get((remote.session_id, first.id)) is not None
                          and runtime.calls[(remote.session_id, first.id)].status == "running")
-        second = remote.python(lambda: 9)
+        second = remote.python(lambda: 9, return_call=True)
         await asyncio.wait_for(
             remote.transport.request("heartbeat", session_id=remote.session_id), timeout=0.3,
         )
@@ -84,7 +84,7 @@ async def test_open_http_wait_without_authenticated_heartbeat_does_not_extend_re
         # An open/stale TCP long poll cannot keep resources alive indefinitely.
         # Only new authenticated traffic advances the offline grace deadline.
         await remote._lease.close()
-        call = remote.python(blocked, args=(31, 0.5))
+        call = remote.python(blocked, args=(31, 0.5), return_call=True)
         with pytest.raises(SessionClosed):
             await call.output()
         session = remote.session_id
@@ -102,10 +102,10 @@ async def test_workflow_intermediate_ready_before_whole_workflow(native_http):
     runtime, url = native_http
     async with Client(url) as remote:
         with remote.graph() as graph:
-            intermediate, = await remote.python(lambda: 17)
-            slow = remote.python(delayed, args=(intermediate, 0.5))
+            intermediate, = await remote.python(lambda: 17, return_call=True)
+            slow = remote.python(delayed, args=(intermediate, 0.5), return_call=True)
             graph.output("final", slow.output())
-        run = remote.submit(graph)
+        run = remote.submit(graph, return_call=True)
         value = await asyncio.wait_for(run[intermediate], timeout=10)
         assert value.ownership == "borrowed"
         assert not runtime.calls[(remote.session_id, run.id)].done.done()
@@ -116,9 +116,9 @@ async def test_workflow_intermediate_ready_before_whole_workflow(native_http):
 async def test_gc_does_not_release_queued_consumer_input(native_http):
     runtime, url = native_http
     async with Client(url) as remote:
-        producer = remote.python(lambda: {"items": [2, 3]})
+        producer = remote.python(lambda: {"items": [2, 3]}, return_call=True)
         value = producer.output()
-        consumer = remote.python(delayed, args=([value, value], 0.2))
+        consumer = remote.python(delayed, args=([value, value], 0.2), return_call=True)
         consumer_id = consumer.id
         await eventually(lambda: (remote.session_id, consumer_id) in runtime.calls)
         del producer, value
@@ -134,7 +134,7 @@ async def test_completed_call_records_and_objects_are_collected(native_http):
     runtime, url = native_http
     async with Client(url) as remote:
         for index in range(20):
-            call = remote.python(lambda value: {"value": value}, inputs={"value": index})
+            call = remote.python(lambda value: {"value": value}, inputs={"value": index}, return_call=True)
             ref = await call.output()
             assert await ref.fetch() == {"value": index}
             del call, ref
@@ -149,9 +149,9 @@ async def test_workflow_borrowed_value_expires_after_native_cache_clear(native_h
     async def returned_borrow():
         remote = await Client(url).start()
         with remote.graph() as graph:
-            value, = await remote.python(lambda: [5, 6])
+            value, = await remote.python(lambda: [5, 6], return_call=True)
             graph.output("value", value)
-        run = remote.submit(graph)
+        run = remote.submit(graph, return_call=True)
         ref = await run.output("value")
         return ref, weakref.ref(remote), remote._lease, remote.session_id
 
@@ -177,19 +177,19 @@ async def test_workflow_borrowed_value_expires_after_native_cache_clear(native_h
 async def test_workflow_reuses_eager_object_and_native_prompt(native_http):
     _, url = native_http
     async with Client(url) as remote:
-        eager = remote.python(lambda: 11)
+        eager = remote.python(lambda: 11, return_call=True)
         with remote.graph() as graph:
             value = graph.input("value")
-            changed, = await remote.python(lambda value: value * 2, inputs={"value": value})
+            changed, = await remote.python(lambda value: value * 2, inputs={"value": value}, return_call=True)
             graph.output("changed", changed)
-        run = remote.submit(graph, inputs={"value": eager.output()})
+        run = remote.submit(graph, inputs={"value": eager.output()}, return_call=True)
         assert await (await run.output("changed")).fetch() == 22
         raw = {
             "1": {"class_type": "EmptyLatentImage", "inputs": {
                 "width": 64, "height": 64, "batch_size": 1,
             }},
         }
-        raw_run = remote.submit(raw, outputs={"latent": ["1", 0]}, targets=["1"])
+        raw_run = remote.submit(remote.graph(raw, outputs={"latent": ["1", 0]}, targets=["1"]), return_call=True)
         latent = await (await raw_run.output("latent")).fetch()
         assert tuple(latent["samples"].shape) == (1, 4, 8, 8)
 
@@ -203,9 +203,9 @@ async def test_python_file_and_package_artifacts(native_http, tmp_path):
     (package / "__init__.py").write_text("from .operation import apply\n")
     (package / "operation.py").write_text("def apply(value):\n    return (value, [value + 3])\n")
     async with Client(url) as remote:
-        file_call = remote.python(source=source, entry="apply", inputs={"value": 5})
+        file_call = remote.python(source=source, entry="apply", inputs={"value": 5}, return_call=True)
         assert await (await file_call.output()).fetch() == {"value": 7}
-        package_call = remote.python(source=package, entry="transform_package:apply", inputs={"value": 5})
+        package_call = remote.python(source=package, entry="transform_package:apply", inputs={"value": 5}, return_call=True)
         assert await (await package_call.output()).fetch() == (5, [8])
 
 
@@ -219,16 +219,16 @@ async def test_composed_graph_runs_file_and_package_python(native_http, tmp_path
     async with Client(url) as remote:
         with remote.graph() as inner:
             value = inner.input("value")
-            changed, = await remote.python(source=source, entry="apply", inputs={"value": value})
+            changed, = await remote.python(source=source, entry="apply", inputs={"value": value}, return_call=True)
             inner.output("changed", changed)
         with remote.graph() as outer:
             value = outer.input("value")
-            first = remote.submit(inner, inputs={"value": value})
-            second = remote.submit(inner, inputs={"value": first.output("changed")})
+            first = remote.submit(inner, inputs={"value": value}, return_call=True)
+            second = remote.submit(inner, inputs={"value": first.output("changed")}, return_call=True)
             final = remote.python(source=package, entry="triple:apply",
-                                  inputs={"value": second.output("changed")})
+                                  inputs={"value": second.output("changed")}, return_call=True)
             outer.output("final", final.output())
-        run = remote.submit(outer, inputs={"value": 3})
+        run = remote.submit(outer, inputs={"value": 3}, return_call=True)
         assert await (await run.output("final")).fetch() == 21
 
 
@@ -254,33 +254,33 @@ async def test_package_normal_imports_globals_and_conflicts(native_http, tmp_pat
     )
     original_hash = prepare_code(source=package, entry="ops:apply").artifact_id
     async with Client(url) as remote:
-        first = remote.python(source=package, entry="ops:apply", inputs={"value": 3})
+        first = remote.python(source=package, entry="ops:apply", inputs={"value": 3}, return_call=True)
         assert await (await first.output()).fetch() == {"value": 5, "count": 1}
         for path in package.glob("*.py"):
             os.utime(path, (1_700_000_000, 1_700_000_000))
             path.chmod(path.stat().st_mode ^ stat.S_IXUSR)
         assert prepare_code(source=package, entry="ops:apply").artifact_id == original_hash
         second = remote.python(source=package, entry="comani_package_a_fixture.ops:apply",
-                               inputs={"value": 4})
+                               inputs={"value": 4}, return_call=True)
         assert await (await second.output()).fetch() == {"value": 6, "count": 2}
     async with Client(url) as remote:
-        third = remote.python(source=package, entry="ops:apply", inputs={"value": 5})
+        third = remote.python(source=package, entry="ops:apply", inputs={"value": 5}, return_call=True)
         assert await (await third.output()).fetch() == {"value": 7, "count": 3}
         other = tmp_path / "different" / package.name
         shutil.copytree(package, other)
         (other / "helpers.py").write_text("OFFSET = 999\n")
-        conflict = remote.python(source=other, entry="ops:apply", inputs={"value": 0})
+        conflict = remote.python(source=other, entry="ops:apply", inputs={"value": 0}, return_call=True)
         with pytest.raises(PackageConflict, match="(?i)conflict|already|different"):
             await conflict
-        intact = remote.python(source=package, entry="ops:apply", inputs={"value": 6})
+        intact = remote.python(source=package, entry="ops:apply", inputs={"value": 6}, return_call=True)
         assert await (await intact.output()).fetch() == {"value": 8, "count": 4}
         installed = tmp_path / "cloudpickle"
         installed.mkdir()
         (installed / "__init__.py").write_text("def apply():\n    return 'not the installed package'\n")
-        collision = remote.python(source=installed, entry="cloudpickle:apply")
+        collision = remote.python(source=installed, entry="cloudpickle:apply", return_call=True)
         with pytest.raises(PackageConflict, match="(?i)conflict|installed|already"):
             await collision
-        version = remote.python(lambda: __import__("cloudpickle").__version__)
+        version = remote.python(lambda: __import__("cloudpickle").__version__, return_call=True)
         assert await (await version.output()).fetch() == "3.1.2"
 
 
@@ -332,7 +332,7 @@ async def test_native_prompt_history_ui_events_and_hidden_prompt(native_http, tm
 async def test_http_bearer_token(native_http):
     _, url = native_http
     async with Client(url, token="integration-token") as remote:
-        call = remote.python(lambda: 23)
+        call = remote.python(lambda: 23, return_call=True)
         assert await (await call.output()).fetch() == 23
     async with ClientSession() as http:
         async with http.post(url + "/rpc", json={"method": "handshake", "params": {}},

@@ -47,7 +47,7 @@ async def main(args):
     async with Client(transport=transport) as remote:
         assert remote.handshake.get('capabilities', {}).get('bounded_wait') is True
         started = time.monotonic()
-        call = remote.python(once, inputs={'marker': uuid.uuid4().hex, 'seconds': args.seconds, 'directory': args.remote_directory})
+        call = remote.python(once, inputs={'marker': uuid.uuid4().hex, 'seconds': args.seconds, 'directory': args.remote_directory}, return_call=True)
         value = await (await call.output()).fetch()
         elapsed = time.monotonic() - started
         assert value['executions'] == 1 and elapsed >= args.seconds

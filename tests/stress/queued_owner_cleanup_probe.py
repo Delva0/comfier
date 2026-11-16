@@ -30,7 +30,7 @@ async def zero_output_call(url):
     client = await Client(url).start()
     with client.graph() as graph:
         client.node('IndependentOutput', return_call=True, value=92)
-    call = client.submit(graph)  # No declared workflow outputs: a zero-output public Call.
+    call = client.submit(graph, return_call=True)  # No declared workflow outputs: a zero-output public Call.
     assert await call == ()
     await asyncio.sleep(.05)  # The legitimate user await and its continuations have ended.
     return call, weakref.ref(client), client.session_id
@@ -52,7 +52,7 @@ async def make_context_control(url, kind):
         return ref, client_weak, session
     with client.graph() as graph:
         client.node('IndependentOutput', return_call=True, value=94)
-    call = client.submit(graph)
+    call = client.submit(graph, return_call=True)
     assert await call == ()
     await asyncio.sleep(.05)
     token = user_owner.set(client)

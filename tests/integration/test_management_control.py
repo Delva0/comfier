@@ -45,15 +45,15 @@ async def test_emergency_restart_interrupts_calls_without_stopping_bash_and_defa
     try:
         async with Client(url) as remote:
             await remote.comfyui.start()
-            reference = await remote.python(lambda: 123).output()
+            reference = await remote.python(lambda: 123, return_call=True).output()
             assert (await remote.bash.run("printf runtime-is-running")).stdout == "runtime-is-running"
             long_shell = await remote.bash.begin("printf entered > shell.entered; sleep 30")
             await entered(tmp_path / "shell.entered")
             marker = str(tmp_path / "interrupted")
-            running = remote.python(source=source, entry="work", inputs={"marker": marker, "duration": 30})
+            running = remote.python(source=source, entry="work", inputs={"marker": marker, "duration": 30}, return_call=True)
             await entered(Path(marker + ".entered"))
             queued_marker = str(tmp_path / "queued")
-            queued = remote.python(source=source, entry="work", inputs={"marker": queued_marker, "duration": 0})
+            queued = remote.python(source=source, entry="work", inputs={"marker": queued_marker, "duration": 0}, return_call=True)
             async with asyncio.timeout(3):
                 while (await supervisor.runtime_rpc("runtime_info"))["pending"] < 2:
                     await asyncio.sleep(0.01)
@@ -71,10 +71,10 @@ async def test_emergency_restart_interrupts_calls_without_stopping_bash_and_defa
             assert (await remote.comfyui.info()).state == "running"
 
             marker = str(tmp_path / "drained")
-            remote.python(source=source, entry="work", inputs={"marker": marker, "duration": 1})
+            remote.python(source=source, entry="work", inputs={"marker": marker, "duration": 1}, return_call=True)
             await entered(Path(marker + ".entered"))
             queued_marker = str(tmp_path / "drained-queue")
-            remote.python(source=source, entry="work", inputs={"marker": queued_marker, "duration": 0.1})
+            remote.python(source=source, entry="work", inputs={"marker": queued_marker, "duration": 0.1}, return_call=True)
             stop = await remote.comfyui.begin_stop()
             await asyncio.sleep(0.1)
             assert not (await stop.status()).done

@@ -28,35 +28,29 @@ await remote.comfyui.configure(
     runtime_python=env.python, comfy_root="/srv/ComfyUI",
     cpu=True, custom_nodes=False,
 )
-await remote.comfyui.prepare_tools(
-    cli_revision="4f554bb5a9e5d0b5d04146e7bdf8cac2ceb729a5",
-    manager_version="4.2.2",
-)
-await remote.comfyui.install(
-    commit="eee59185ff4f43ae2d9ad122b245619d27d9daad",
-    skip_torch=False,
-)
+await remote.comfyui.prepare_tools(skip_manager=True)
+await remote.comfyui.install(skip_torch=False)
 await remote.comfyui.prepare_runtime("/srv/packages/current-comani.whl")
 await remote.comfyui.start()
 ```
 
 路径均在服务器。`create_environment(path, python=None)` 创建不使用 system site-packages 的独立 venv；已有目录拒绝，不默修旧环境。默认 base Python 是管理解释器，可明确指定服务器上的另一个 Python。已有模板可直接 configure 其解释器，不必创建 venv。
 
-`prepare_tools` 是明确安装请求，固定 comfy-cli commit 与 packaged Manager 4.2.2；`hub_version` 可显式安装所选精确 huggingface-hub 版本。它读回实际包版本/来源并执行 pip check，不在缺包时暗装工具。`prepare_runtime(package)` 安装调用方选定的 wheel/requirement 并读回目标环境依赖，建议使用本次构建的精确 wheel。
+`prepare_tools` 是明确准备请求，默认复用已装 comfy-cli/Manager；缺 CLI 才安装发行版，缺 Manager 优先按所选 core 的 manager_requirements.txt 安装，没有该文件才选发行版。用 `cli_version` 选择 PyPI 版本，或 `cli_revision` 选择 Git ref（两者互斥）；`manager_version` 和 `hub_version` 是显式版本选择。`skip_cli/skip_manager` 才表示跳过，不用 None 暗示跳过。它读回包版本/来源并执行 pip check，不在普通 start/configure 时暗装工具。`prepare_runtime(package)` 安装调用方选定的 wheel/requirement 并读回目标环境依赖，建议使用本次构建的精确 wheel。
 
 CPU 安装需 `configure(cpu=True)` 和 `install(skip_torch=False)`。GPU 环境的 Torch/CUDA build 由调用方选择，可用 `bash.run` 对明确的 `runtime_python -m pip` 安装完整固定 requirement 与 index，再 `install(skip_torch=True)`；不从硬件猜测并安装 CUDA。pip check 只证明包依赖关系，不证明 CUDA/ABI 或模型健康。
 
-`install/update` 可选择 `commit=完整40位SHA` 或 `version=...`，不能同时给两者。首次接纳将 tag/latest/nightly 固定到实际 commit；未指定 install 目标使用上面的固定 ComfyUI commit。实际 HEAD 必须匹配，dirty 工作树拒绝。更新已有源码使用 update；配置和启动不会重置已有目录。
+`install/update` 可选择 `commit=完整40位SHA` 或 `version=...`，不能同时给两者。首次接纳将 tag/latest/nightly 固定到实际 commit；未指定 install 目标选择官方 nightly/default branch；普通 update 沿当前分支 upstream，detached HEAD 需要明确目标。实际 HEAD 必须匹配本次解析结果，dirty 工作树拒绝。配置、启动和普通查询不会安装、升级或重置已有目录；显式目标才做 exact version/revision 校验。
 
 ## 静态 namespace
 
-所有查询都到远端获取实际事实，包括 info/config、backend/list/versions、resolve/manifest 和 roots；不在客户端查询 pip/Git、解析上游或缓存一个旧状态当作新结果。DTO 是普通本地值，不拥有远端对象。
+模块静态 namespace 与显式 Client 的有状态方法相同，使用当前显式 Client；info/config、backend/list、categories/list 和 roots 都到远端读取实际状态。纯 `comani.models.resolve/versions/manifest` 和 `comani.plugins.versions` 则在客户端查询上游，无需 Client，也不在 remote facade 上。它们使用本地 provider 凭证，与 daemon 下载权限分开。DTO 是普通本地值，不拥有远端对象。
 
 | namespace | 查询 | 明确变更 |
 | --- | --- | --- |
 | comfyui | info/config/logs | configure/create_environment/prepare_tools/prepare_runtime/install/update/start/stop/restart |
-| plugins | backend/list/versions(package) | install/update/enable/disable/uninstall；install_git/update_git |
-| models | categories/list/versions/resolve/manifest | download/snapshot/remove |
+| plugins | backend/list；模块 versions(package) 为本地查询 | install/update/enable/disable/uninstall；install_git/update_git |
+| models | categories/list；模块 versions/resolve/manifest 为本地查询 | download/snapshot/remove |
 | bash | 无独立本地查询 | run/begin |
 
 大部分变更都有 `begin_动作(...)` 返回 ManagementOperation；短写直接等待 result。具体参数见源码静态方法；模型选择与 snapshot 见 [模型设计](models.md)，本地文件见 [文件 I/O](files.md)。
@@ -67,7 +61,7 @@ CPU 安装需 `configure(cpu=True)` 和 `install(skip_torch=False)`。GPU 环境
 
 ```python
 backend = await remote.plugins.backend()
-available = await remote.plugins.versions("requested-package")
+available = await comani.plugins.versions("requested-package")  # 本地 registry 查询
 changes = await remote.plugins.install(["requested-package"], version="1.2.3")
 await remote.plugins.disable(["requested-package"])
 await remote.plugins.enable(["requested-package"])
@@ -79,7 +73,7 @@ await remote.plugins.install_git(
 
 示例中的包 ID、版本和 Git URL 是调用方的选择，不能直接作为存在证明。Registry 安装先远端解析固定版本，再交给 Manager；nightly 对应 Git 来源。Git install/update 将未给定的 HEAD 在 daemon 固定一次，拒绝 dirty，读回实际 commit。更新只接指定包，拒绝 all/comfy/comfyui，避免扩展成隐式 core 更新。
 
-工具经目标解释器的独立子进程运行，不 import 有全局 cwd/env/单例的 CLI 模块到 daemon。实例专属工具 HOME 和显式 workspace 避免借用其他安装；解释器仍要读回核对。packaged Manager 4.2.2 的 enable/disable 采用其原生 .disabled 目录规则、create-only 原子移动和独立读回。`no_deps=True` 不保证安装脚本不运行 install.py。
+工具按当前已安装入口/flags/布局检查能力；未主动指定版本时不要求某个历史 SHA 或 Manager 版本，缺能力时明确报错。工具经目标解释器的独立子进程运行，不 import 有全局 cwd/env/单例的 CLI 模块到 daemon。实例专属工具 HOME 和显式 workspace 避免借用其他安装；解释器仍要读回核对。packaged Manager 的 enable/disable 采用其原生 .disabled 目录规则、create-only 原子移动和独立读回。`no_deps=True` 不保证安装脚本不运行 install.py。
 
 ## Bash
 

@@ -128,7 +128,7 @@ async def test_capture_is_symbolic_run_bound_and_borrowed(peer):
         await call
     with pytest.raises(NotSubmitted):
         client.node("Echo", return_call=True, value=output)
-    run = client.submit(graph, inputs={"image": ["looks-like-link", 0]})
+    run = client.submit(graph, inputs={"image": ["looks-like-link", 0]}, return_call=True)
     result, = await run
     middle = await run[output]
     assert result.ownership == middle.ownership == "borrowed"
@@ -150,8 +150,8 @@ async def test_workflow_composition_remaps_internal_ports(peer):
         inner.output("out", out)
     with client.graph() as outer:
         value = outer.input("source")
-        first = client.submit(inner, inputs={"x": value})
-        second = client.submit(inner, inputs={"x": first.output("out")})
+        first = client.submit(inner, inputs={"x": value}, return_call=True)
+        second = client.submit(inner, inputs={"x": first.output("out")}, return_call=True)
         outer.output("result", second.output("out"))
     await client.submit(outer, inputs={"source": 4})
     nodes = runtime.submissions[0][1]["graph"]["nodes"]
@@ -197,9 +197,9 @@ async def test_python_nested_refs_tuple_and_artifact_reuse(peer):
     seed = client.node("Echo", return_call=True, value=3)
     def function(tree):
         return tree["a"][0] + 1, False, None
-    result, = await client.python(function, inputs={"tree": {"a": [seed.output(0)]}})
+    result, = await client.python(function, inputs={"tree": {"a": [seed.output(0)]}}, return_call=True)
     assert await result.fetch() == (4, False, None)
-    await client.python(function, inputs={"tree": {"a": [3]}})
+    await client.python(function, inputs={"tree": {"a": [3]}}, return_call=True)
     assert len(runtime.artifacts) == 1
 
 
@@ -207,7 +207,7 @@ async def test_graph_python_uploads_at_submit_and_lifts_ports(peer):
     client, runtime = peer
     with client.graph() as graph:
         source = graph.input("x")
-        value, = await client.python(lambda tree: tree[0], inputs={"tree": [source]})
+        value, = await client.python(lambda tree: tree[0], inputs={"tree": [source]}, return_call=True)
         graph.output("value", value)
     assert not runtime.artifacts
     await client.submit(graph, inputs={"x": 1})
@@ -221,7 +221,7 @@ async def test_pickle_incompatibility_has_no_source_fallback(peer):
     client, runtime = peer
     client.handshake["python"] = [0, 0, 0]
     with pytest.raises(CodeCompatibilityError):
-        await client.python(lambda: 1)
+        await client.python(lambda: 1, return_call=True)
     assert not runtime.artifacts and not runtime.submissions
 
 
@@ -262,7 +262,7 @@ async def test_auto_output_roots_keep_effects_without_forcing_every_node(peer):
     with client.graph() as graph:
         client.node("Echo", return_call=True, value="unused")
         client.node("Effect", return_call=True, value="root")
-    await client.submit(graph)
+    await client.submit(graph, return_call=True)
     assert runtime.submissions[0][1]["graph"]["targets"] == ["2"]
 
 
@@ -284,9 +284,9 @@ async def test_intermediate_wait_waits_ack_not_whole_workflow(peer):
 
     runtime.artifact_put = upload
     with client.graph() as graph:
-        port, = await client.python(lambda: 1)
+        port, = await client.python(lambda: 1, return_call=True)
         graph.output("out", port)
-    run = client.submit(graph)
+    run = client.submit(graph, return_call=True)
     waiter = asyncio.ensure_future(run[port])
     await asyncio.sleep(0)
     await asyncio.sleep(0)
@@ -328,7 +328,7 @@ async def test_callable_captured_reference_is_rejected_with_inputs_hint(peer):
         return value
 
     with pytest.raises(TypeError, match="inputs"):
-        client.python(accidentally_captured)
+        client.python(accidentally_captured, return_call=True)
 
 
 async def test_canceling_one_waiter_does_not_cancel_remote_call(peer):
@@ -422,7 +422,7 @@ async def test_middle_borrow_keeps_invocation_metadata_until_last_reference(peer
     with client.graph() as graph:
         middle, = await client.node("Echo", return_call=True, value=3)
         graph.output("out", middle)
-    run = client.submit(graph)
+    run = client.submit(graph, return_call=True)
     call_id = run.id
     borrowed = await run[middle]
     await run

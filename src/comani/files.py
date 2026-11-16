@@ -9,17 +9,20 @@ import json
 import os
 import random
 import re
-import stat
+import stat as stat_module
 import tempfile
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from functools import partial
 from pathlib import Path
+from typing import Any, Coroutine
 
 import aiohttp
 from aiohttp import ContentTypeError
 
+from ._context import invoke_async as _invoke_async
 from .errors import RemoteError, SessionClosed, error_from_wire
 
 FILE_VERSION = 1
@@ -170,6 +173,49 @@ class Files:
             return tuple(FileRoot(**value) for value in values)
         return await self._run(operation)
 
+    async def from_ui(self, ui, *, node_id=None, key=None) -> tuple[RemoteFile, ...]:
+        """Resolve every standard Comfy filename/subfolder/type descriptor.
+
+        Pass a call's native UI mapping. Optional node_id and key select one
+        node and one UI field; the returned tuple preserves descriptor order.
+        This performs file metadata I/O and never fetches computation outputs.
+        """
+        if not isinstance(ui, Mapping):
+            raise TypeError("ui must be a native Comfy UI mapping")
+        selected = ui
+        if node_id is not None:
+            selected = selected[str(node_id)]
+        if key is not None:
+            if node_id is not None:
+                selected = selected[key]
+            else:
+                selected = [node[key] for node in selected.values()
+                            if isinstance(node, Mapping) and key in node]
+        descriptors = []
+
+        def visit(value):
+            if isinstance(value, Mapping):
+                if "filename" in value and "type" in value:
+                    filename, subfolder, directory = (value["filename"],
+                                                       value.get("subfolder", ""), value["type"])
+                    if (not isinstance(filename, str) or not filename
+                            or not isinstance(subfolder, str)
+                            or not isinstance(directory, str)
+                            or directory not in {"input", "temp", "output"}):
+                        raise ValueError("Invalid native Comfy file descriptor")
+                    descriptors.append((f"{subfolder}/{filename}" if subfolder else filename,
+                                        directory))
+                else:
+                    for child in value.values():
+                        visit(child)
+            elif isinstance(value, (list, tuple)):
+                for child in value:
+                    visit(child)
+
+        visit(selected)
+        return tuple([await self.stat(path, directory=directory)
+                      for path, directory in descriptors])
+
     async def stat(self, remote_file, *, directory=None, root=None, checksum=False) -> RemoteFile:
         selection = _selector(remote_file, directory=directory, root=root)
 
@@ -238,7 +284,7 @@ async def _upload_once(transport, session_id, source, selection):
     completed = {}
     try:
         before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode):
+        if not stat_module.S_ISREG(before.st_mode):
             raise ValueError("Upload source must be a regular local file")
         boundary = "comani-" + uuid.uuid4().hex
         metadata = {"session_id": session_id, "size": before.st_size, **selection}
@@ -518,7 +564,7 @@ async def _upload_resumable(transport, session_id, source, selection, timeout, o
     state, success = {}, False
     try:
         before = os.fstat(stream.fileno())
-        if not stat.S_ISREG(before.st_mode):
+        if not stat_module.S_ISREG(before.st_mode):
             raise ValueError("Upload source must be a regular local file")
         status = await transfer.request("upload/start", admission=True, size=before.st_size, **selection)
         offset, acknowledged, digest = 0, 0, hashlib.sha256()
@@ -710,3 +756,28 @@ async def _download_resumable(transport, session_id, selection, target, overwrit
                 temporary.unlink(missing_ok=True)
             if not success:
                 await transfer.cancel()
+
+
+# Module-level current-Client file I/O.
+def roots(*, directory=None, category=None) -> Coroutine[Any, Any, tuple[FileRoot, ...]]:
+    return _invoke_async(('files', 'roots'), directory=directory, category=category)
+
+
+def from_ui(ui, *, node_id=None, key=None) -> Coroutine[Any, Any, tuple[RemoteFile, ...]]:
+    return _invoke_async(('files', 'from_ui'), ui, node_id=node_id, key=key)
+
+
+def stat(remote_file, *, directory=None, root=None, checksum=False) -> Coroutine[Any, Any, RemoteFile]:
+    return _invoke_async(('files', 'stat'), remote_file, directory=directory, root=root, checksum=checksum)
+
+
+def remove(remote_file, *, directory=None, root=None, missing_ok=False) -> Coroutine[Any, Any, None]:
+    return _invoke_async(('files', 'remove'), remote_file, directory=directory, root=root, missing_ok=missing_ok)
+
+
+def upload(local_path, *, directory=None, root=None, path=None, recovery_timeout=None) -> Coroutine[Any, Any, RemoteFile]:
+    return _invoke_async(('files', 'upload'), local_path, directory=directory, root=root, path=path, recovery_timeout=recovery_timeout)
+
+
+def download(remote_file, local_path, *, directory=None, root=None, overwrite=False, recovery_timeout=None) -> Coroutine[Any, Any, DownloadedFile]:
+    return _invoke_async(('files', 'download'), remote_file, local_path, directory=directory, root=root, overwrite=overwrite, recovery_timeout=recovery_timeout)

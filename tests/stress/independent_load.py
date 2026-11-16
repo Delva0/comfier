@@ -226,11 +226,11 @@ async def make_graph(client):
         expanded = client.node("IndependentExpand", return_call=True, value=early)
         bad = client.node("IndependentFail", return_call=True, value=-999)
         selected = client.node("IndependentLazy", return_call=True, left=expanded.output(), right=bad.output(), choose_left=True)
-        computed = client.python(nested_sum, inputs={"payload": {"left": [selected.output()], "right": {"value": early}}})
+        computed = client.python(nested_sum, inputs={"payload": {"left": [selected.output()], "right": {"value": early}}}, return_call=True)
         sub.output("value", computed.output())
     with client.graph() as graph:
         value = graph.input("value", type="*")
-        combined = client.submit(sub, inputs={"value": value})
+        combined = client.submit(sub, inputs={"value": value}, return_call=True)
         final = client.node("IndependentAdd", return_call=True, value=combined.output("value"), amount=1)
         graph.output("value", final.output())
         graph.output("alias", final.output())
@@ -245,20 +245,20 @@ async def load_session(index, rounds, url, meter):
         for i in range(rounds):
             n = index * 100000 + i
             root = client.node("IndependentEcho", return_call=True, value=n)
-            py = client.python(nested_sum, inputs={"payload": {"left": [root.output()], "right": {"value": root.output()}}})
+            py = client.python(nested_sum, inputs={"payload": {"left": [root.output()], "right": {"value": root.output()}}}, return_call=True)
             final = client.node("IndependentAdd", return_call=True, value=py.output(), amount=1)
             calls.extend((root, py, final))
             checks.extend((assert_output(root, n, meter), assert_output(py, n * 2, meter), assert_output(final, n * 2 + 1, meter)))
             if i % 4 == 0:
-                run = client.submit(graph, inputs={"value": root.output()})
-                owned = client.python(identity, inputs={"value": run.output("value")})
+                run = client.submit(graph, inputs={"value": root.output()}, return_call=True)
+                owned = client.python(identity, inputs={"value": run.output("value")}, return_call=True)
                 calls.extend((run, owned))
                 checks.extend((assert_output(run, None, meter, fetch=False), assert_output(owned, n * 2 + 20, meter)))
                 raw = {"a": {"class_type": "IndependentEcho", "inputs": {"value": n}},
                        "b": {"class_type": "IndependentExpand", "inputs": {"value": ["a", 0]}},
                        "c": {"class_type": "IndependentAdd", "inputs": {"value": ["b", 0], "amount": 9}}}
-                rawrun = client.submit(raw, outputs={"answer": ["c", 0]}, targets=["c"])
-                rawowned = client.python(identity, inputs={"value": rawrun.output("answer")})
+                rawrun = client.submit(client.graph(raw, outputs={"answer": ["c", 0]}, targets=["c"]), return_call=True)
+                rawowned = client.python(identity, inputs={"value": rawrun.output("answer")}, return_call=True)
                 calls.extend((rawrun, rawowned))
                 checks.extend((assert_output(rawrun, None, meter, fetch=False), assert_output(rawowned, n + 14, meter)))
         results = await asyncio.gather(*checks, return_exceptions=True)
@@ -328,7 +328,7 @@ async def semantic_phase(url, runtime, meter):
             slow = client.node("IndependentSlow", return_call=True, value=early, delay=.2)
             graph.output("value", slow.output())
         assert len(runtime.calls) == before, "capture unexpectedly executed"
-        run = client.submit(graph)
+        run = client.submit(graph, return_call=True)
         early_ref = await run[early]
         assert await early_ref.fetch() == 47
         assert not run._state.done.done(), "middle ref failed to arrive before whole invocation"
@@ -340,7 +340,7 @@ async def semantic_phase(url, runtime, meter):
             meter.cancelled += 1
         cancelled = await asyncio.gather(*waiters[:2], return_exceptions=True)
         assert all(isinstance(error, asyncio.CancelledError) for error in cancelled)
-        owned = client.python(identity, inputs={"value": run.output("value")})
+        owned = client.python(identity, inputs={"value": run.output("value")}, return_call=True)
         ownedref = await owned.output()
         assert ownedref.ownership == "owned"
         assert await ownedref.fetch() == 47
@@ -388,7 +388,7 @@ async def semantic_phase(url, runtime, meter):
             unselected = client.node("IndependentFail", return_call=True, value=99)
             choice = client.node("IndependentLazy", return_call=True, left=selected.output(), right=unselected.output(), choose_left=True)
             lazygraph.output("chosen", choice.output())
-        lazyrun = client.submit(lazygraph)
+        lazyrun = client.submit(lazygraph, return_call=True)
         assert await (await lazyrun.output()).fetch() == 16
         try:
             await lazyrun[unselected.output()]
@@ -411,7 +411,7 @@ async def semantic_phase(url, runtime, meter):
                 raise AssertionError("wire cross-session token fetched")
         image = client.node("EmptyImage", return_call=True, width=16, height=16, batch_size=1, color=0)
         invert = client.node("ImageInvert", return_call=True, image=image.output())
-        tensor_summary = client.python(lambda x: (tuple(x.shape), float(x.mean())), inputs={"x": invert.output()})
+        tensor_summary = client.python(lambda x: (tuple(x.shape), float(x.mean())), inputs={"x": invert.output()}, return_call=True)
         assert await (await tensor_summary.output()).fetch() == ((1, 16, 16, 3), 1.0)
         notes.append("built-in native CPU EmptyImage/ImageInvert plus Python verified")
     await settle(runtime)
@@ -494,13 +494,13 @@ async def package_phase(url, runtime, meter):
         async def package_session(index):
             async with Client(transport=TimedTransport(url, meter)) as client:
                 selected = package if index % 2 else clone
-                calls = [client.python(source=selected, entry="operations:tick", inputs={"value": index}) for _ in range(32)]
+                calls = [client.python(source=selected, entry="operations:tick", inputs={"value": index}, return_call=True) for _ in range(32)]
                 with client.graph() as graph:
                     seed = graph.input("seed", type="*")
-                    file_call = client.python(source=source_file, entry="apply", inputs={"value": seed})
+                    file_call = client.python(source=source_file, entry="apply", inputs={"value": seed}, return_call=True)
                     graph.output("value", file_call.output())
-                graph_run = client.submit(graph, inputs={"seed": index})
-                owned = client.python(identity, inputs={"value": graph_run.output()})
+                graph_run = client.submit(graph, inputs={"seed": index}, return_call=True)
+                owned = client.python(identity, inputs={"value": graph_run.output()}, return_call=True)
                 refs = await asyncio.gather(*(waiter(call.output(), meter) for call in calls))
                 values = await asyncio.gather(*(ref.fetch() for ref in refs))
                 assert all(isinstance(value, tuple) and value[1] == index + 5 for value in values)
@@ -510,10 +510,10 @@ async def package_phase(url, runtime, meter):
         values = await asyncio.gather(*(package_session(i) for i in range(8)))
         assert sorted(value for group in values for value in group) == list(range(1, 257))
         async with Client(transport=TimedTransport(url, meter)) as client:
-            reused = client.python(source=package, entry="operations:tick", inputs={"value": 0})
+            reused = client.python(source=package, entry="operations:tick", inputs={"value": 0}, return_call=True)
             assert await (await reused.output()).fetch() == (257, 5)
             (clone / "helper.py").write_text("def plus(value):\n    return value + 999\n")
-            conflict = client.python(source=clone, entry="operations:tick", inputs={"value": 0})
+            conflict = client.python(source=clone, entry="operations:tick", inputs={"value": 0}, return_call=True)
             try:
                 await conflict
             except PackageConflict:
@@ -523,7 +523,7 @@ async def package_phase(url, runtime, meter):
             installed = root / "aiohttp"
             installed.mkdir()
             (installed / "__init__.py").write_text("def apply():\n    return 999\n")
-            collision = client.python(source=installed, entry="aiohttp:apply")
+            collision = client.python(source=installed, entry="aiohttp:apply", return_call=True)
             try:
                 await collision
             except PackageConflict:
@@ -546,7 +546,7 @@ async def large_graph_phase(url, runtime, meter):
                 current = value
                 for step in range(32):
                     first = client.node("IndependentAdd", return_call=True, value=current, amount=1)
-                    py = client.python(nested_sum, inputs={"payload": {"left": [first.output()], "right": {"value": 1}}})
+                    py = client.python(nested_sum, inputs={"payload": {"left": [first.output()], "right": {"value": 1}}}, return_call=True)
                     expanded = client.node("IndependentExpand", return_call=True, value=py.output())
                     current = expanded.output()
                     if step % 4 == 0:
@@ -555,16 +555,16 @@ async def large_graph_phase(url, runtime, meter):
                 inner.output("value", current)
             with client.graph() as outer:
                 value = outer.input("value", type="*")
-                first = client.submit(inner, inputs={"value": value})
-                second = client.submit(inner, inputs={"value": first.output()})
+                first = client.submit(inner, inputs={"value": value}, return_call=True)
+                second = client.submit(inner, inputs={"value": first.output()}, return_call=True)
                 outer.output("value", second.output())
                 outer.output("alias", second.output())
             assert len(outer.nodes) == 224
             calls, checks = [], []
             for repeat in range(4):
                 n = index * 10000 + repeat
-                run = client.submit(outer, inputs={"value": n})
-                owned = client.python(identity, inputs={"value": run.output("alias")})
+                run = client.submit(outer, inputs={"value": n}, return_call=True)
+                owned = client.python(identity, inputs={"value": run.output("alias")}, return_call=True)
                 calls.extend((run, owned))
                 checks.extend((assert_output(run, None, meter, fetch=False), assert_output(owned, n + 448, meter)))
             results = await asyncio.gather(*checks, return_exceptions=True)

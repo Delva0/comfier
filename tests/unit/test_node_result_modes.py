@@ -345,7 +345,7 @@ async def test_graph_default_and_unchecked_slots_survive_submit_and_composition(
         assert all(isinstance(ref, GraphRef) for ref in (first, second, off_first, off_second))
         graph.output("value", first)
     assert not runtime.submissions
-    run = remote.submit(graph)
+    run = remote.submit(graph, return_call=True)
     bound = await run[first]
     assert await bound.fetch() == "middle:2"
     downstream = remote.node("Echo", value=run[first])

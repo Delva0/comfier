@@ -267,7 +267,7 @@ async def test_native_graph_explicit_slots_execute_and_whole_graph_edges_are_rej
             assert await result is result
             graph.output("value", result)
         assert not runtime.calls and WholeProducer.runs == 0
-        run = remote.submit(graph)
+        run = remote.submit(graph, return_call=True)
         assert await (await run.output("value")).fetch() == 41
         assert await (await run[first]).fetch() == 40
         downstream = remote.node("AcceptanceWholeConsumer", value=run[second], fail=False)
@@ -278,7 +278,7 @@ async def test_native_graph_explicit_slots_execute_and_whole_graph_edges_are_rej
 async def test_python_container_is_one_output_value_when_passed_to_native_node(whole_nodes, value):
     _, url = whole_nodes
     async with Client(url) as remote:
-        python_call = remote.python(lambda item: item, inputs={"item": value})
+        python_call = remote.python(lambda item: item, inputs={"item": value}, return_call=True)
         reference, = await python_call
         assert await reference.fetch() == value
         native = remote.node("AcceptanceWholeConsumer", value=python_call.output(), fail=False)

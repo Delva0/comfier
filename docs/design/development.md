@@ -1,113 +1,129 @@
 # 运行、示例与开发
 
-管理和客户端需要 Python 3.11+ 与 Comani 轻量包。ComfyUI、Torch、节点和模型只需要存在于明确选定的远端计算环境。本文命令在 Linux/WSL；服务器路径与客户端路径分别标明。
+客户端和管理 daemon 需要 Python 3.11+ 与轻量 Comani 包。ComfyUI、Torch、节点和模型属于明确选定的计算环境。以下命令用于 Linux/WSL；服务器路径和客户端路径分别标明。
 
 ## 启动管理 daemon
 
-把当前 wheel 放到服务器并安装到管理环境：
+在服务器管理环境安装当前 wheel，然后选择实际 root、计算解释器和 workspace：
 
 ```sh
-python -m pip install /server/packages/comani-0.4.0-py3-none-any.whl
-comani daemon \
-  --comfy-root /server/ComfyUI \
-  --workspace /server \
-  --no-start
+python -m pip install /server/packages/comani-0.5.0-py3-none-any.whl
+comani daemon --comfy-root /server/ComfyUI \
+  --runtime-python /server/comfy-env/bin/python --workspace /server --no-start
 ```
 
-ComfyUI 目录可尚不存在。`python -m comani daemon` 与 console 入口相同。默认前台监听 127.0.0.1:8190；Ctrl-C/SIGTERM 或部署者进程管理器停止。公开入口统一为 `python -m comani` 与 `comani`；CLI 位于 `cli/`，单向调用 `daemon/`。
+ComfyUI 和计算环境路径可以尚不存在；此时先执行下面的显式准备。`python -m comani daemon` 与 console 入口相同。默认前台监听 127.0.0.1:8190，由 Ctrl-C/SIGTERM 或部署者进程管理器停止。`--no-start` 只启动管理，不加时 CLI 尝试启动计算；Client 连接始终只做管理握手。
 
-`--no-start` 选择纯管理。为兼容旧启动脚本，不加时 CLI 尝试启动计算；**Client 连接始终只管理握手**，不自动安装/启动。已有模板通过 `--runtime-python /server/venv/bin/python` 选择解释器。源码位置、workspace、硬件和原生参数显式配置，连接不迁移或重置它们。只保留必要启动入口，不实现旧 39 项 CLI 候选。
+通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMANI_TOKEN 或 --token，非 loopback 绑定必须有 token。
 
-可通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件；没有配置文件时修改只在该进程中有效。`--print-config` 可查看有效配置。配置字段包括 runtime_python/comfy_root/workspace/cpu/custom_nodes/comfy_args、计算宽限与配额、文件大小与传输 policy。
+## 空白 CPU 环境
 
-## 就绪与网络入口
-
-token 取自 COMANI_TOKEN 或 --token，非 loopback 绑定必须有 token。使用部署方 SSH 转发/鉴权 HTTPS；租机、隧道、多实例调度和账号/系统安装由部署者负责。
+先启动纯管理 daemon。在客户端把下面保存为 `prepare_cpu.py` 并运行，填写真实服务器路径；wheel 必须已经存在于服务器。新 venv 目录必须不存在。
 
 ```python
 import asyncio
 import os
-from comani import Client
+
+import comani
 
 
-async def check_ready():
-    async with Client(os.environ["COMANI_URL"], token=os.environ.get("COMANI_TOKEN")) as remote:
-        info = await remote.comfyui.info()
-        print(info.state, info.installed, info.runtime_python)
+async def main():
+    async with comani.Client(
+        os.environ.get("COMANI_URL", "http://127.0.0.1:8190"),
+        token=os.environ.get("COMANI_TOKEN"),
+    ):
+        env = await comani.comfyui.create_environment("/server/comfy-env")
+        await comani.comfyui.configure(
+            runtime_python=env.python, comfy_root="/server/ComfyUI",
+            cpu=True, custom_nodes=False,
+        )
+        await comani.comfyui.prepare_tools(skip_manager=True)
+        await comani.comfyui.install(skip_torch=False, skip_manager=True)
+        await comani.comfyui.prepare_runtime("/server/packages/comani-0.5.0-py3-none-any.whl")
 
 
-asyncio.run(check_ready())
+asyncio.run(main())
 ```
 
-这个检查只证明管理入口及实际状态，不加载模型，也不声称计算就绪。需要计算时显式 start，再执行对应原生调用。启动缺依赖会报 RuntimeEnvironmentIncomplete，管理/bash/files 仍存活。网络中断在配置的恢复窗口内观察原调用，不重跑脚本；显式关闭仍优先撤销计算会话。
-
-## CPU 完整示例
-
-从纯管理 daemon 开始，在客户端项目目录运行：
+这些是明确的安装动作。缺失 comfy-cli 时安装发行版，首次 ComfyUI 安装默认选择上游 nightly/default branch，并记录实际 commit；不固定一次历史验收的 SHA。CPU 的 Torch 由 `install(skip_torch=False)` 按 CPU 配置安装。已有环境可以直接 configure 其解释器，无需重新创建。准备结束后使用 `basic.py` 启动计算并处理图片：
 
 ```sh
-python examples/basic.py \
-  --url http://127.0.0.1:8190 \
-  --new-environment /server/new-comfy-env \
-  --comfy-root /server/ComfyUI \
-  --runtime-package /server/packages/current-comani.whl \
-  --output artifacts/basic.png --stop
+python examples/basic.py --input photo.png --output artifacts/basic.png
 ```
 
-server 环境目录必须不存在，wheel 必须是服务器已有的本次精确包。脚本逐步 create_environment→configure CPU→prepare_tools→install 固定 core/Torch/requirements→prepare_runtime→start，任何失败中断后续步骤。它还演示 bash、本地文件 upload/stat/remove、eager/graph 和 SaveImage metadata→files.download；本地只需 Comani，无需 Torch/Pillow。
+只需要本地图片和轻量客户端，不需要 checkpoint 或本地 Torch。脚本上传输入、执行 LoadImage → inline Python → ImageInvert → SaveImage，再用 `Call.file()` 和 `files.download` 下载。输入在读取完成后删除，远端结果保留；本地输出 create-only，重复运行请选择新路径。它不要求 CPU 专用配置，也可复用 GPU 实例。
 
-已有 CPU 环境省略三个准备参数即可。basic.py 不默改一个 GPU 环境的硬件配置。返回文件默认 create-only；再次运行请选新的本地 output。
+## graph 导出接 eager 下游
 
-basic.py 可在现有 runtime 运行时执行 bash 和文件准备，再显式确保 runtime 已启动。bash 是独立 OS 通道，不要求停机，也不持环境维护锁。专用安装/更新仍须先停止计算；`stop()` / `restart()` 默认等待计算及受管安装，显式 `wait=False` 才紧急中断相关工作后停止/尝试重启。
+```sh
+python examples/graph_to_eager.py --output artifacts/graph-to-eager.png
+```
+
+[graph_to_eager.py](../../examples/graph_to_eager.py) 不需要模型或本地 Torch。它把 eager EmptyImage 绑定到 graph 输入，图内 ImageInvert 声明一个导出；`processed = comani.submit(workflow, inputs=...)` 默认直接给 Output，再交给图外 ImageInvert，最后保存下载。两次反转近似恢复原始 RGB(18,52,86)，浮点计算后保存为 8-bit PNG 可能每通道相差一级。
+
+此处没有 Call 包装或 .output() 胶水。需要 UI/文件句柄的 checkpoint/H3 图则显式 `submit(..., return_call=True)`。零导出的默认 submit 返回 None 仍已提交；需要等待整图时也选 True。计算、逐节点观察与返回形状见 [SDK](sdk.md#graph-导出直接接-eager-下游)。
+
+## checkpoint 工作流
+
+```sh
+python examples/local_checkpoint.py --checkpoint my-model.safetensors \
+  --prompt "a red panda in a sunlit garden" --output artifacts/panda.png
+```
+
+`--checkpoint` 是 ComfyUI 原生模型名。要上传本地 checkpoint，增加 `--upload-checkpoint /local/model.safetensors`；多个 checkpoint 根时还需 `--model-root /actual/server/checkpoints`，只有一个根可直接使用它。上传是 create-only，模型保留供以后使用。选择的权重须适合可见的 CheckpointLoaderSimple/CLIP/KSampler/VAE 节点链和目标硬件；示例不替你选择模型体系。
+
+这个脚本使用显式 `async with Client(...) as remote`，与 basic/H3 的模块上下文风格相互对应。graph 仅捕获计算，SaveImage 默认是原生执行根，通过 submit(graph, return_call=True) 保留 Call，下载用 run.file(node_id=saved.id) 获取实际结果。
 
 ## H3 完整脚本
 
-主入口 [minimax_h3_remote.py](../../examples/minimax_h3_remote.py) 以同一流程准备环境/插件、固定三权重并生成 eager、captured graph、native API 三种输出。默认将纯identity计算作为source artifact，支持客户端/目标Python不同；--callable明确选择要求Python/cloudpickle匹配的callable传输。[minimax_h3_source_remote.py](../../examples/minimax_h3_source_remote.py) 保留明确source-file入口；[source_ops](../../examples/minimax_h3_source_ops.py) 不读管理版本、文件或provenance。新流程不依赖私有model-verification文件、外部安装脚本或固定平台目录。
-
-已有 GPU 模板的管理 daemon 先用 `--no-start`、实际 root/解释器/workspace 启动。客户端配置 COMANI_URL、COMANI_TOKEN；以下变量显式选服务器路径：
+[minimax_h3_remote.py](../../examples/minimax_h3_remote.py) 用同一脚本表达环境/插件准备、三个权重的获取屏障和一次原生 graph 推理。普通运行复用已安装 core、工具和 GPU 配置：
 
 ```sh
-python examples/minimax_h3_remote.py \
-  --prepare \
-  --runtime-python "$RUNTIME_PYTHON" \
-  --comfy-root "$COMFY_ROOT" \
-  --runtime-package "$SERVER_COMANI_WHEEL" \
-  --comfy-commit eee59185ff4f43ae2d9ad122b245619d27d9daad \
-  --output artifacts/h3-new-run
+python examples/minimax_h3_remote.py --output artifacts/h3.png
 ```
 
-`--prepare` 要求计算已停止；使用已有 core 时调用 update(commit)，缺失时 install(commit)。安装固定 comfy-cli/Manager 到目标环境，显式准备 runtime 包；脚本不猜测 CUDA。若模板需替换/安装 GPU 包，重复传完整 `--torch-requirement` 并给 `--torch-index-url`；新建 GPU venv 用 `--new-environment` 替代 `--runtime-python`，且必须明确这些 GPU package/index 参数。例如包版本和索引由调用方选为 TORCH_REQUIREMENT/TORCH_INDEX_URL，不在例程中硬编码硬件发行版。
+`--prompt/--seed/--width/--height/--steps` 直接控制脚本中可见的 H3 节点链；采样器、scheduler、CFG、loader 类型和三个模型名也明确写在脚本中，可按需要修改或插入节点。没有模型专属的隐藏 pipeline。
 
-可选约束 `--expected-python`、`--expected-torch` 核对 info 的实际环境；`--comfy-commit` 默认要求上述完整 commit。重复 `--plugin registry-id@version` 或 `--git-plugin repository-url@full-commit` 在准备阶段安装指定插件。H3 所需节点由选定 backend/插件提供，不假称任意旧模板都包含它们。
+需要准备或修改目标时先显式停止计算，然后选择所需路径和依赖：
 
-脚本在 daemon 解析 Civitai version3462708/file3365259 和 HF commit0bb149f5… 的 encoder/VAE，核对固定SHA，reuse时也验证内容。默认auto利用已装hub/Xet/aria2能力；`--transport http|aria2` 可明确选择。本例跨Civitai/HF，强制hf不适用于全部文件。可选 `--hub-version` 在prepare时安装一个明确版本；不自动装系统工具。
+```sh
+python examples/minimax_h3_remote.py --prepare \
+  --runtime-python "$RUNTIME_PYTHON" --comfy-root "$COMFY_ROOT" \
+  --runtime-package "$SERVER_COMANI_WHEEL" --output artifacts/h3.png
+```
 
-原生类别分别为 diffusion_models/text_encoders/vae；每类只有一个root时使用该唯一根，多根必须给 `--diffusion-root/--encoder-root/--vae-root`，值是服务器上的实际根绝对路径。三路获取用 asyncio.gather 形成就绪屏障，不是跨roots原子事务。安装失败或任意模型校验失败不会继续出图。
+`--prepare` 复用已装 core/工具，缺 core 才 install；不会默认更新已装 core。增加 `--update` 才沿当前 upstream 更新；`--comfy-version nightly|latest|tag` 或 `--comfy-commit 完整SHA` 明确选择目标，并在已安装时更新到该目标。detached HEAD 没有当前 upstream，更新时必须指定目标。
 
-无 `--prepare` 时，脚本只检查现有环境/commit，校验复用或获取三模型，再显式启动计算。默认输出 native SaveImage 8-bit PNG 和 run.json，本地无需Torch。`--fetch-tensors` 额外获取精确float Tensor、保存.pt/诊断PNG并逐位比较三模式，客户端要预装匹配的Torch/NumPy/Pillow。fetch本身没有隐式PNG转换。
+新 GPU venv 使用 `--new-environment /server/new-env` 代替 `--runtime-python`，并必须传 `--runtime-package`、重复的 `--torch-requirement` 和 `--torch-index-url`。GPU 的 Torch/CUDA build 由调用者根据机器选择，不由脚本猜测。已有目标仅在给了这些包参数时安装它们。除非明确给版本，prepare_tools 保留已装工具；缺 Manager 时按所选 core 的 manager_requirements 安装，缺该文件时使用发行版。
 
-重复调用准备好的 refs 见 [minimax_h3_reuse.py](../../examples/minimax_h3_reuse.py)：使用相同管理参数，保留原 `--serial` 和默认 seeds426390/426391/426392；最多一个生成与一个fetch/save在途。此性能脚本明确依赖本地Tensor库，preparation_seconds单列准备时间。历史 --verification-path、source provenance 和外部 --monitor-source 已移除；资源采样由验收器另行完成，历史 artifacts 保持原样，不能把新代码记成已测。
+软件选择参数都在 `--prepare` 组：`--cli-version` 选择 comfy-cli PyPI 版本，`--cli-revision` 选择 Git ref，二者互斥；`--manager-version` 和 `--hub-version` 明确选择对应包。插件用重复的 `--plugin registry-id@version` 或 `--git-plugin repository-url@完整commit`；修改后显式 start 才加载 registry。
 
-### 六个文件的职责
+本地 `models.resolve` 查询 Civitai version3462708/file3365259 和 HF commit0bb149f5… 的 encoder/VAE，保留模型内容 SHA 校验；真正下载由 daemon 完成。`HF_TOKEN/CIVITAI_TOKEN` 的本地查询权限与 daemon 下载权限独立配置。每类只有一个模型根时直接选它；多个根时必须给 `--diffusion-root/--encoder-root/--vae-root`，值是服务器实际绝对路径。三路下载使用 asyncio.gather，全部成功才构图；它不是跨根的原子事务。
 
-| 文件 | 当前职责 |
-| --- | --- |
-| basic.py | CPU准备、管理bash/files、eager/graph、原生PNG |
-| local_checkpoint.py | 现有远端checkpoint或明确本地upload，原生PNG下载 |
-| minimax_h3_remote.py | 完整GPU实例准备/模型/三模式生成主入口 |
-| minimax_h3_source_remote.py | 同流程的source计算变体 |
-| minimax_h3_reuse.py | 保留refs、有界overlap、--serial与精确Tensor基准 |
-| minimax_h3_source_ops.py | 必要的纯计算identity，不承担管理/文件功能 |
+脚本启动后检查实际 registry 是否有 H3 所需节点，不对软件 commit 做默认等式检查。loader 类型、输入端口和实际模型兼容性仍由 ComfyUI 原生验证/执行检查；节点存在不代表模型或硬件一定可用。`--transport auto` 复用目标已装 hub/Xet/aria2 能力，`http|aria2` 可显式选择；不自动安装系统工具。
 
-## 原生节点与参数
+普通输出只有 native SaveImage 8-bit PNG，无计时 sidecar 或精确 Tensor 对照。[minimax_h3_source_remote.py](../../examples/minimax_h3_source_remote.py) 在同一 source 文件定义纯函数和 async 入口，用 `source=Path(__file__)` 向上述图插入计算；本地入口的 imports 放在 main guard 中，不要求服务器存在本地 example 模块。inline 字符串、源码文件、目录包与 callable 的选择见 [Python artifacts](python-artifacts.md)。
 
-通过 plugins 安装明确registry版本或Git commit，依赖进入 runtime_python。停止计算后修改，显式start/restart读入新registry；磁盘安装成功不代表live导入成功。也可由部署者预装，SDK按原始节点名调用，不生成本地绑定类。
+## 高级性能示例
 
-原生计算参数放在 `--` 后，例如 `-- --lowvram --reserve-vram 4`，或 configure(comfy_args=[...])。设备环境在Torch导入前应用；headless支持/拒绝项见 [Runtime](runtime.md)。前端JS、所有第三方HTTP route和官方WebUI不属于统一兼容承诺。
+[advanced/minimax_h3_reuse.py](../../examples/advanced/minimax_h3_reuse.py) 保留 model/conditioning refs，最多一个生成和一个 fetch/save 在途，`--serial` 关闭重叠。它明确依赖客户端 Torch/NumPy/Pillow，并记录 setup、生成、下载、写盘和构建身份；这是性能研究需要的复杂度，不是普通生图步骤。
+
+```sh
+python examples/advanced/minimax_h3_reuse.py --output artifacts/h3-benchmark \
+  --seeds 426390 426391 426392
+```
+
+可选 `--expected-python/--expected-torch/--expected-comfy-commit` 为复现实验主动断言已装环境，不是默认安装目标。历史冻结脚本、模型 hash、测量和图片保留于各自 artifacts/report；当前脚本的 CLI、语法或 CPU 结果不能充当新的 H3 GPU 数值认证。
+
+## 原生参数与管理行为
+
+原生参数放在 daemon 的 `--` 后，例如 `-- --lowvram --reserve-vram 4`，或 configure(comfy_args=[...])。设备环境在 Torch 导入前应用。节点名直接取 registry，不生成本地包装类；前端 JS、所有第三方 HTTP route 和官方 WebUI 不在统一兼容范围。
+
+环境、core、插件变更需显式停止计算；bash 是独立 OS 通道，可与 runtime 并行。`stop()/restart()` 默认 wait=True；显式 wait=False 紧急中断相关工作后停止/尝试重启，不保证安装回滚。就绪、恢复和 Operation 细节见 [管理设计](remote-management-plan.md)。
 
 ## 测试与打包
 
-开发环境选择有测试所需ComfyUI/Torch的解释器；SDK-only用例不需要native依赖：
+选择具备目标 ComfyUI/Torch 的开发解释器；SDK-only 用例不需要 native 依赖：
 
 ```sh
 python -m pip install -e ".[test]"
@@ -116,8 +132,8 @@ python -m ruff check src tests scripts examples
 python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-unit验证SDK/故障/打包，native验证实际cache/lazy/loop/expand/list，integration验证HTTP/隔离环境/管理与计算。GPU用例通过 COMANI_TEST_URL 及显式COMANI_TEST_CHECKPOINT选已有权重，不自动下载或租机。
+unit 验证 SDK/故障/打包，native 验证 cache/lazy/loop/expand/list，integration 验证 HTTP/隔离环境/管理与计算。GPU 测试通过 COMANI_TEST_URL 和显式 COMANI_TEST_CHECKPOINT 选择已有权重，不自动下载或租机。
 
-最终wheel必须在README和生产源码冻结后构建，核对source/archive/独立安装身份并执行新独立验收。历史 [wheel_manifest.json](../wheel_manifest.json) 是0.2.0快照；旧v4-r2、cd6或files/binary/LZ4报告各自记录其原wheel/source，不能借给新包。使用 [verify_wheel.py](../../tests/acceptance/verify_wheel.py) 时提供本次真实SHA，不复制历史SHA作为新构建证明。
+最终 wheel 在源码/README 冻结后构建，并核对 source/archive/独立安装身份。历史 [wheel_manifest.json](../wheel_manifest.json) 是 0.2.0 快照；旧报告不得借给新构建。[verify_wheel.py](../../tests/acceptance/verify_wheel.py) 必须使用本次真实 SHA。scripts/ 保留必要 [环境诊断](../../scripts/check_environment.py) 与 [wheel 刷新](../../scripts/refresh_wheel.py)。
 
-scripts/只保留必要的 [环境诊断](../../scripts/check_environment.py) 与 [wheel刷新](../../scripts/refresh_wheel.py)。模型/constraints测试fixture和历史交付资料不是产品安装前提。新CPU/故障/GPU/WAN验收报告应独立记录实际覆盖与未测项，作者自测和文档AST/help检查不能代替真实远端结论。
+示例作者的 AST/ruff/help 检查、独立 CPU 执行、新 GPU/WAN 验收和最终发布身份是不同证据，应分别记录。

@@ -580,7 +580,12 @@ class NativeRuntime:
                 inputs = native_python_inputs(inputs)
             nodes[name]["inputs"] = inputs
         targets = graph_spec.get("targets") if workflow else ["result"]
-        if not targets:
+        if workflow and "automatic_targets" in graph_spec:
+            automatic = [name for name in graph_spec["automatic_targets"]
+                         if name in nodes and getattr(self.adapter.nodes.NODE_CLASS_MAPPINGS[
+                             nodes[name]["class_type"]], "OUTPUT_NODE", False)]
+            targets = list(dict.fromkeys(list(targets or []) + automatic))
+        elif not targets:
             targets = [name for name in original_nodes if getattr(self.adapter.nodes.NODE_CLASS_MAPPINGS[nodes[name]["class_type"]], "OUTPUT_NODE", False)]
         if not targets:
             raise ValueError("Workflow requires execution targets")

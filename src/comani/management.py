@@ -6,7 +6,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import dataclass, field, fields, is_dataclass
 from typing import Any
 
 from .errors import (
@@ -25,8 +25,10 @@ from .transport import retryable_transport_error
 def _plain(value):
     if isinstance(value, ManagementMetadata):
         return _plain(value.data)
+    if isinstance(value, ModelArtifact):
+        return _plain(value.to_wire())
     if is_dataclass(value):
-        return _plain(asdict(value))
+        return {item.name: _plain(getattr(value, item.name)) for item in fields(value)}
     if isinstance(value, Mapping):
         return {str(key): _plain(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -95,6 +97,18 @@ class ModelArtifact:
     revision: str | None = None
     metadata: dict = field(default_factory=dict)
     git_sha1: str | None = None
+    _download_url: str | None = field(default=None, repr=False, compare=False)
+
+    def to_public_dict(self):
+        """Stable provider facts suitable for logs; omit private transport data."""
+        return {item.name: getattr(self, item.name) for item in fields(self)
+                if not item.name.startswith("_")}
+
+    def to_wire(self):
+        result = self.to_public_dict()
+        if self._download_url is not None:
+            result["source"] = {**self.source, "url": self._download_url}
+        return result
 
 
 @dataclass(frozen=True)
@@ -103,6 +117,10 @@ class ModelSource:
     source: Any
     revision: str | None
     files: tuple[ModelArtifact, ...]
+
+    def to_public_dict(self):
+        return {"provider": self.provider, "source": self.source, "revision": self.revision,
+                "files": [artifact.to_public_dict() for artifact in self.files]}
 
 
 @dataclass(frozen=True)
@@ -114,6 +132,11 @@ class ModelManifest:
     allow: tuple[str, ...] | None = None
     ignore: tuple[str, ...] | None = None
     total_size: int | None = None
+
+    def to_public_dict(self):
+        return {"provider": self.provider, "source": self.source, "revision": self.revision,
+                "files": [artifact.to_public_dict() for artifact in self.files],
+                "allow": self.allow, "ignore": self.ignore, "total_size": self.total_size}
 
 
 @dataclass(frozen=True)
@@ -440,15 +463,19 @@ class ComfyUI(_Namespace):
     async def create_environment(self, path: str, *, python=None, timeout=None) -> ManagementMetadata:
         return await (await self.begin_create_environment(path, python=python, timeout=timeout)).result()
 
-    async def begin_prepare_tools(self, *, cli_revision="4f554bb5a9e5d0b5d04146e7bdf8cac2ceb729a5",
-                                  manager_version="4.2.2", hub_version=None, timeout=None) -> ManagementOperation:
+    async def begin_prepare_tools(self, *, cli_revision=None, cli_version=None,
+                                  manager_version=None, hub_version=None, skip_cli=False,
+                                  skip_manager=False, timeout=None) -> ManagementOperation:
         return await self._begin("prepare_tools", cli_revision=cli_revision,
-            manager_version=manager_version, hub_version=hub_version, timeout=timeout)
+            cli_version=cli_version, manager_version=manager_version, hub_version=hub_version,
+            skip_cli=skip_cli, skip_manager=skip_manager, timeout=timeout)
 
-    async def prepare_tools(self, *, cli_revision="4f554bb5a9e5d0b5d04146e7bdf8cac2ceb729a5",
-                            manager_version="4.2.2", hub_version=None, timeout=None) -> ManagementMetadata:
+    async def prepare_tools(self, *, cli_revision=None, cli_version=None, manager_version=None,
+                            hub_version=None, skip_cli=False, skip_manager=False,
+                            timeout=None) -> ManagementMetadata:
         return await (await self.begin_prepare_tools(cli_revision=cli_revision,
-            manager_version=manager_version, hub_version=hub_version, timeout=timeout)).result()
+            cli_version=cli_version, manager_version=manager_version, hub_version=hub_version,
+            skip_cli=skip_cli, skip_manager=skip_manager, timeout=timeout)).result()
 
     async def begin_install(self, *, version=None, commit=None, skip_torch=True,
                             skip_requirements=False, skip_manager=False, cli_version=None):
@@ -518,22 +545,19 @@ class Plugins(_Namespace):
     async def list(self) -> tuple[PluginInfo, ...]:
         return await self._read("list")
 
-    async def versions(self, package: str):
-        return await self._read("versions", package=package)
-
-    async def begin_install(self, packages, *, version=None, no_deps=False, timeout=None, manager_version="4.2.2"):
+    async def begin_install(self, packages, *, version=None, no_deps=False, timeout=None, manager_version=None):
         return await self._begin("install", packages=packages, version=version, no_deps=no_deps,
                                  timeout=timeout, manager_version=manager_version)
 
-    async def install(self, packages, *, version=None, no_deps=False, timeout=None, manager_version="4.2.2") -> PluginChanges:
+    async def install(self, packages, *, version=None, no_deps=False, timeout=None, manager_version=None) -> PluginChanges:
         return await (await self.begin_install(packages, version=version, no_deps=no_deps,
                                                timeout=timeout, manager_version=manager_version)).result()
 
-    async def begin_update(self, packages, *, version=None, no_deps=False, timeout=None, manager_version="4.2.2"):
+    async def begin_update(self, packages, *, version=None, no_deps=False, timeout=None, manager_version=None):
         return await self._begin("update", packages=packages, version=version, no_deps=no_deps,
                                  timeout=timeout, manager_version=manager_version)
 
-    async def update(self, packages, *, version=None, no_deps=False, timeout=None, manager_version="4.2.2") -> PluginChanges:
+    async def update(self, packages, *, version=None, no_deps=False, timeout=None, manager_version=None) -> PluginChanges:
         return await (await self.begin_update(packages, version=version, no_deps=no_deps,
                                               timeout=timeout, manager_version=manager_version)).result()
 
@@ -549,14 +573,16 @@ class Plugins(_Namespace):
     async def disable(self, packages, *, version=None, timeout=None) -> PluginChanges:
         return await (await self.begin_disable(packages, version=version, timeout=timeout)).result()
 
-    async def begin_uninstall(self, packages, *, timeout=None):
-        return await self._begin("uninstall", packages=packages, timeout=timeout)
+    async def begin_uninstall(self, packages, *, timeout=None, manager_version=None):
+        return await self._begin("uninstall", packages=packages, timeout=timeout,
+                                 manager_version=manager_version)
 
-    async def uninstall(self, packages, *, timeout=None) -> PluginChanges:
-        return await (await self.begin_uninstall(packages, timeout=timeout)).result()
+    async def uninstall(self, packages, *, timeout=None, manager_version=None) -> PluginChanges:
+        return await (await self.begin_uninstall(packages, timeout=timeout,
+                                                manager_version=manager_version)).result()
 
-    async def remove(self, packages, *, timeout=None) -> PluginChanges:
-        return await self.uninstall(packages, timeout=timeout)
+    async def remove(self, packages, *, timeout=None, manager_version=None) -> PluginChanges:
+        return await self.uninstall(packages, timeout=timeout, manager_version=manager_version)
 
 
 class Models(_Namespace):
@@ -568,21 +594,12 @@ class Models(_Namespace):
     async def list(self, *, category=None, root: FileRoot | None = None, prefix=None):
         return await self._read("list", category=category, root=root, prefix=prefix)
 
-    async def resolve(self, source, *, revision=None, file_id=None) -> ModelSource:
-        return await self._read("resolve", source=source, revision=revision, file_id=file_id)
-
-    async def versions(self, source):
-        return await self._read("versions", source=source)
-
-    async def manifest(self, source, *, revision=None, allow=None, ignore=None) -> ModelManifest:
-        return await self._read("manifest", source=source, revision=revision, allow=allow, ignore=ignore)
-
-    async def begin_download(self, artifact: ModelArtifact | Mapping, *, root: FileRoot,
+    async def begin_download(self, artifact: ModelArtifact | Mapping | str, *, root: FileRoot,
                              path=None, reuse=False, timeout=None, transport="auto", connections=8) -> ManagementOperation:
         return await self._begin("download", artifact=artifact, root=root, path=path,
                                  reuse=reuse, timeout=timeout, transport=transport, connections=connections)
 
-    async def download(self, artifact: ModelArtifact | Mapping, *, root: FileRoot,
+    async def download(self, artifact: ModelArtifact | Mapping | str, *, root: FileRoot,
                        path=None, reuse=False, timeout=None, transport="auto", connections=8) -> RemoteFile:
         return await (await self.begin_download(artifact, root=root, path=path,
             reuse=reuse, timeout=timeout, transport=transport, connections=connections)).result()

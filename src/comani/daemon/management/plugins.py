@@ -12,11 +12,11 @@ import aiohttp
 from .operations import ManagementError
 from .processes import run_process
 from .tools import (
-    MANAGER_VERSION,
     dependency_changes,
     git_fact,
     manager_argv,
     python_metadata,
+    require_flags,
     tool_env,
 )
 
@@ -40,11 +40,11 @@ async def backend(supervisor):
                 "source": await git_fact(legacy[0].parent),
                 "packaged_available": packaged,
                 "selection": "existing-legacy-layout",
-                "python": metadata["executable"], "capabilities": ["list", "versions", "install", "update", "enable", "disable", "remove"]}
+                "python": metadata["executable"], "capabilities": ["list", "install", "update", "enable", "disable", "remove"]}
     return {"kind": "packaged" if packaged else "missing",
             "version": packaged["version"] if packaged else None,
-            "python": metadata["executable"], "required_version": MANAGER_VERSION,
-            "capabilities": ["list", "versions", "install", "update", "enable", "disable", "remove"] if packaged else ["list", "versions"]}
+            "python": metadata["executable"],
+            "capabilities": ["list", "install", "update", "enable", "disable", "remove"] if packaged else ["list"]}
 
 
 async def custom_node_roots(supervisor):
@@ -86,13 +86,8 @@ async def listing(supervisor):
 
 
 async def versions(package):
-    package_id(package)
-    url = f"https://api.comfy.org/nodes/{quote(package)}/versions?statuses=NodeVersionStatusActive&statuses=NodeVersionStatusPending"
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
-        async with session.get(url) as response:
-            if response.status != 200:
-                raise ManagementError("ProviderError", f"Registry returned HTTP {response.status}")
-            return {"package": package, "versions": await response.json()}
+    from .providers import ProviderResolver
+    return await ProviderResolver().registry_versions(package)
 
 
 async def resolve_registry_version(package, version):
@@ -176,7 +171,7 @@ async def change_disk_state(supervisor, package, action, before, version):
 
 
 async def change(supervisor, context, action, *, packages, version=None, no_deps=False,
-                 manager_version=MANAGER_VERSION, timeout=None):
+                 manager_version=None, timeout=None):
     packages = [packages] if isinstance(packages, str) else list(packages)
     if not packages or len(packages) > 100:
         raise ManagementError("InvalidArgument", "Select between 1 and 100 packages")
@@ -198,7 +193,7 @@ async def change(supervisor, context, action, *, packages, version=None, no_deps
         selected = {"kind": "git", "version": None} if git_only else await backend(supervisor)
         if selected["kind"] == "missing":
             raise ManagementError("MissingManagementTool", "Install Manager explicitly in runtime_python")
-        if selected["kind"] == "packaged" and selected["version"] != manager_version:
+        if selected["kind"] == "packaged" and manager_version is not None and selected["version"] != manager_version:
             raise ManagementError("UnsupportedManagementTool", "Manager version differs from the explicit selection",
                                   {"installed": selected["version"], "selected": manager_version})
         metadata = await python_metadata(supervisor.config.runtime_python, inventory=True)
@@ -247,6 +242,10 @@ async def change(supervisor, context, action, *, packages, version=None, no_deps
                 args += ["--exit-on-fail"]
                 if no_deps:
                     args += ["--no-deps"]
+            await require_flags(context, manager_argv(supervisor.config, selected, [actual_action, "--help"]),
+                                {value for value in args if value.startswith("--")},
+                                cwd=supervisor.config.workspace, env=env, tool="ComfyUI-Manager",
+                                version=selected.get("version"))
             command = await run_process(context, manager_argv(supervisor.config, selected, args), cwd=supervisor.config.workspace,
                                         env=env, timeout=timeout)
             environment_after = await python_metadata(supervisor.config.runtime_python, inventory=True)

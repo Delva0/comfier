@@ -158,7 +158,7 @@ async def test_independent_process_short_grace_heartbeat_survives_blocked_client
                 await asyncio.sleep(0.05)
         remote = await Client(url).start()
         await remote.comfyui.start()
-        call = remote.python(lambda: 12345)
+        call = remote.python(lambda: 12345, return_call=True)
         reference = await call.output()
         assert await reference.fetch() == 12345
         keeper = remote._lease
@@ -215,7 +215,7 @@ async def test_real_http_partition_recovers_original_session_and_side_effect(tmp
     try:
         async with Client(url) as remote:
             await remote.comfyui.start()
-            call = remote.python(source=source, entry="produce", inputs={"path": str(effect)})
+            call = remote.python(source=source, entry="produce", inputs={"path": str(effect)}, return_call=True)
             async with asyncio.timeout(5):
                 while not effect.exists():
                     await asyncio.sleep(0.01)

@@ -57,7 +57,7 @@ async def test_managed_http_start_lost_replies_and_owned_references(tmp_path):
 """
             source_file = tmp_path / "produce.py"
             source_file.write_text(source)
-            call = remote.python(source=source_file, entry="produce", inputs={"path": str(effect_file)})
+            call = remote.python(source=source_file, entry="produce", inputs={"path": str(effect_file)}, return_call=True)
             first, second = await asyncio.gather(asyncio.ensure_future(call), asyncio.ensure_future(call))
             assert first[0] is second[0]
             assert await first[0].fetch() == 42

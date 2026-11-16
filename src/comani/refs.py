@@ -6,7 +6,7 @@ import asyncio
 import contextvars
 import weakref
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 
 from .errors import (
     Expired,
@@ -18,6 +18,9 @@ from .errors import (
 )
 
 T = TypeVar("T")
+
+if TYPE_CHECKING:
+    from .files import RemoteFile
 
 
 @dataclass(frozen=True)
@@ -281,6 +284,18 @@ class Call(Generic[T]):
         """Wait for this producer and return local JSON UI/execution metadata."""
         await asyncio.shield(self._state.done)
         return self._state.metadata
+
+    async def files(self, *, node_id=None, key=None) -> tuple[RemoteFile, ...]:
+        """Resolve native UI files through this call's original Client."""
+        metadata = await self.metadata()
+        return await self._state.client().files.from_ui(metadata.ui, node_id=node_id, key=key)
+
+    async def file(self, *, node_id=None, key=None) -> RemoteFile:
+        """Return exactly one native UI file; reject missing or multiple files."""
+        files = await self.files(node_id=node_id, key=key)
+        if len(files) != 1:
+            raise ValueError(f"Expected exactly one native UI file, found {len(files)}; use files()")
+        return files[0]
 
     def _hold_outputs(self):
         if self._state.output_count is not None:

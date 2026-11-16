@@ -30,8 +30,8 @@ async def test_hidden_auth_metadata_uses_existing_native_protocol_without_api_ca
         with remote.graph() as graph:
             value, = await remote.node("ComaniTestHiddenAuth", return_call=True, extra_data="captured-port")
             graph.output("answer", value)
-        run = remote.submit(graph, extra_data=metadata)
+        run = remote.submit(graph, extra_data=metadata, return_call=True)
         assert await (await run.output("answer")).fetch() == {"port": "captured-port", "auth": "dummy-auth", "key": "dummy-key"}
         raw = {"node": {"class_type": "ComaniTestHiddenAuth", "inputs": {"extra_data": "raw-port"}}}
-        run = remote.submit(raw, outputs={"answer": ["node", 0]}, targets=["node"], extra_data=metadata)
+        run = remote.submit(remote.graph(raw, outputs={"answer": ["node", 0]}, targets=["node"]), extra_data=metadata, return_call=True)
         assert await (await run.output("answer")).fetch() == {"port": "raw-port", "auth": "dummy-auth", "key": "dummy-key"}

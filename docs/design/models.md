@@ -1,13 +1,13 @@
 # 模型来源、获取与原生发布
 
-实现：[SDK](../../src/comani/management.py)、[来源解析](../../src/comani/daemon/management/providers.py)、[模型服务](../../src/comani/daemon/management/models.py)、[transport](../../src/comani/daemon/management/transports.py)。
+实现：[SDK](../../src/comani/management.py)、[本地查询](../../src/comani/_model_providers.py)、[下载来源](../../src/comani/daemon/management/providers.py)、[模型服务](../../src/comani/daemon/management/models.py)、[transport](../../src/comani/daemon/management/transports.py)。
 
-models 管理原生磁盘文件，不创建模型对象或显存 cache。来源解析、版本查询和下载全部在 daemon；SDK 只传参数和返回本地 DTO。模型加载仍由原生 Loader 节点执行，删除文件不会自动卸载已加载对象。
+models 管理原生磁盘文件，不创建模型对象或显存 cache。`comani.models.resolve/versions/manifest` 在客户端查询 HF/Civitai 并返回可交给所选 daemon 的来源值，无需 Client；`remote.models` 没有这些纯查询。categories/list、下载、snapshot 和删除依赖远端实际状态，使用模块当前 Client 或显式 remote.models。模型加载仍由原生 Loader 节点执行，删除文件不会自动卸载已加载对象。
 
 ## 选择具体 artifact
 
 ```python
-source = await remote.models.resolve({
+source = await comani.models.resolve({
     "repo_id": "owner/model-repo",
     "revision": REQUESTED_REVISION,
     "path": "weights/model.safetensors",
@@ -27,11 +27,13 @@ file = await remote.models.download(
 model = remote.node("UNETLoader", unet_name=file.native_name, weight_dtype="default")
 ```
 
-示例的 repo、revision、server root 由调用方指定，不是客户端文件路径。HF 返回的实际 commit 固定在 ModelSource/ModelArtifact，文件包括 size、SHA256 或 Git blob hash 等可得证据。resolve 接受 HF URL 或 repo_id/revision/path Mapping；Civitai 接受模型/版本 URL 或 model_id/version_id/file_id。普通 HTTP(S) URL 也可解析为单文件来源。
+示例的 repo、revision、server root 由调用方指定，不是客户端文件路径。HF 返回的实际 commit 固定在 ModelSource/ModelArtifact，文件包括 size、SHA256 或 Git blob hash 等可得证据。resolve 接受 HF URL 或 repo_id/revision/path Mapping；Civitai 接受模型/版本 URL 或 model_id/version_id/file_id。普通 HTTP(S) URL 的下载推荐直接传给远端 models.download，无需 provider metadata 查询。
 
-Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`versions(source)`、`categories()` 和 `list(category=..., root=..., prefix=...)` 都是远端查询；list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
+Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`comani.models.versions(source)` 是本地 provider 查询；categories() 和 list(category=..., root=..., prefix=...) 才查询远端。list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
 
-直链的 signed URL/凭证保留在 daemon 的有界来源注册表，DTO/日志只返回净化 URL 与不透明 source_id。过期来源需重新 resolve 后才可开启新下载；已接纳操作持有自己的来源。HF_TOKEN、CIVITAI_TOKEN 配置在 daemon 环境，SDK 不打印或传回它们；授权失败明确报告。
+本地 provider 查询使用客户端进程的 HF_TOKEN/CIVITAI_TOKEN，也可显式传 `token=...`；返回值不携带 provider token。真正下载使用 daemon 的网络及其独立配置的凭证，本地查询成功不保证远端可下载；授权失败分别报告。
+
+普通或 signed HTTP(S) URL 可直接交给 `models.download(url, root=..., path=...)`；daemon 在接纳下载时管理实际来源，公开结果/日志净化秘密 query。不要把本地生成的 source_id 当成远端来源。signed URL 仍受上游有效期限制，不能从净化后的 URL 恢复秘密参数。
 
 ## 分层职责与 transport
 
@@ -54,7 +56,7 @@ Provider→daemon 断流与 SDK→daemon 断流不同：SDK 恢复观察同一�
 ## HF manifest 与 snapshot
 
 ```python
-manifest = await remote.models.manifest(
+manifest = await comani.models.manifest(
     {"repo_id": "owner/model-repo"}, revision=REQUESTED_REVISION,
     allow=["weights/*.safetensors", "*.json"], ignore=["weights/experimental/*"],
 )
@@ -65,7 +67,7 @@ snapshot = await remote.models.snapshot(
 )
 ```
 
-manifest 在 daemon 枚举并固定同一个 HF commit。allow/ignore 为仓库路径模式；allow=None 选择完整仓库，也可以只选择明确的子集。ModelManifest 包含固定 revision、所有 ModelArtifact 与已知总大小；不是单个 RemoteFile。
+manifest 在客户端枚举并固定同一个 HF commit，无需 Client；snapshot 在远端获取并发布。allow/ignore 为仓库路径模式；allow=None 选择完整仓库，也可以只选择明确的子集。ModelManifest 包含固定 revision、所有 ModelArtifact 与已知总大小；不是单个 RemoteFile。
 
 snapshot 的 **publish 必填且无默认值**：
 

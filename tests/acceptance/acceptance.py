@@ -107,7 +107,7 @@ async def main(args):
     try:
         await remote.start()
         assert remote.handshake.get('capabilities', {}).get('bounded_wait') is True
-        info = await (await remote.python(metadata).output()).fetch()
+        info = await (await remote.python(metadata, return_call=True).output()).fetch()
         import hashlib
         import zipfile
         wheel_sha256 = hashlib.sha256(args.wheel.read_bytes()).hexdigest()
@@ -126,7 +126,7 @@ async def main(args):
         record('runtime_metadata_and_installed_source_identity', client_wheel_sha256=wheel_sha256, **info)
         started = time.monotonic()
         first = remote.node('EmptyImage', return_call=True, width=64, height=64, batch_size=1, color=0x204080)
-        transformed = remote.python(lambda x: x * 0.5, inputs={'x': first.output()})
+        transformed = remote.python(lambda x: x * 0.5, inputs={'x': first.output()}, return_call=True)
         last = remote.node('ImageInvert', return_call=True, image=transformed.output())
         submitted_seconds = time.monotonic() - started
         ref = await last.output()
@@ -137,7 +137,7 @@ async def main(args):
         assert ref.ownership == 'owned'
         record('eager_node_python_node_pending_refs', shape=list(tensor.shape), submission_seconds=submitted_seconds)
 
-        slow = remote.python(delayed, args=(17, 2.0))
+        slow = remote.python(delayed, args=(17, 2.0), return_call=True)
         await slow._state.accepted
         started = time.monotonic()
         await remote.transport.request('heartbeat', session_id=remote.session_id)
@@ -149,10 +149,10 @@ async def main(args):
         with remote.graph() as graph:
             entry = graph.input('image', type='IMAGE')
             middle, = await remote.node('ImageInvert', return_call=True, image=entry)
-            final = remote.python(delayed, args=(middle, 2.0))
+            final = remote.python(delayed, args=(middle, 2.0), return_call=True)
             graph.output('image', final.output())
-        run = remote.submit(graph, inputs={'image': first.output()})
-        keep = remote.python(lambda value: value, inputs={'value': run.output('image')})
+        run = remote.submit(graph, inputs={'image': first.output()}, return_call=True)
+        keep = remote.python(lambda value: value, inputs={'value': run.output('image')}, return_call=True)
         await keep._state.accepted
         intermediate = await run[middle]
         assert intermediate.ownership == 'borrowed'
@@ -162,7 +162,7 @@ async def main(args):
         assert owned.ownership == 'owned'
         before = await owned.fetch()
         record('native_capture_and_early_intermediate', intermediate_ownership=intermediate.ownership)
-        await remote.python(explicit_test_cache_eviction)
+        await remote.python(explicit_test_cache_eviction, return_call=True)
         try:
             await borrowed.fetch()
         except Expired:
@@ -172,9 +172,9 @@ async def main(args):
         torch.testing.assert_close(await owned.fetch(), before)
         record('borrowed_expired_and_explicit_eager_consumer_retained')
 
-        producer = remote.python(lambda: {'items': [2, 3]})
+        producer = remote.python(lambda: {'items': [2, 3]}, return_call=True)
         pending = producer.output()
-        consumer = remote.python(delayed, args=([pending, pending], 0.2))
+        consumer = remote.python(delayed, args=([pending, pending], 0.2), return_call=True)
         await consumer._state.accepted
         del producer, pending
         gc.collect()
@@ -190,8 +190,8 @@ async def main(args):
             raise AssertionError('Released aliases remained usable')
         record('release_invalidates_aliases')
 
-        bad = remote.python(fail)
-        dependent = remote.python(lambda value: value, inputs={'value': bad.output()})
+        bad = remote.python(fail, return_call=True)
+        dependent = remote.python(lambda value: value, inputs={'value': bad.output()}, return_call=True)
         for call in (bad, dependent):
             try:
                 await call
@@ -199,24 +199,24 @@ async def main(args):
                 pass
             else:
                 raise AssertionError('Producer/consumer failure was not reported')
-        assert await (await remote.python(lambda: 42).output()).fetch() == 42
+        assert await (await remote.python(lambda: 42, return_call=True).output()).fetch() == 42
         record('producer_error_dependency_error_and_worker_recovery')
 
         with tempfile.TemporaryDirectory(prefix='comani-remote-acceptance-') as temporary:
             directory = Path(temporary)
             source = directory / 'operation.py'
             source.write_text('def apply(value):\n    return value * 3\n')
-            assert await (await remote.python(source=source, entry='apply', inputs={'value': 7}).output()).fetch() == 21
+            assert await (await remote.python(source=source, entry='apply', inputs={'value': 7}, return_call=True).output()).fetch() == 21
             package = directory / ('acceptance_package_' + str(time.time_ns()))
             package.mkdir()
             init = package / '__init__.py'
             init.write_text('counter = 0\ndef apply():\n    global counter\n    counter += 1\n    return counter\n')
             entry = package.name + ':apply'
-            assert await (await remote.python(source=package, entry=entry).output()).fetch() == 1
-            assert await (await remote.python(source=package, entry=entry).output()).fetch() == 2
+            assert await (await remote.python(source=package, entry=entry, return_call=True).output()).fetch() == 1
+            assert await (await remote.python(source=package, entry=entry, return_call=True).output()).fetch() == 2
             init.write_text('def apply():\n    return 999\n')
             try:
-                await remote.python(source=package, entry=entry)
+                await remote.python(source=package, entry=entry, return_call=True)
             except PackageConflict:
                 pass
             else:
@@ -225,7 +225,7 @@ async def main(args):
 
         if args.model:
             await test_model(remote, args, record)
-        dangling = await remote.python(lambda: 7).output()
+        dangling = await remote.python(lambda: 7, return_call=True).output()
         await remote.close()
         try:
             await dangling.fetch()
@@ -268,7 +268,7 @@ async def test_model(remote, args, record):
                               sampler_name='euler', scheduler='simple', positive=condition.output(0),
                               negative=negative.output(), latent_image=condition.output(1), denoise=1.0)
         # This Python call is a real in-memory latent dependency in the model path.
-        passed = remote.python(lambda latent: latent, inputs={'latent': sampled.output()})
+        passed = remote.python(lambda latent: latent, inputs={'latent': sampled.output()}, return_call=True)
         vae = remote.node('VAELoader', return_call=True, **raw['vae']['inputs'])
         decoded = remote.node('VAEDecode', return_call=True, samples=passed.output(), vae=vae.output())
         return await (await decoded.output()).fetch()
@@ -282,8 +282,8 @@ async def test_model(remote, args, record):
            shape=list(image.shape), steps=6, seed=426190, resolution='2048x2048')
     gc.collect()
     started = time.monotonic()
-    run = remote.submit(raw, outputs={'image': ['decode', 0]}, targets=['decode'])
-    kept = remote.python(lambda image: image, inputs={'image': run.output('image')})
+    run = remote.submit(remote.graph(raw, outputs={'image': ['decode', 0]}, targets=['decode']), return_call=True)
+    kept = remote.python(lambda image: image, inputs={'image': run.output('image')}, return_call=True)
     await kept._state.accepted
     reference = (await (await kept.output()).fetch()).cpu()
     error = float((image - reference).abs().max())

@@ -96,7 +96,7 @@ async def test_python_capture_defers_runtime_attachment_and_callable_abi_check_u
     runtime = ManagedSchemaRuntime(incompatible=True)
     async with Client(transport=InProcessTransport(runtime)) as remote:
         with remote.graph() as graph:
-            port, = await remote.python(lambda: 42)
+            port, = await remote.python(lambda: 42, return_call=True)
             graph.output("result", port)
         assert runtime.compute_handshakes == 0 and not remote.epoch
         with pytest.raises(CodeCompatibilityError):
@@ -110,11 +110,11 @@ async def test_known_python_output_layout_captures_offline_without_transport(art
     remote = Client("http://127.0.0.1:1")
     with remote.graph() as graph:
         if artifact_kind == "callable":
-            port, = await remote.python(lambda: {"items": [1, 2]})
+            port, = await remote.python(lambda: {"items": [1, 2]}, return_call=True)
         else:
             source = tmp_path / "produce.py"
             source.write_text("def produce():\n    return {'items': [1, 2]}\n")
-            port, = await remote.python(source=source, entry="produce")
+            port, = await remote.python(source=source, entry="produce", return_call=True)
         graph.output("value", port)
     assert isinstance(port, GraphRef) and graph.sealed and len(graph.nodes) == 1
     assert remote._opening is None and remote._compute_opening is None

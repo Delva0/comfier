@@ -84,7 +84,7 @@ async def test_bounded_wait_repolls_same_call_and_node_without_resubmission(peer
         with client.graph() as graph:
             middle, = await client.node("Echo", return_call=True, value=1)
             graph.output("answer", middle)
-        run = client.submit(graph)
+        run = client.submit(graph, return_call=True)
         await run[middle]
         await run
         assert len(runtime.submissions) == 2

@@ -50,7 +50,7 @@ async def probe():
 
         runtime.adapter.executor.caches.outputs.set = evict_after_set
         raw = {"target": {"class_type": "ProbeConstant", "inputs": {"value": 7}}}
-        call = client.submit(raw, outputs={"value": ["target", 0]}, targets=["target"])
+        call = client.submit(client.graph(raw, outputs={"value": ["target", 0]}, targets=["target"]), return_call=True)
         try:
             result = await asyncio.wait_for(call.output("value"), timeout=1)
             try:
@@ -72,7 +72,7 @@ async def probe():
         # Simulate losing the adapter's result observation entirely. A native
         # terminal result still must settle the requested output as not produced.
         runtime.adapter._capture = lambda node_id, entry: None
-        missed = client.submit(raw, outputs={"value": ["target", 0]}, targets=["target"])
+        missed = client.submit(client.graph(raw, outputs={"value": ["target", 0]}, targets=["target"]), return_call=True)
         try:
             await asyncio.wait_for(missed.output("value"), timeout=1)
             outcome = "ready"

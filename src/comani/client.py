@@ -15,6 +15,8 @@ from functools import partial
 
 import aiohttp
 
+from ._context import enter_client, exit_client
+from ._graph import Graph, GraphInput, GraphRef, _receiver
 from ._outputs import _OutputProxy, declared_outputs
 from .code import prepare_code
 from .errors import (
@@ -26,7 +28,6 @@ from .errors import (
     UnknownOutputLayout,
 )
 from .files import Files
-from .graph import Graph, GraphInput, GraphRef, _receiver
 from .management import Bash, ComfyUI, Models, Operations, Plugins
 from .protocol import PYTHON_NODE, encode_tree, lift_arguments, unpack_pickle
 from .refs import Call, OutputFuture, RemoteRef, _CallState
@@ -202,6 +203,9 @@ class Client:
         self._abort_started = False
         self._abort_task = None
         self._close_task = None
+        self._context_entering = False
+        self._context_binding = None
+        self._context_token = None
         self._cleanup = _ClientCleanup(self.transport)
         self._finalizer = weakref.finalize(self, self._cleanup.abandon)
 
@@ -239,10 +243,22 @@ class Client:
         return Operations(self)
 
     async def __aenter__(self):
-        await self.start()
+        if self._context_entering or self._context_binding is not None:
+            raise RuntimeError("The same Client cannot enter more than one owning async context")
+        self._context_entering = True
+        try:
+            await self.start()
+            self._context_binding, self._context_token = enter_client(self)
+        finally:
+            self._context_entering = False
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        if self._context_binding is None:
+            raise RuntimeError("The Client has no owning async context to exit")
+        binding, token = self._context_binding, self._context_token
+        exit_client(binding, token)
+        self._context_binding = self._context_token = None
         await self.close(wait=exc_type is None)
 
     def _activate(self):
@@ -500,50 +516,86 @@ class Client:
             return call
         return declared_outputs(call, count, graph=graph) if check else _OutputProxy(call, graph=graph)
 
-    def python(self, function=None, /, *, source=None, entry=None, inputs=None, args=()):
-        artifact = prepare_code(function, source=source, entry=entry)
+    def python(self, function=None, /, *, code=None, source=None, entry=None, inputs=None,
+               args=(), return_call=False):
+        if type(return_call) is not bool:
+            raise TypeError("return_call must be bool")
+        artifact = prepare_code(function, code=code, source=source, entry=entry)
         layout, ports = lift_arguments(tuple(args), dict(inputs or {}))
-        return self._node(PYTHON_NODE, {"code": artifact.descriptor(), "layout": layout, **ports}, (artifact,))
+        return self._node(PYTHON_NODE, {"code": artifact.descriptor(), "layout": layout, **ports},
+                          (artifact,), return_call=return_call, check=True)
 
-    def graph(self):
-        return Graph(self)
+    def graph(self, prompt=None, /, *, outputs=None, targets=None):
+        if prompt is None:
+            if outputs is not None or targets is not None:
+                raise TypeError("Raw outputs and targets require a prompt dictionary")
+            return Graph(self)
+        return self._raw_graph(prompt, outputs=outputs, targets=targets)
 
-    def submit(self, graph, /, *, inputs=None, outputs=None, targets=None, extra_data=None):
+    def submit(self, graph, /, *, inputs=None, extra_data=None,
+               return_call=False) -> Call | OutputFuture | GraphRef | tuple | None:
+        """Submit eagerly and return declared exports, or an explicit Call.
+
+        Zero exports return None, one returns its future, and multiple exports
+        return a tuple in declaration order. Export futures wait for the whole
+        workflow. Inside a graph capture this composes symbolic outputs only.
+        """
+        if type(return_call) is not bool:
+            raise TypeError("return_call must be bool")
         extra_data = self._extra_data(extra_data)
         if not isinstance(graph, Graph):
-            graph = self._raw_graph(graph, outputs=outputs, targets=targets)
-        elif outputs is not None or targets is not None:
-            raise TypeError("Declare outputs and targets on a captured graph")
+            graph = self._raw_graph(graph, outputs=None, targets=None)
+        elif graph.client is not self:
+            raise InvalidReference("A graph belongs to another client")
         bindings = dict(inputs or {})
         missing, extra = set(graph.inputs) - set(bindings), set(bindings) - set(graph.inputs)
         if missing or extra:
             raise ValueError(f"Invalid workflow bindings: missing={sorted(missing)}, extra={sorted(extra)}")
+        count = len(graph.outputs)
         capture = self._capture()
         if capture is not None:
             if extra_data:
                 raise ValueError("Execution extra_data belongs to the whole native run; pass it to the outer submit after capture")
-            return capture.compose(graph, bindings)
+            call = capture.compose(graph, bindings)
+            return call if return_call else declared_outputs(call, count, graph=capture)
         self._validate_live(bindings)
         if not graph.sealed or graph._failed:
             raise ValueError("Submit a successfully sealed graph")
         call = self._enqueue("workflow", {"graph": graph, "bindings": bindings, "extra_data": extra_data},
-                             tuple(graph.artifacts.values()), output_count=len(graph.outputs),
+                             tuple(graph.artifacts.values()), output_count=count,
                              names={name: i for i, name in enumerate(graph.outputs)})
         call._graph = graph
-        return call
+        return call if return_call else declared_outputs(call, count)
 
     def _raw_graph(self, prompt, *, outputs, targets):
         if not isinstance(prompt, dict):
             raise TypeError("A raw API workflow must be a prompt dictionary")
         prompt = prompt.get("prompt", prompt)
+        if not isinstance(prompt, dict):
+            raise TypeError("A raw API workflow must contain a prompt dictionary")
+        if outputs is not None and not isinstance(outputs, Mapping):
+            raise TypeError("Raw outputs must map names to [node_id, slot] pairs")
+        if targets is not None and not isinstance(targets, (list, tuple)):
+            raise TypeError("Raw targets must be a list or tuple of node IDs")
         graph = Graph(self)
         graph.native = True
-        graph.nodes = {str(key): dict(node) for key, node in prompt.items()}
+        for key, node in prompt.items():
+            if (not isinstance(node, Mapping) or not isinstance(node.get("class_type"), str)
+                    or not isinstance(node.get("inputs", {}), Mapping)):
+                raise TypeError("Each raw node needs class_type and an input mapping")
+            graph.nodes[str(key)] = {**node, "inputs": dict(node.get("inputs", {}))}
         for name, source in (outputs or {}).items():
-            graph.outputs[name] = GraphRef(graph, str(source[0]), int(source[1]))
+            if (not isinstance(source, (list, tuple)) or len(source) != 2
+                    or str(source[0]) not in graph.nodes
+                    or type(source[1]) is not int or source[1] < 0):
+                raise ValueError("Each raw output must select an existing node and nonnegative slot")
+            graph.outputs[name] = GraphRef(graph, str(source[0]), source[1])
         graph.targets = [str(t) for t in (targets or [])]
+        if any(node_id not in graph.nodes for node_id in graph.targets):
+            raise ValueError("Raw targets must select existing node IDs")
         graph._automatic_targets = [key for key, node in graph.nodes.items()
                                     if self._nodes.get(node["class_type"], {}).get("output_node", False)]
+        graph._automatic_nodes = list(graph.nodes)
         graph.sealed = True
         return graph
 
@@ -792,7 +844,7 @@ class Client:
         self._closing = True
         for task in tuple(self._file_tasks):
             task.cancel()
-        self._close_task = asyncio.create_task(self._close(wait=wait))
+        self._close_task = asyncio.create_task(self._close(wait=wait), context=contextvars.Context())
         self._close_task.add_done_callback(lambda result: None if result.cancelled() else result.exception(),
                                            context=contextvars.Context())
         await asyncio.shield(self._close_task)

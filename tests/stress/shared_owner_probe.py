@@ -267,7 +267,7 @@ async def make_borrowed(url):
     with client.graph() as graph:
         symbolic = client.node('IndependentEcho', return_call=True, value=88)
         graph.output('value', symbolic.output())
-    run = client.submit(graph)
+    run = client.submit(graph, return_call=True)
     ref = await run.output()
     assert ref.ownership == 'borrowed'
     # Graph, symbolic node and public run Call all leave scope here.

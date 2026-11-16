@@ -24,7 +24,7 @@ import comani
 async def capture():
     remote = Client('http://127.0.0.1:1')
     with remote.graph() as graph:
-        value, = await remote.python(lambda: {'items': [1, 2]})
+        value, = await remote.python(lambda: {'items': [1, 2]}, return_call=True)
         graph.output('value', value)
     assert len(graph.nodes) == 1
     assert remote._opening is None
@@ -82,13 +82,13 @@ from comani import Client
 import comani
 async def main():
     async with Client(sys.argv[1]) as remote:
-        call=remote.python(lambda:{'ok':True})
+        call=remote.python(lambda:{'ok':True},return_call=True)
         assert await (await call.output()).fetch()=={'ok':True}
         with remote.graph() as graph:
-            a,=await remote.python(lambda:3)
-            b=remote.python(lambda value:value*7,inputs={'value':a})
+            a,=await remote.python(lambda:3,return_call=True)
+            b=remote.python(lambda value:value*7,inputs={'value':a},return_call=True)
             graph.output('answer',b.output())
-        run=remote.submit(graph)
+        run=remote.submit(graph,return_call=True)
         assert await (await run.output('answer')).fetch()==21
     print(json.dumps({'package':comani.__file__,'answer':21}))
 asyncio.run(main())

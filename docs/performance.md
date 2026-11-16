@@ -26,7 +26,7 @@ manifest SHA256 26d2ca637b98f3b03fd6f7e491d569d5630cbde302c57d896d74f257619e8e49
 
 两轮均安装同一个已验 wheel，核对 21 个 package Python 文件、README metadata 和公开源码清单，使用同一套已核 SHA256 的模型、官方模板镜像 tag `vastai/comfy:v0.44.0-cuda-13.2-py312`、Python 3.12.15、Torch 2.10.0+cu130、LZ4 4.4.5 与原生 flags。镜像 immutable digest 未暴露；CPU、driver、power limit、线程数、RAM 限额与 observer 方式不同，不能声称两台环境逐字节相同。
 
-实际公共脚本是 [examples/minimax_h3_reuse.py](../examples/minimax_h3_reuse.py)，SHA256 `cd1e1d5d…`。独立验收 driver 原样 import 其 `setup/run_images`，编排 warmup、同 ref 传输与 ABBA；driver 是验收工具，不是另一个产品入口。两轮原始 driver 与来源 hashes 保留在最终摘要。下面是健康 host 的实际新样图，完整 float tensor 校验另存于验收证据；PNG 不是 float 对象的替代传输。
+实际公共脚本是 [冻结的 examples/minimax_h3_reuse.py](https://github.com/Delva0/comani/blob/cae8c24ff13f97256d0b6b79a361c7ba1fbcacde/examples/minimax_h3_reuse.py)，SHA256 `cd1e1d5d…`。独立验收 driver 原样 import 其 `setup/run_images`，编排 warmup、同 ref 传输与 ABBA；driver 是验收工具，不是另一个产品入口。两轮原始 driver 与来源 hashes 保留在最终摘要。下面是健康 host 的实际新样图，完整 float tensor 校验另存于验收证据；PNG 不是 float 对象的替代传输。
 
 ![冻结候选在健康 RTX 4090 上生成的 H3 2048×2048 样图](../artifacts/performance/final-remote-2026-11-15.png)
 
@@ -139,7 +139,7 @@ await remote.files.download(file, "result.png")
 
 ## 现有做法与合理的工程投入
 
-[复用例程](../examples/minimax_h3_reuse.py)一次准备稳定 refs，随后逐 seed 采样；默认最多一张正在计算、上一张正在 fetch/save，`--serial` 可关闭重叠。它保留原生模型管理和单 native worker，通过小窗口限制未物化结果的数量。改变 prompt、尺寸或模型时，应重新准备相应 refs，并显式释放不用的 refs。
+[当前高级复用例程](../examples/advanced/minimax_h3_reuse.py)一次准备稳定 refs，随后逐 seed 采样；默认最多一张正在计算、上一张正在 fetch/save，`--serial` 可关闭重叠。它保留原生模型管理和单 native worker，通过小窗口限制未物化结果的数量。改变 prompt、尺寸或模型时，应重新准备相应 refs，并显式释放不用的 refs。
 
 当前例程已迁入显式管理 API。下面入口用于已配置实例，完整环境/模型准备参数见[H3 主流程](design/development.md#h3-完整脚本)。历史测量使用各报告记录的旧脚本 hash，不因示例改写成为本轮管理架构的性能证据。例如：
 
@@ -147,12 +147,12 @@ await remote.files.download(file, "result.png")
 comani daemon --comfy-root /path/to/ComfyUI --runtime-python /path/to/runtime/bin/python --no-start -- --reserve-vram 4
 ```
 
-客户端配置 `COMANI_URL`、`COMANI_TOKEN`，在项目目录运行。脚本通过远端 models.resolve/download 校验并复用指定三模型，不再读取私有 model-verification 文件：
+客户端配置 `COMANI_URL`、`COMANI_TOKEN`，在项目目录运行。脚本通过本地 models.resolve 查询来源、远端 models.download 校验并复用指定三模型，不再读取私有 model-verification 文件：
 
 ```sh
-python -B examples/minimax_h3_reuse.py \
+python -B examples/advanced/minimax_h3_reuse.py \
   --output artifacts/h3-overlap --seeds 426390 426391 426392
-python -B examples/minimax_h3_reuse.py \
+python -B examples/advanced/minimax_h3_reuse.py \
   --serial --output artifacts/h3-serial --seeds 426390 426391 426392
 ```
 

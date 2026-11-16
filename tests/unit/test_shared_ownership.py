@@ -11,7 +11,7 @@ import pytest
 from aiohttp import web
 
 from comani import Client, HTTPTransport, Released, RemoteError, SessionClosed
-from comani.graph import _receiver
+from comani._graph import _receiver
 
 from .test_heartbeat import LeaseServer, until
 
@@ -50,6 +50,9 @@ async def returned_handle(server, kind):
 
 @pytest.mark.parametrize("kind", ["call", "future", "ref"])
 async def test_helper_returned_handle_keeps_session_until_last_owner_disappears(owner_server, kind):
+    # Explicit GC can hold the GIL and pause both this threaded peer and keeper.
+    # This checks ownership through GC, rather than a subsecond recovery window.
+    owner_server.ttl = 2.0
     owner_server.block_results = kind != "ref"
     handle, client_ref, lease, transport = await returned_handle(owner_server, kind)
     gc.collect()
@@ -106,7 +109,7 @@ async def test_retained_call_is_an_independent_owner_after_all_outputs_are_relea
             with client.graph() as graph:
                 captured = client.node("Echo", return_call=True)
                 graph.output("value", captured.output())
-            call = client.submit(graph)
+            call = client.submit(graph, return_call=True)
         else:
             call = client.node("Echo", return_call=True)
         return call, weakref.ref(client), client._lease, client.transport
@@ -142,7 +145,7 @@ async def test_explicitly_retained_graph_remains_a_public_session_owner(owner_se
         client = await Client(owner_server.url).start()
         with client.graph() as graph:
             graph.output("value", client.node("Echo", return_call=True).output())
-        ref = await client.submit(graph).output()
+        ref = await client.submit(graph, return_call=True).output()
         return graph, ref, weakref.ref(client), client._lease, client.transport
 
     graph, ref, client_ref, lease, transport = await graph_and_ref()

@@ -1,12 +1,16 @@
 # SDK 调用与 graph 语义
 
-实现：[client.py](../../src/comani/client.py)、[refs.py](../../src/comani/refs.py)、[graph.py](../../src/comani/graph.py)。
+实现：[client.py](../../src/comani/client.py)、[refs.py](../../src/comani/refs.py)、[_graph.py](../../src/comani/_graph.py)。
 
 ## 管理连接与计算附着
 
 `async with Client(url, token=...)` 只做管理握手，ComfyUI 未安装/停止时也可查询、准备环境和使用 bash/files。显式 `await remote.comfyui.start()` 后首个计算调用才惰性附着计算 session。连接从不自动安装或启动。旧 direct native/in-process transport 保持其原有计算入口语义。
 
-`remote.comfyui/plugins/models/bash` 是静态 namespace，其查询和变更都是真实远端 I/O；返回 DTO/metadata 是本地值。与 files 一样，普通 async 方法在 await/调度时执行，即使位于 graph scope 内也不被捕获。准备、管理 Operation 和恢复见 [管理设计](remote-management-plan.md)。
+`comani.node/python/graph/submit` 和 `comani.files/comfyui/plugins/models/bash/operations` 是有明确签名的模块 API。有状态调用使用最近进入的 `async with Client(...)`；显式 `remote.node(...)` 等仍可用，始终使用该 Client。构造 Client 或单独 `await client.start()` 不设置当前上下文，也不创建隐式连接。
+
+嵌套上下文退出后恢复外层，task 之间按 ContextVar 隔离。子 task 继承 binding，但必须在拥有 Client 的 scope 内完成；scope 退出后新模块调用失败。相同 Client 重复/并发 owning enter 被拒绝。binding 不强持有 Client，不扩大原有 Call/Ref/Graph 生命周期；跨 loop/thread 使用仍拒绝。模块 async 代理在调用时捕获原 scope，await 时再次校验，不能通过在 B 中 await 将 A 的工作改投 B。
+
+`models.resolve/versions/manifest` 在客户端查询 HF/Civitai，`plugins.versions` 在客户端查询 registry，无需 Client；这些纯查询不在 remote facade 上。远端状态（如 models.list、plugins.backend）和所有变更仍 RPC。管理与 files 是普通 async I/O，即使位于 graph scope 内也不被捕获。准备、Operation 和恢复见 [管理设计](remote-management-plan.md)。
 
 `comfyui.stop()` / `restart()` 默认 `wait=True`，等待计算和相关受管安装完成。显式 `wait=False` 中断计算及本实例受管维护后停止或尝试重启；不保证安装回滚，结果保留被中断 Operation，重启失败也明确报告。`wait=True` 与 `force=True` 不能同时使用。Python `await restart(wait=False)` 仍等待重启结果；`begin_restart` 才先返回观察句柄。实际计算代际结束后旧调用与引用失效。bash 可在 runtime 运行时执行，长 shell 不阻挡生命周期控制。
 
@@ -51,7 +55,17 @@ positive = remote.node("CLIPTextEncode", text=prompt, clip=clip)
 | `RemoteRef` | 已取得的远端引用，不可 await；仍可能因 session/缓存失效 |
 | `await ref.fetch()` | 显式反序列化到本地，不重新执行 producer |
 
-`.python()` 与 `.submit()` 仍返回 `Call`；它们的整体 await 返回 refs tuple。`.python()` 只有一个输出槽，函数返回 tuple/list/dict 时整个值放在此槽中，不自动拆成节点输出。零输出 `Call` 的整体结果是空 tuple，副作用仍需执行完成。
+`.python()` 默认也返回一个 Output；函数返回 tuple/list/dict/None 时整个值放在这一个槽中。显式 `python(..., return_call=True)` 才保留 Call。
+
+`submit()` 同样默认 `return_call=False`，按 Graph 显式命名导出的数量塑形，不按图内节点的输出数：
+
+| graph 导出数 | 默认 submit() 返回 | 等待语义 |
+| --- | --- | --- |
+| 0 | None；调用仍已提交 | 需要等待、文件/UI、ID 或控制句柄时显式 return_call=True |
+| 1 | 一个 OutputFuture | await 得该导出的 ready ref，等待整个 workflow 完成 |
+| 多个 | 按导出顺序的可等待 tuple | await 得相同顺序 refs tuple，等待整个 workflow 完成 |
+
+`submit(..., return_call=True)` 保留 Call，整体 await 始终给导出顺序的 refs tuple，零导出时为空 tuple。没有 exports 的普通 raw prompt 默认返回 None，但仍入队执行；不能从 None 判断它没有提交。`return_call` 只选择返回形状，不改变执行根或是否提交。
 
 ## 声明输出数与实际结果
 
@@ -99,7 +113,7 @@ plain = remote.node("OriginalClassName", extra_data=node_input)
 call = remote.node("OriginalClassName", {"extra_data": node_input,
                                         "declared_outputs": node_count_mode},
                    extra_data=metadata, return_call=True)
-run = remote.submit(workflow, inputs=bindings, extra_data=metadata)
+run = remote.submit(workflow, inputs=bindings, extra_data=metadata, return_call=True)
 ```
 
 第二位置 Mapping 形式的 kwargs 只允许执行选项 `extra_data`、`return_call` 和 `declared_outputs`，其他选项会报 `TypeError`。metadata 必须是 JSON 兼容 Mapping，在调用时生成快照；不能放 RemoteRef、Future 或任意 Python 对象。它传给原生执行上下文，不会变成节点端口。`submit` 的选项同时适用于 captured graph 与 raw API prompt。
@@ -110,13 +124,31 @@ run = remote.submit(workflow, inputs=bindings, extra_data=metadata)
 
 ```python
 saved = remote.node("SaveImage", images=image, filename_prefix="comani/result", return_call=True)
-await saved
-metadata = await saved.metadata()
-item = metadata.ui["result"]["images"][0]
-# filename/subfolder/type 定位原生文件，随后 files.stat/download/remove。
+file = await saved.file()
+await remote.files.download(file, "result.png")
+# 多文件使用 await saved.files()；workflow 可传 node_id=saved.id。
 ```
 
+`Call.files(*, node_id=None, key=None)` 等待原调用完成，将标准 filename/subfolder/type 描述符解析并 stat 为 RemoteFile tuple；使用原 Call 的 Client，与当前模块上下文无关。所有执行 Call/workflow run 都有该方法；只有标准 UI 文件描述符会产生文件，没有则 files() 返回空 tuple。`file()` 要求恰好一个，零个或多个均报含实际数量的 ValueError，提示使用 files()。Tensor、模型或普通字符串返回值不会自动成为文件；capture 内尚未 submit 的 Call 调用会报 NotSubmitted。node_id 选择某节点，不存在时报 KeyError；同时给 key 时，该节点缺少该字段也报 KeyError。仅给 key 则跨节点筛选对应 UI 字段，没有匹配时返回空 tuple。原始 metadata 不变；不下载 payload、不 fetch Tensor。
+
 SaveImage 的 PNG 是明确的 8-bit 文件输出；`fetch()` 保持完整浮点 Tensor，不隐式压成 PNG。直接取图片不需要 source wrapper 来读取 UI 或写临时文件。
+
+## graph 导出直接接 eager 下游
+
+```python
+source = comani.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
+with comani.graph() as workflow:
+    image = workflow.input("image", type="IMAGE")
+    inverted = comani.node("ImageInvert", image=image)
+    workflow.output("image", inverted)
+
+processed = comani.submit(workflow, inputs={"image": source})
+restored = comani.node("ImageInvert", image=processed)
+```
+
+只有一个导出，所以 processed 就是该输出，无需 .output()、解包或先 await。它可直接建立 eager 下游的数据依赖，数据仍留在远端。完整可运行入口见 [graph_to_eager.py](../../examples/graph_to_eager.py)。
+
+默认 submit 输出、`await run.output(name)` 和整体 `await run` 都等待整个 workflow，包括原生收尾；要在整个图结束前观察某个 producer，显式保留 Call 后使用 `run[GraphRef]`。这不追加执行，不改变 borrowed cache 所有权。
 
 ## Graph receiver
 
@@ -127,7 +159,7 @@ with remote.graph() as workflow:
     last = remote.node("ImageInvert", image=middle)
     workflow.output("image", last)
 
-run = remote.submit(workflow, inputs={"image": source})
+run = remote.submit(workflow, inputs={"image": source}, return_call=True)
 early = await run[middle]
 final = await run.output("image")
 ```
@@ -136,13 +168,13 @@ final = await run.output("image")
 
 退出 scope 只封图，不提交。GraphRef 在所属 capture 内 await 返回符号自身；离开该 capture 或在其他 capture 内直接 await 会报 `NotSubmitted`，不能据此等待某次运行。图外通过 `run[GraphRef]` 将它绑定到明确的一次运行。一个 sealed graph 可以重复提交，每个 run 有独立调用 ID，端口不会隐式绑定到“最后一次运行”。
 
-`run.output(name)` 的名称是声明输出的 slot 别名，整体 await 仍按声明顺序返回 tuple。它和 `await run` 等整个 workflow invocation，包括原生收尾；`run[GraphRef]` 等该节点 producer，可在整体结束前就绪。声明输出已经产出不代表 workflow 已完成。
+需要逐节点观察或命名索引时如上显式保留 Call。`run.output(name)` 的名称是声明输出的 slot 别名，整体 await 仍按声明顺序返回 tuple。它和 `await run` 等整个 workflow invocation，包括原生收尾；`run[GraphRef]` 等该节点 producer，可在整体结束前就绪。声明输出已经产出不代表 workflow 已完成。
 
 ## 目标、组合与控制流
 
-声明的输出 demand 其 producer；原生 OUTPUT_NODE 可作为默认执行根，显式副作用用 `workflow.target(call)`。查询 `run[port]` 不添加执行目标，所以未被原生 lazy 分支请求的中间量会得到 `Skipped`，不会自动补算。
+命名导出 demand 其 producer，并保留默认原生 OUTPUT_NODE 执行根；增加导出不会意外删掉 SaveImage。显式 `workflow.target(call_or_ref)` 选择执行根并替代默认自动根，命名导出的 producer 仍会被 demand。查询 `run[port]` 不添加执行目标，所以未被原生 lazy 分支请求的中间量会得到 `Skipped`，不会自动补算。
 
-在外层 capture 中调用 `remote.submit(inner, inputs=...)` 会结构性嵌入子图：绑定输入、隔离节点 ID、重映射连接与输出，不发送独立 RPC。它不做全程序捕获、跨实例分配或全局优化。
+在外层 capture 中调用 `remote.submit(inner, inputs=...)` 会结构性嵌入子图：绑定输入、隔离节点 ID、重映射连接与输出，不发送独立 RPC。默认仍按子图导出数返回 None/GraphRef/符号 tuple；return_call=True 才保留 capture Call。它不做全程序捕获、跨实例分配或全局优化。
 
 相邻的两个 graph 内 await 不增加 A→B 顺序边；只有输出传入输入才形成数据边。数据相关条件、循环和动态展开使用原生节点表达；本地已知参数可用普通 Python if/for 决定构图结构。
 
@@ -157,8 +189,33 @@ final = await run.output("image")
 | `result, = await remote.node(...)`（单输出） | `result = await remote.node(...)` |
 | 需要 `id`、`metadata()`、graph target 或同一调用的重复 await | `call = remote.node(..., return_call=True)` |
 
-现有 `.python()` / `.submit()` 的 `Call.output()` 和 refs 所有权写法保持适用。
+保留旧 Python/submit Call 写法时加 `return_call=True`；单导出的普通组合可直接把 `submit(workflow)` 传给后续节点，不再用 `run.output(name)`。refs 所有权不因返回形状改变。
 
-## 原生 API prompt
+## submit 输入、导出与执行根
 
-`remote.submit(api_prompt, outputs={"image": ["decode", 0]}, targets=["decode"])` 接受后端 `node_id -> {class_type, inputs}` 格式。它保留原生 `[node_id, slot]` 链接，不是前端 canvas JSON。外部 Python 内存对象和远端引用通过 capture 的 input/bindings 传入，不直接塞进标准 JSON。
+`submit(graph_or_prompt, *, inputs=None, extra_data=None, return_call=False)` 负责本次提交、graph 输入绑定与返回形状；outputs/targets 属于图构建声明，不再是 submit 参数。
+
+| 选择 | 何时需要 | captured Graph | raw API prompt |
+| --- | --- | --- | --- |
+| inputs | graph.input(name) 声明了端口时，绑定本次值 | submit(workflow, inputs={...})，键须完全匹配 | 普通 JSON 已有字面值和链接，省略 inputs |
+| 命名导出 | 需要 run.output(name) / 整体 await 返回对象 refs | capture 内 workflow.output(name, ref) | 先 graph(prompt, outputs={"image": ["decode", 0]}) |
+| 执行根 | 原生 OUTPUT_NODE 之外的副作用或自选执行范围 | workflow.target(call_or_ref) | 先 graph(prompt, targets=["decode"]) |
+
+普通导出的 ComfyUI 后端 prompt 使用 `node_id -> {class_type, inputs}` 和原生 `[node_id, slot]` 链接；含 SaveImage 等 OUTPUT_NODE 时可以直接提交：
+
+```python
+run = comani.submit(api_prompt, return_call=True)
+file = await run.file(node_id="save")
+await comani.files.download(file, "image.png")
+```
+
+需要从原生 prompt 导出对象引用时再显式构图：
+
+```python
+workflow = comani.graph(api_prompt, outputs={"image": ["decode", 0]})
+image = comani.submit(workflow)
+inverted = comani.node("ImageInvert", image=image)  # 默认 Output 直接作为 eager 输入
+ready = await inverted
+```
+
+这不是前端 canvas JSON；外部 Python 对象与远端 refs 使用 capture 的声明输入传入。命名导出会执行 producer；`run[ref]` 只是观察已选择执行的节点，不追加执行、不强制 lazy 分支，也不将 borrowed cache ref 变成永久持有。

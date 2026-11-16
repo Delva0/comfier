@@ -165,7 +165,7 @@ async def test_callable_abi_uses_runtime_handshake_even_when_daemon_versions_dis
     runtime = SeparateInterpreters()
     async with Client(transport=InProcessTransport(runtime)) as remote:
         assert not runtime.submissions
-        call = remote.python(lambda: 42)
+        call = remote.python(lambda: 42, return_call=True)
         if runtime_compatible:
             assert await (await call.output()).fetch() == 42
         else:

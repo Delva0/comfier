@@ -28,12 +28,12 @@ async def test_gpu_node_python_node_matches_native_function(gpu_url):
     async with Client(gpu_url) as remote:
         source = remote.node("EmptyImage", return_call=True, width=64, height=64, batch_size=1, color=0x123456)
         adjusted = remote.python(lambda image: image.to("cuda") * 0.5,
-                                 inputs={"image": source.output()})
+                                 inputs={"image": source.output()}, return_call=True)
         output = remote.node("ImageInvert", return_call=True, image=adjusted.output())
         reference = remote.python(
             lambda image: __import__("nodes").NODE_CLASS_MAPPINGS["ImageInvert"]().invert(
                 image.to("cuda") * 0.5)[0], inputs={"image": source.output()},
-        )
+         return_call=True)
         actual = await (await output.output()).fetch()
         expected = await (await reference.output()).fetch()
         assert actual.device.type == "cuda"
@@ -74,7 +74,7 @@ async def test_existing_checkpoint_eager_matches_native_workflow(gpu_url):
         negative = remote.node("CLIPTextEncode", return_call=True, text="", clip=clip)
         latent = remote.node("EmptyLatentImage", return_call=True, width=64, height=64, batch_size=1)
         adjusted = remote.python(lambda value: {"samples": value["samples"] + 0.0},
-                                 inputs={"value": latent.output()})
+                                 inputs={"value": latent.output()}, return_call=True)
         sampled = remote.node(
             "KSampler", return_call=True, model=model, seed=42, steps=1, cfg=1.0, sampler_name="euler",
             scheduler="normal", positive=positive.output(), negative=negative.output(),
@@ -111,11 +111,11 @@ async def test_existing_checkpoint_eager_matches_native_workflow(gpu_url):
             }},
             "decode": {"class_type": "VAEDecode", "inputs": {"samples": ["sample", 0], "vae": ["loader", 2]}},
         }
-        run = remote.submit(prompt, outputs={"image": ["decode", 0]}, targets=["decode"])
+        run = remote.submit(remote.graph(prompt, outputs={"image": ["decode", 0]}, targets=["decode"]), return_call=True)
         observe("native_submitted", session=remote.session_id, call_id=run.id)
         # Explicit eager consumption protects only this accepted input, then
         # owns its returned image; the workflow cache remains free to evict.
-        retained = remote.python(lambda image: image, inputs={"image": run.output("image")})
+        retained = remote.python(lambda image: image, inputs={"image": run.output("image")}, return_call=True)
         await retained._state.accepted
         observe("native_consumer_accepted", session=remote.session_id,
                 call_id=run.id, consumer_id=retained.id)

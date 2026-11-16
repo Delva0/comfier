@@ -1,106 +1,44 @@
-"""CPU preparation, eager/graph calls, local files, bash and a native PNG.
+"""Upload a local image, adjust it remotely, save and download a PNG.
 
-Existing configured daemon: python examples/basic.py --output /local/result.png
-New installation also needs --new-environment /server/venv,
---comfy-root /server/ComfyUI and --runtime-package /server/comani.whl.
-Start the daemon with --no-start when ComfyUI is not installed.
+ComfyUI must already be installed and configured on the daemon.
+Example: python examples/basic.py --input photo.png --output artifacts/basic.png
 """
 
 import argparse
 import asyncio
-import json
 import os
-import tempfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
-from comani import Client
-
-COMFY_COMMIT = "eee59185ff4f43ae2d9ad122b245619d27d9daad"
-CLI_COMMIT = "4f554bb5a9e5d0b5d04146e7bdf8cac2ceb729a5"
+import comani
 
 
-def half_image(image):
-    """Pure remote computation; the source-file path is local and uploaded explicitly."""
-    return image * 0.5
-
-
-async def prepare(remote, args):
-    info = await remote.comfyui.info()  # Always reads the remote daemon.
-    if args.new_environment:
-        if not args.comfy_root or not args.runtime_package:
-            raise ValueError("New installation needs --comfy-root and --runtime-package")
-        if info.state == "running":
-            raise ValueError("Stop the runtime explicitly before creating an environment")
-        env = await remote.comfyui.create_environment(args.new_environment)
-        await remote.comfyui.configure(
-            runtime_python=env.python, comfy_root=args.comfy_root, cpu=True, custom_nodes=False,
-        )
-        await remote.comfyui.prepare_tools(cli_revision=CLI_COMMIT, manager_version="4.2.2")
-        await remote.comfyui.install(commit=args.comfy_commit, skip_torch=False)
-        await remote.comfyui.prepare_runtime(args.runtime_package)
-    elif not info.installed:
-        raise ValueError("ComfyUI is absent; select the three new-installation arguments")
-    info = await remote.comfyui.info()
-    if not info.config.get("cpu"):
-        raise ValueError("This example needs configure(cpu=True) while the runtime is stopped")
-
-
-async def run(args):
-    async with Client(args.url, token=os.environ.get("COMANI_TOKEN")) as remote:
-        await prepare(remote, args)
-        command = await remote.bash.run("printf 'management ready\\n'", check=True)
-        print(command.stdout, end="")
-        with tempfile.TemporaryDirectory() as directory:
-            local = Path(directory) / "example.txt"
-            local.write_text("A local file, transferred explicitly.\n")
-            staged = await remote.files.upload(local)
-            try:
-                assert (await remote.files.stat(staged)).size == local.stat().st_size
-            finally:
-                await remote.files.remove(staged)
-
-        await remote.comfyui.start()
-        image = remote.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
-        adjusted = remote.python(source=Path(__file__), entry="half_image",
-                                 inputs={"image": image})
-        inverted = remote.node("ImageInvert", image=adjusted.output())
-        with remote.graph() as workflow:
-            image_in = workflow.input("image", type="IMAGE")
-            middle = remote.node("ImageInvert", image=image_in)
-            restored = remote.node("ImageInvert", image=middle)
-            workflow.output("image", restored)
-        submitted = remote.submit(workflow, inputs={"image": inverted})
-        intermediate = await submitted[middle]
-        saved = remote.node("SaveImage", images=submitted.output("image"),
-                            filename_prefix="comani/basic", return_call=True)
-        await saved
-        metadata = await saved.metadata()
-        item = metadata.ui["result"]["images"][0]
-        remote_path = str(PurePosixPath(item["subfolder"]) / item["filename"])
-        output = await remote.files.stat(remote_path, directory=item["type"])
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        downloaded = await remote.files.download(output, args.output)
-        print(json.dumps({"local_png": str(downloaded.local_path), "sha256": downloaded.sha256,
-                          "intermediate_ownership": intermediate.ownership,
-                          "remote_png": output.native_name}))
-        # SaveImage writes an 8-bit PNG; fetch still preserves exact Tensor values.
-        # Generated files persist until removed. This example keeps its PNG.
-        if args.stop:
-            await remote.comfyui.stop(wait=True)
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
-    parser.add_argument("--output", type=Path, default=Path("artifacts/basic.png"),
-                        help="local destination; must not exist")
-    parser.add_argument("--new-environment", help="new absolute server venv directory")
-    parser.add_argument("--comfy-root", help="absolute server ComfyUI source directory")
-    parser.add_argument("--runtime-package", help="exact server wheel path or pinned requirement")
-    parser.add_argument("--comfy-commit", default=COMFY_COMMIT)
-    parser.add_argument("--stop", action="store_true", help="stop compute after saving")
-    asyncio.run(run(parser.parse_args()))
+async def main(args):
+    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        await comani.comfyui.start()
+        uploaded = await comani.files.upload(args.input)
+        try:
+            image, _mask = comani.node("LoadImage", image=uploaded.native_name)
+            adjusted = comani.python(
+                code="def adjust(image):\n    return image * 0.5\n",
+                entry="adjust", inputs={"image": image},
+            )
+            inverted = comani.node("ImageInvert", image=adjusted)
+            saved = comani.node("SaveImage", images=inverted,
+                                filename_prefix="comani/basic", return_call=True)
+            output = await saved.file()
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            downloaded = await comani.files.download(output, args.output)
+            print(downloaded.local_path)
+        finally:
+            # LoadImage has finished before this staged input is removed.
+            await comani.files.remove(uploaded)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--url", type=str,
+                        default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--input", type=Path, required=True, help="local image to upload")
+    parser.add_argument("--output", type=Path, default=Path("artifacts/basic.png"),
+                        help="new local PNG; existing files are not overwritten")
+    asyncio.run(main(parser.parse_args()))

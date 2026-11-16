@@ -1,16 +1,27 @@
-"""The same complete H3 preparation and three compute paths using source artifacts.
+"""Run the H3 story with a small computation shipped from this very file.
 
-Only identity (an in-memory computation) is shipped as Python source.
-Environment, versions, model selection, verification and PNG I/O use management
-and files APIs. Arguments are the same as minimax_h3_remote.py.
+Arguments and native H3 nodes are in minimax_h3_remote.py. The source file is
+loaded on the remote Python; its main block runs only on the client.
 """
 
-import argparse
-import asyncio
 
-import minimax_h3_remote as h3
+def soften(image):
+    """Pure remote computation; imports it needs would belong here or at module scope."""
+    return image * 0.5
+
 
 if __name__ == "__main__":
+    import argparse
+    import asyncio
+    from pathlib import Path
+
+    import minimax_h3_remote as h3
+
+    import comani
+
+    def transform(image):
+        return comani.python(source=Path(__file__), entry="soften", inputs={"image": image})
+
     parser = argparse.ArgumentParser(description=__doc__)
     h3.add_arguments(parser)
-    asyncio.run(h3.run(parser.parse_args(), source=True))
+    asyncio.run(h3.run(parser.parse_args(), transform=transform))

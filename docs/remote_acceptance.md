@@ -12,8 +12,8 @@ local watchdog was stopped. The [acceptance summary](../artifacts/remote/6074160
 
 ### Actual scripts and build identity
 
-The executed client is [minimax_h3_source_remote.py](../examples/minimax_h3_source_remote.py),
-with [minimax_h3_source_ops.py](../examples/minimax_h3_source_ops.py) as explicit
+The executed client is [minimax_h3_source_remote.py](https://github.com/Delva0/comani/blob/42350b082ba29b6b5c9e82fed40858d971fccb8c/examples/minimax_h3_source_remote.py),
+with [minimax_h3_source_ops.py](https://github.com/Delva0/comani/blob/42350b082ba29b6b5c9e82fed40858d971fccb8c/examples/minimax_h3_source_ops.py) as explicit
 Python source artifacts. They were run before being published with this report;
 [run.json](../artifacts/remote/60741609-20261115/run.json) records both file hashes.
 The pipeline retains original native node names, places a source-file identity

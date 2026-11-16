@@ -156,8 +156,8 @@ class _HTTPHeartbeat:
                                     retry_http=True)
                         self.error = None
                     except (aiohttp.ClientConnectionError, aiohttp.ClientPayloadError, TimeoutError, OSError) as error:
-                        # The server owns lease expiry, including active-request
-                        # exemptions. Retry this ID; never handshake or resubmit.
+                        # The server owns strict lease expiry; do not extend it
+                        # locally. Retry this ID; never handshake or resubmit.
                         self.error = RemoteError(f"Session heartbeat unavailable ({type(error).__name__}): {error}")
                     except aiohttp.ClientResponseError as error:
                         terminal = not _retryable_heartbeat_status(error.status)

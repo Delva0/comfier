@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 
 from .operations import ManagementError
 from .processes import child_env, run_process
-
-COMFY_CLI_REVISION = "4f554bb5a9e5d0b5d04146e7bdf8cac2ceb729a5"
-MANAGER_VERSION = "4.2.2"
 
 
 async def python_metadata(python, *, inventory=False):
@@ -108,12 +106,8 @@ async def comfy_cli(supervisor, context, args, *, cli_version=None, timeout=None
     metadata = await python_metadata(supervisor.config.runtime_python)
     package = metadata["packages"].get("comfy-cli")
     if not package:
-        raise ManagementError("MissingManagementTool", "Install the pinned comfy-cli in runtime_python explicitly",
-                              {"required_revision": COMFY_CLI_REVISION})
+        raise ManagementError("MissingManagementTool", "Install comfy-cli in runtime_python with prepare_tools() explicitly")
     actual_commit = package["direct_url"].get("vcs_info", {}).get("commit_id")
-    if cli_version is None and actual_commit != COMFY_CLI_REVISION:
-        raise ManagementError("UnsupportedManagementTool", "comfy-cli revision is not the validated pin; select cli_version explicitly",
-                              {"version": package["version"], "required_revision": COMFY_CLI_REVISION})
     if cli_version is not None and cli_version not in {package["version"], actual_commit}:
         raise ManagementError("UnsupportedManagementTool", "Installed comfy-cli differs from the selected version")
     config = supervisor.config
@@ -122,18 +116,27 @@ async def comfy_cli(supervisor, context, args, *, cli_version=None, timeout=None
     instance = hashlib.sha256((str(config.workspace) + "\0" + str(config.comfy_root)).encode()).hexdigest()[:20]
     home = Path(config.workspace) / ".comani" / "tool-home" / instance
     home.mkdir(parents=True, exist_ok=True)
-    # The fixed CLI derives its ConfigManager path from expanduser('~'), not
+    # The official CLI derives its ConfigManager path from expanduser('~'), not
     # XDG_CONFIG_HOME. Its mutable recent/default workspace is instance-local.
     env["HOME"] = str(home)
     env["XDG_CONFIG_HOME"] = str(home / ".config")
     env["XDG_CACHE_HOME"] = str(home / ".cache")
+    env["NO_COLOR"] = "1"
+    base = [config.runtime_python, "-m", "comfy_cli"]
+    await require_flags(context, [*base, "--help"], {"--skip-prompt", "--workspace"},
+                        cwd=config.workspace, env=env, tool="comfy-cli", version=package["version"])
+    help_args = [args[0], "--help"]
+    required = {value.split("=", 1)[0] for value in args if value.startswith("--")}
+    await require_flags(context, [*base, *help_args], required,
+                        cwd=config.workspace, env=env, tool="comfy-cli", version=package["version"])
     # Prove the selected environment before any install/update executes. The CLI's
     # VIRTUAL_ENV-first resolver must pick exactly the configured interpreter.
     check = await run_process(context, [config.runtime_python, "-c",
         "from comfy_cli.resolve_python import resolve_workspace_python;print(resolve_workspace_python())"],
         cwd=config.workspace, env=env, timeout=20)
     if check["exit_code"]:
-        raise ManagementError("RuntimePythonMismatch", "comfy-cli selected another Python interpreter")
+        raise ManagementError("UnsupportedManagementTool", "Installed comfy-cli cannot resolve the configured runtime interpreter",
+                              {"version": package["version"], "required_capability": "resolve_workspace_python"})
     selected = check["stdout"].strip()
     try:
         selected_environment = await python_metadata(selected)
@@ -145,3 +148,15 @@ async def comfy_cli(supervisor, context, args, *, cli_version=None, timeout=None
         raise ManagementError("RuntimePythonMismatch", "comfy-cli selected another Python environment")
     return await run_process(context, [config.runtime_python, "-m", "comfy_cli", "--skip-prompt",
         "--workspace", str(config.comfy_root), *args], cwd=config.workspace, env=env, timeout=timeout)
+
+
+async def require_flags(context, argv, required, *, cwd, env, tool, version=None):
+    """Probe the installed official entrypoint before a mutating command."""
+    # Rich/Typer truncates long option names at the default non-TTY width.
+    result = await run_process(context, argv, cwd=cwd, env={**env, "COLUMNS": "240", "NO_COLOR": "1"}, timeout=30)
+    output = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", result["stdout"] + result["stderr"])
+    available = set(re.findall(r"--[a-z][a-z0-9-]*", output))
+    missing = sorted(required - available)
+    if result["exit_code"] or missing:
+        raise ManagementError("UnsupportedManagementTool", f"Installed {tool} does not provide the required command interface",
+                              {"version": version, "missing_flags": missing, "probe_exit_code": result["exit_code"]})

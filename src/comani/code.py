@@ -51,14 +51,22 @@ class CodeArtifact:
             )
 
 
-def prepare_code(function=None, *, source=None, entry=None):
+def prepare_code(function=None, *, code=None, source=None, entry=None):
     if function is not None:
-        if source is not None or entry is not None:
+        if code is not None or source is not None or entry is not None:
             raise TypeError("Choose a callable or explicit source/entry, not both")
         if not callable(function):
             raise TypeError("The first argument must be callable")
         _check_captured_references(function)
         return CodeArtifact("pickle", cloudpickle.dumps(function))
+    if code is not None:
+        if source is not None:
+            raise TypeError("Choose code=source_text or source=path, not both")
+        if not isinstance(code, str):
+            raise TypeError("code must be a Python source string")
+        if not entry:
+            raise TypeError("Inline source code requires entry=entrypoint")
+        return CodeArtifact("file", code.encode("utf-8"), str(entry))
     if source is None or not entry:
         raise TypeError("Source code requires source=path and entry=entrypoint")
     path = Path(source).expanduser().resolve(strict=True)
@@ -96,7 +104,7 @@ def prepare_code(function=None, *, source=None, entry=None):
 
 
 def _check_captured_references(function):
-    from .graph import GraphInput, GraphRef
+    from ._graph import GraphInput, GraphRef
     from .refs import OutputFuture, RemoteRef
 
     seen = set()

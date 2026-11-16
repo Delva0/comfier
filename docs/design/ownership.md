@@ -29,7 +29,7 @@ owner cell → 轻量 producer state → invocation lifetime
 
 删除局部 Client 变量只减少一个本地别名；公开 Call、未 release 的输出 cell 或 Graph 仍是合法会话拥有者。Call 独立保留 Client，直到 Call 被回收，即使其全部输出已 release；当前没有 `Call.release()` API。Graph 及其端口沿既有 Graph→Client 关系保留会话。
 
-`node()` 默认直接返回输出，不要求为了保留输出而另存一个 Call；单输出及多输出 tuple 中的各槽沿同一 owner cell 规则持有会话。需要调用句柄时才显式 `return_call=True`。返回形状与检查规则见 [SDK](sdk.md#eager-调用)。
+`node()/python()/submit()` 默认直接返回输出，不要求为了保留输出而另存一个 Call；单输出及多输出 tuple 中的各槽沿同一 owner cell 规则持有会话。需要调用句柄时才显式 `return_call=True`。返回形状与检查规则见 [SDK](sdk.md#eager-调用)。
 
 相同逻辑输出的 Future 和 ready Ref 别名共享 owner cell。`ref.release()` / `future.release()` 幂等地撤销该 cell 的全部别名，并交还该 cell 对 Client 的强持有；它不撤销其他输出、Call 或 Graph 的独立拥有权。Output 不反向保留整个 Call，所以只保留一个输出不会因此保活其他槽的数据。
 
@@ -46,9 +46,9 @@ SDK 在发送/上传及提交 ACK 前强引用输入。ACK 后 daemon 已为输�
 需要明确保留 workflow 结果时，可以提交一个 eager identity 消费者：
 
 ```python
-run = remote.submit(workflow, inputs=bindings)
+run = remote.submit(workflow, inputs=bindings, return_call=True)
 kept = remote.python(lambda value: value, inputs={"value": run.output("image")})
-owned_image = await kept.output(0)
+owned_image = await kept
 ```
 
 消费者必须在源值尚可使用时被接受；已经失效的 ref 无法通过此方式复活。新 eager 输出有自己的 owned lease，原始 workflow ref 仍是 borrowed。
@@ -64,6 +64,8 @@ daemon 仅在调用终态、非 inflight、无依赖 reservation 时回收调用
 ## 会话续约与业务 loop 暂停
 
 当前默认 offline_grace 为3600秒，可配置。HTTP transport 为有效计算会话启动独立keeper线程，使用自己的event loop/连接续约，不依赖业务asyncio loop。只有已认证客户端流量推进session_seen；worker执行、内部admission或只保持打开的TCP不续约。历史0.6秒TTL/2.4秒业务loop暂停等保活测量仍按其报告版本解释，不是当前默认值。
+
+宽限在daemon端持续计时，应覆盖网络延迟、重试和daemon控制面的停顿。独立keeper仍依赖daemon及时处理心跳；若停顿超过宽限，存活的本地owner也不能阻止会话到期。
 
 支持同代恢复的HTTP连接遇暂态故障会用原session、不透明recovery授权及runtime epoch恢复，继续原wait/fetch；提交重用原call ID/摘要/签名窗口，不新建会话补跑副作用。离线release/forget恢复后幂等补发。keeper独立于业务loop仍不能让阻塞中的业务协程提交/取回。InProcessTransport和其他custom transport的fallback heartbeat仍共享业务loop。
 

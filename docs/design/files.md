@@ -1,6 +1,6 @@
 # 原生文件与模型 I/O
 
-实现：[客户端文件代理](../../src/comani/files.py)、[文件存储](../../src/comani/daemon/files.py)、[HTTP 流](../../src/comani/daemon/file_http.py)。管理 daemon 独立持有文件存储，计算未启动或重启时仍可用。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。
+实现：[客户端文件代理](../../src/comani/files.py)、[文件存储](../../src/comani/daemon/files.py)、[HTTP 流](../../src/comani/daemon/file_http.py)。管理 daemon 独立持有文件存储，计算未启动或重启时仍可用。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。模块 `comani.files` 使用当前显式 Client 上下文；`remote.files` 始终使用指定 Client。
 
 ## 上传后交给原生节点
 
@@ -19,6 +19,24 @@ async with Client(url, token=token) as remote:
 ```
 
 `Path` 节点输入只传路径对象，字符串路径指远端文件；它们不会自动读取客户端文件。Python `source=...` 上传代码 artifact，图片和模型使用 `files.upload`。文件必须保留到最后一次原生读取完成，再显式删除。
+
+## 从原生文件结果下载
+
+```python
+saved = comani.node("SaveImage", images=image, filename_prefix="comani/result", return_call=True)
+file = await saved.file()
+await comani.files.download(file, "result.png")
+
+# 捕获图的标准输出节点：需要文件/UI 时显式保留 Call
+run = comani.submit(workflow, return_call=True)
+files = await run.files(node_id=saved_in_graph.id, key="images")
+for index, file in enumerate(files):
+    await comani.files.download(file, f"result-{index}.png")
+```
+
+`Call.files(*, node_id=None, key=None)` 等待调用完成，使用该 Call 原本的 Client 将标准 UI filename/subfolder/type descriptor 定位为 RemoteFile tuple；不依赖新的当前 Client。所有执行 Call（包括 workflow run）都有此方法，但只有标准 UI 文件描述符会产生文件；没有文件时 files() 返回空 tuple，file() 在零个或多个时均报 ValueError 并提示使用 files()。不会从 Tensor、模型对象、普通字符串返回值推断文件。尚未提交的 capture Call 调用此方法会报 NotSubmitted。
+
+无需手解 SaveImage 的 UI 字典、拼 subfolder/filename 或额外 stat。该桥接支持 input/temp/output 根，仍保留原始 metadata；只解析与查询文件元数据，不取 Tensor、不自动下载、不转换图像。自定义非标准 UI 字段仍由应用解释；已有 UI Mapping 可用 `await comani.files.from_ui(ui, node_id=..., key=...)` 走相同桥接。
 
 ## 公共方法与本地值
 

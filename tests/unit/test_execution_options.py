@@ -26,7 +26,7 @@ async def test_workflow_metadata_belongs_to_submit(peer):
     with remote.graph() as graph:
         value, = await remote.node("Echo", return_call=True, value=1)
         graph.output("answer", value)
-    run = remote.submit(graph, extra_data={"auth_token_comfy_org": "dummy-auth"})
+    run = remote.submit(graph, extra_data={"auth_token_comfy_org": "dummy-auth"}, return_call=True)
     await run
     assert runtime.submissions[-1][1]["extra_data"] == {"auth_token_comfy_org": "dummy-auth"}
     with remote.graph():

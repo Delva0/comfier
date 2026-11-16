@@ -37,14 +37,14 @@ async def main():
         async with Client(transport=InProcessTransport(runtime)) as remote:
             assert runtime.adapter.executor.cache_type.name == sys.argv[3]
             assert runtime.adapter.executor.cache_args == json.loads(sys.argv[4])
-            first = remote.python(lambda: 3)
-            second = remote.python(lambda value: value * 7, inputs={'value': first.output()})
+            first = remote.python(lambda: 3, return_call=True)
+            second = remote.python(lambda value: value * 7, inputs={'value': first.output()}, return_call=True)
             assert await (await second.output()).fetch() == 21
             with remote.graph() as graph:
-                middle, = await remote.python(lambda: 6)
-                final = remote.python(lambda value: value * 7, inputs={'value': middle})
+                middle, = await remote.python(lambda: 6, return_call=True)
+                final = remote.python(lambda value: value * 7, inputs={'value': middle}, return_call=True)
                 graph.output('answer', final.output())
-            run = remote.submit(graph)
+            run = remote.submit(graph, return_call=True)
             ref = await run.output('answer')
             assert ref.ownership == 'borrowed'
             assert await ref.fetch() == 42
@@ -100,7 +100,7 @@ async def main():
         runtime = NativeRuntime(sys.argv[1], cpu=True, custom_nodes=False)
         try:
             async with Client(transport=InProcessTransport(runtime)) as remote:
-                result = remote.python(lambda value: value, inputs={'value': expected})
+                result = remote.python(lambda value: value, inputs={'value': expected}, return_call=True)
                 assert await (await result.output()).fetch() == expected
         finally:
             await runtime.close()
