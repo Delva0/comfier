@@ -53,8 +53,10 @@ def provider_headers(url, *, token=None):
     host = (urlsplit(url).hostname or "").lower()
     if host == "huggingface.co" and (token or os.environ.get("HF_TOKEN")):
         return {"Authorization": "Bearer " + (token or os.environ["HF_TOKEN"])}
-    if host in {"civitai.com", "www.civitai.com"} and (token or os.environ.get("CIVITAI_TOKEN")):
-        return {"Authorization": "Bearer " + (token or os.environ["CIVITAI_TOKEN"])}
+    if host in {"civitai.com", "www.civitai.com"}:
+        credential = token or os.environ.get("CIVITAI_TOKEN") or os.environ.get("CIVITAI_API_TOKEN")
+        if credential:
+            return {"Authorization": "Bearer " + credential}
     return {}
 
 

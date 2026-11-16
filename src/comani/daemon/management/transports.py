@@ -30,7 +30,7 @@ class QuietContext:
 def diagnostic(command):
     value = (command.get("stderr", "") + "\n" + command.get("stdout", ""))[-4000:]
     value = re.sub(r"https?://[^\s\"'<>]+", lambda match: safe_url(match[0]), value)
-    for name in ("HF_TOKEN", "CIVITAI_TOKEN"):
+    for name in ("HF_TOKEN", "CIVITAI_TOKEN", "CIVITAI_API_TOKEN"):
         if os.environ.get(name):
             value = value.replace(os.environ[name], "<redacted>")
     return value.strip()
@@ -60,7 +60,11 @@ async def external_download(context, resolver, artifact, target, *, transport, c
             raise ManagementError("UnverifiableTransport", "aria2 requires an expected SHA256; select http for validator-based acquisition")
         address = await resolver.address(artifact)
         headers = provider_headers(address)
-        # URI and auth are kept in an owner-only input file, never in argv.
+        if headers:
+            # aria2 forwards custom Authorization headers across redirects.
+            raise ManagementError("UnsafeDownloadTransport",
+                                  "aria2 cannot scope provider credentials across redirects; select http")
+        # Signed URIs stay in an owner-only input file, never in argv.
         fd, name = tempfile.mkstemp(prefix="aria-input-", dir=target.parent)
         try:
             os.fchmod(fd, 0o600)
@@ -69,10 +73,6 @@ async def external_download(context, resolver, artifact, target, *, transport, c
                 # aria2's global --out is ignored for --input-file entries.
                 stream.write(" dir=" + str(target.parent) + "\n")
                 stream.write(" out=" + target.name + "\n")
-                for key, value in headers.items():
-                    if "\n" in value or "\r" in value:
-                        raise ManagementError("InvalidArgument", "Invalid provider credential")
-                    stream.write(f" header={key}: {value}\n")
             command = await run_process(QuietContext(context), [binary,
                 "--input-file=" + name, "--dir=" + str(target.parent), "--out=" + target.name,
                 "--max-connection-per-server=" + str(connections), "--split=" + str(connections),

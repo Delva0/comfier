@@ -31,7 +31,7 @@ model = remote.node("UNETLoader", unet_name=file.native_name, weight_dtype="defa
 
 Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`comani.models.versions(source)` 是本地 provider 查询；categories() 和 list(category=..., root=..., prefix=...) 才查询远端。list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
 
-本地 provider 查询使用客户端进程的 HF_TOKEN/CIVITAI_TOKEN，也可显式传 `token=...`；返回值不携带 provider token。真正下载使用 daemon 的网络及其独立配置的凭证，本地查询成功不保证远端可下载；授权失败分别报告。
+本地 provider 查询使用客户端进程的 `HF_TOKEN`、`CIVITAI_TOKEN`（兼容别名 `CIVITAI_API_TOKEN`），也可显式传 `token=...`；显式参数优先，两个 Civitai 环境变量同时存在时 `CIVITAI_TOKEN` 优先。返回值不携带 provider token。真正下载使用 daemon 的网络及其独立配置的凭证，本地查询成功不保证远端可下载；授权失败分别报告。需要受限模型时，应明确将该 provider 凭据配置给目标 daemon；客户端全部凭据不会自动透传。带 provider 鉴权的下载使用 HTTP 或官方 HF 传输；选择 aria2（含 `auto`）时，因该引擎无法安全限定重定向凭据范围而回退 HTTP，Operation 记录实际传输及回退原因。匿名 aria2 下载不受影响。
 
 普通或 signed HTTP(S) URL 可直接交给 `models.download(url, root=..., path=...)`；daemon 在接纳下载时管理实际来源，公开结果/日志净化秘密 query。不要把本地生成的 source_id 当成远端来源。signed URL 仍受上游有效期限制，不能从净化后的 URL 恢复秘密参数。
 

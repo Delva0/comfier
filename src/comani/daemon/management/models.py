@@ -228,7 +228,7 @@ class ModelService:
             staging.mkdir(parents=True, exist_ok=True)
             staging_directory = Path(tempfile.mkdtemp(prefix="model-", dir=staging))
             partial = staging_directory / "payload.part"
-            partial.touch()
+            partial.touch(mode=0o600, exist_ok=False)
             max_bytes = store.max_file_size
             if _max_bytes is not None:
                 max_bytes = _max_bytes if max_bytes is None else min(max_bytes, _max_bytes)
@@ -315,7 +315,9 @@ class ModelService:
         try:
             await self._external(context, artifact, target, selected, connections, timeout, max_bytes)
         except ManagementError as exc:
-            if transport != "auto" or exc.code not in {"ProviderTransferFailed", "MissingDownloadTool"}:
+            if exc.code != "UnsafeDownloadTransport" and (
+                transport != "auto" or exc.code not in {"ProviderTransferFailed", "MissingDownloadTool"}
+            ):
                 raise
             context.log("Optional engine could not acquire this artifact; falling back to validated HTTP\n")
             context.progress(transport="http", transport_fallback={"from": selected,
@@ -422,7 +424,7 @@ class ModelService:
                 context.progress(file=index + 1, files=len(entries), path=relative)
                 transfer_directory = Path(tempfile.mkdtemp(prefix="acquire-", dir=staging))
                 temporary = transfer_directory / "payload.part"
-                temporary.touch()
+                temporary.touch(mode=0o600, exist_ok=False)
                 self.resolver.retain(artifact)
                 try:
                     max_bytes = store.max_file_size

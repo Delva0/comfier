@@ -318,6 +318,43 @@ async def test_model_http_and_snapshot_files_share_adoption_and_native_cache_not
             await service.close()
 
 
+@pytest.mark.parametrize("creation_mask", [0o000, 0o002])
+@pytest.mark.parametrize("publish", ["download", "files", "directory"])
+async def test_model_acquisition_publishes_private_payload_under_permissive_umask(
+    tmp_path, creation_mask, publish,
+):
+    if not hasattr(os, "getuid"):
+        pytest.skip("Requires POSIX ownership and mode checks")
+    data = b"private model payload"
+    app = web.Application()
+
+    async def model(_):
+        return web.Response(body=data)
+
+    app.router.add_get("/model", model)
+    supervisor = Supervisor(tmp_path)
+    service = ManagementService(supervisor)
+    root, = supervisor.file_store.roots(category="checkpoints")
+    previous_mask = os.umask(creation_mask)
+    try:
+        async with serve(app) as url:
+            artifact = {"provider": "url", "source": {"url": url + "/model"},
+                        "filename": "model.bin", "size": len(data),
+                        "sha256": hashlib.sha256(data).hexdigest()}
+            arguments = ({"artifact": artifact, "path": "model.bin"} if publish == "download"
+                         else {"manifest": {"files": [artifact]}, "publish": publish, "path": "family"})
+            _, accepted = await submit(service, "models", "download" if publish == "download" else "snapshot",
+                                       {**arguments, "root": root.id, "transport": "http"})
+            result = await finish(service, accepted)
+            assert result["state"] == "succeeded", result
+            target = root.path / ("model.bin" if publish == "download" else "family/model.bin")
+            assert target.read_bytes() == data
+            assert target.stat().st_mode & 0o777 == 0o600
+    finally:
+        os.umask(previous_mask)
+        await service.close()
+
+
 async def test_cross_filesystem_publication_cancellation_drains_and_cleans_copy(tmp_path, monkeypatch):
     stage = staged(tmp_path, b"x" * (2 * 1024 * 1024 + 3))
     store, _ = store_at(tmp_path / "native")
