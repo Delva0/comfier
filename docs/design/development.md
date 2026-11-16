@@ -104,12 +104,12 @@ python examples/minimax_h3_remote.py --prepare \
 
 普通输出只有 native SaveImage 8-bit PNG，无计时 sidecar 或精确 Tensor 对照。[minimax_h3_source_remote.py](../../examples/minimax_h3_source_remote.py) 在同一 source 文件定义纯函数和 async 入口，用 `source=Path(__file__)` 向上述图插入计算；本地入口的 imports 放在 main guard 中，不要求服务器存在本地 example 模块。inline 字符串、源码文件、目录包与 callable 的选择见 [Python artifacts](python-artifacts.md)。
 
-## 高级性能示例
+## 性能基准
 
-[advanced/minimax_h3_reuse.py](../../examples/advanced/minimax_h3_reuse.py) 保留 model/conditioning refs，最多一个生成和一个 fetch/save 在途，`--serial` 关闭重叠。它明确依赖客户端 Torch/NumPy/Pillow，并记录 setup、生成、下载、写盘和构建身份；这是性能研究需要的复杂度，不是普通生图步骤。
+[benchmarks/minimax_h3_reuse.py](../../benchmarks/minimax_h3_reuse.py) 保留 model/conditioning refs，最多一个生成和一个 fetch/save 在途，`--serial` 关闭重叠。它明确依赖客户端 Torch/NumPy/Pillow，并记录 setup、生成、下载、写盘和构建身份；这是性能研究需要的复杂度，不是普通生图步骤。
 
 ```sh
-python examples/advanced/minimax_h3_reuse.py --output artifacts/h3-benchmark \
+python benchmarks/minimax_h3_reuse.py --output artifacts/h3-benchmark \
   --seeds 426390 426391 426392
 ```
 
@@ -128,7 +128,7 @@ python examples/advanced/minimax_h3_reuse.py --output artifacts/h3-benchmark \
 ```sh
 python -m pip install -e ".[test]"
 python -B -m pytest -q -m 'not gpu' -p no:cacheprovider
-python -m ruff check src tests scripts examples
+python -m ruff check src tests scripts examples benchmarks
 python -m pip wheel --no-deps --wheel-dir dist .
 ```
 

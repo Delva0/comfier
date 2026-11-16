@@ -5,7 +5,7 @@
 - [远程管理与 Operation](design/remote-management-plan.md)：独立daemon、环境/工具/core/插件准备、bash、生命周期、接纳去重和任务恢复。
 - [模型](design/models.md) 与 [文件 I/O](design/files.md)：本地 provider 查询、远端 HF/Civitai/HTTP 获取、snapshot发布、本地文件流和自动字节续传。
 - [SDK/graph](design/sdk.md)、[runtime](design/runtime.md)、[所有权](design/ownership.md)、[协议](design/protocol.md) 和 [Python artifacts](design/python-artifacts.md)。
-- [运行与开发](design/development.md)：管理启动、空白 CPU 准备、图片入门、graph 导出接 eager 下游、checkpoint/H3 原生工作流和高级基准，路径/版本/本地依赖明确选择。
+- [运行与开发](design/development.md)：管理启动、空白 CPU 准备、图片入门、graph 导出接 eager 下游、checkpoint/H3 原生工作流和性能基准，路径/版本/本地依赖明确选择。
 - [0.5.0 公共 API 验收](public_api_acceptance.md)：当前构建身份、完整 CPU 回归、真实示例、并发与正常升级，以及短宽限反例和未测 GPU 边界。
 - [管理架构与恢复验收](management_acceptance.md)：本轮已测 wheel、stage 发布、GPU/WAN 与性能证据的精确归属，以及仍待完成的交付门。
 
@@ -13,6 +13,7 @@
 
 | 历史资料 | 范围 |
 | --- | --- |
+| [工作流复现研究](research/workflow-reproduction-20261116.md) | 2026-11-16 的附件准备、Score CPU 调优假设与工作流验收快照 |
 | [性能记录](performance.md) | H3冷热/缓存、refs复用、binary/LZ4、WAN及资源边界 |
 | [远端报告](remote_acceptance.md) | 旧cd6/0.2.0官方模板GPU、三路H3、130秒HTTPS与销毁证据 |
 | [后台保活报告](../tests/acceptance/HEARTBEAT_REPORT.md) | v4-r2冻结构建、独立跨版本CPU与生命周期 |

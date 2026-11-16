@@ -1,4 +1,4 @@
-"""Advanced benchmark: retain H3 refs and overlap generation with Tensor fetch/save.
+"""Benchmark H3 ref reuse and overlap generation with Tensor fetch/save.
 
 Uses the same explicit environment/model preparation arguments as
 minimax_h3_remote.py. Tensor fetch/save is intentional in this benchmark and
@@ -22,7 +22,7 @@ import comani
 from comani import Client, RemoteRef
 
 # Direct execution also finds the shared, editable H3 preparation example.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
 import minimax_h3_remote as h3  # noqa: E402
 
 

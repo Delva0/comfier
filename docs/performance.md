@@ -139,7 +139,7 @@ await remote.files.download(file, "result.png")
 
 ## 现有做法与合理的工程投入
 
-[当前高级复用例程](../examples/advanced/minimax_h3_reuse.py)一次准备稳定 refs，随后逐 seed 采样；默认最多一张正在计算、上一张正在 fetch/save，`--serial` 可关闭重叠。它保留原生模型管理和单 native worker，通过小窗口限制未物化结果的数量。改变 prompt、尺寸或模型时，应重新准备相应 refs，并显式释放不用的 refs。
+[当前 H3 性能基准](../benchmarks/minimax_h3_reuse.py)一次准备稳定 refs，随后逐 seed 采样；默认最多一张正在计算、上一张正在 fetch/save，`--serial` 可关闭重叠。它保留原生模型管理和单 native worker，通过小窗口限制未物化结果的数量。改变 prompt、尺寸或模型时，应重新准备相应 refs，并显式释放不用的 refs。
 
 当前例程已迁入显式管理 API。下面入口用于已配置实例，完整环境/模型准备参数见[H3 主流程](design/development.md#h3-完整脚本)。历史测量使用各报告记录的旧脚本 hash，不因示例改写成为本轮管理架构的性能证据。例如：
 
@@ -150,9 +150,9 @@ comani daemon --comfy-root /path/to/ComfyUI --runtime-python /path/to/runtime/bi
 客户端配置 `COMANI_URL`、`COMANI_TOKEN`，在项目目录运行。脚本通过本地 models.resolve 查询来源、远端 models.download 校验并复用指定三模型，不再读取私有 model-verification 文件：
 
 ```sh
-python -B examples/advanced/minimax_h3_reuse.py \
+python -B benchmarks/minimax_h3_reuse.py \
   --output artifacts/h3-overlap --seeds 426390 426391 426392
-python -B examples/advanced/minimax_h3_reuse.py \
+python -B benchmarks/minimax_h3_reuse.py \
   --serial --output artifacts/h3-serial --seeds 426390 426391 426392
 ```
 

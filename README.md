@@ -126,7 +126,8 @@ Call 只有在 metadata.ui 含标准 ComfyUI 文件描述符时才产出文件�
 | 修改 checkpoint 生图工作流 | [local_checkpoint.py](examples/local_checkpoint.py)：兼容 checkpoint，已在远端或显式本地上传；展示显式 Client 与 CLIP/KSampler/VAE 节点 |
 | 单脚本环境、插件、三模型与 H3 生图 | [minimax_h3_remote.py](examples/minimax_h3_remote.py)：H3 可用 GPU 环境；可显式准备 |
 | 从当前脚本发送远端 Python 源码 | [minimax_h3_source_remote.py](examples/minimax_h3_source_remote.py)：相同 H3 前提，纯函数与 async 入口在同一文件 |
-| 高级：保留 refs、有限重叠与 Tensor 性能基准 | [advanced/minimax_h3_reuse.py](examples/advanced/minimax_h3_reuse.py)：H3 环境 + 客户端 Torch/NumPy/Pillow |
+| 图像编辑、布局与视频工作流 | [按任务选择示例](examples/README.md)：运行命令、依赖、产物与使用前提 |
+| 保留 refs、有限重叠与 Tensor 性能基准 | [benchmarks/minimax_h3_reuse.py](benchmarks/minimax_h3_reuse.py)：H3 环境 + 客户端 Torch/NumPy/Pillow |
 | 当前 API、环境准备、模型与文件 | [设计索引](docs/design/README.md)、[运行指南](docs/design/development.md) |
 | 历史环境、图片、性能与验收身份 | [文档目录](docs/README.md) |
 
