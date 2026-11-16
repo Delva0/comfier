@@ -1,6 +1,6 @@
 [project]
 name = "comani"
-version = "0.3.0"
+version = "0.4.0"
 description = "Eager Python SDK and native ComfyUI runtime"
 readme = "README.md"
 requires-python = ">=3.11"

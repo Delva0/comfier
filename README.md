@@ -6,10 +6,10 @@ Comani 是管理并使用远端 ComfyUI 实例的 Python 库。一个普通 Pyth
 
 ## 开始使用
 
-当前版本为 `0.3.0`，尚未发布 PyPI 包。把本仓库构建的 wheel 安装到管理环境和客户端；也可从 Git 安装，部署时固定所需 revision：
+当前版本为 `0.4.0`，尚未发布 PyPI 包。把本仓库构建的 wheel 安装到管理环境和客户端；也可从 Git 安装，部署时固定所需 revision：
 
 ```sh
-python -m pip install /path/to/comani-0.3.0-py3-none-any.whl
+python -m pip install /path/to/comani-0.4.0-py3-none-any.whl
 comani daemon --comfy-root /srv/ComfyUI --workspace /srv --no-start
 ```
 
@@ -21,7 +21,7 @@ comani daemon --comfy-root /srv/ComfyUI --workspace /srv --no-start
 python examples/basic.py \
   --new-environment /srv/comfy-env \
   --comfy-root /srv/ComfyUI \
-  --runtime-package /srv/packages/comani-0.3.0-py3-none-any.whl \
+  --runtime-package /srv/packages/comani-0.4.0-py3-none-any.whl \
   --output artifacts/basic.png
 ```
 

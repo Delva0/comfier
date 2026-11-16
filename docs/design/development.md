@@ -7,7 +7,7 @@
 把当前 wheel 放到服务器并安装到管理环境：
 
 ```sh
-python -m pip install /server/packages/comani-0.3.0-py3-none-any.whl
+python -m pip install /server/packages/comani-0.4.0-py3-none-any.whl
 comani daemon \
   --comfy-root /server/ComfyUI \
   --workspace /server \
