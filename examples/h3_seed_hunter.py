@@ -19,10 +19,8 @@ Outputs default to a private local directory because H3 has territorial restrict
 
 import argparse
 import asyncio
-import json
 import os
 import tempfile
-import time
 from pathlib import Path
 
 import comani
@@ -44,167 +42,89 @@ WEIGHTS = (
 )
 
 
-async def acquire_models(report):
-    for category, repository, path in WEIGHTS:
-        started = time.perf_counter()
-        source = await comani.models.resolve({"repo_id": repository, "path": path})
-        artifact, = source.files
-        roots = await comani.files.roots(category=category)
-        if not roots:
-            raise ValueError(f"No native model roots for {category}")
-        filename = Path(path).name
-        existing = await comani.models.list(category=category, prefix=filename)
-        existing_ids = {item["root"]["id"] for item in existing["files"]
-                        if item["relative_path"] == filename}
-        # Reuse the first native match, or write to the first native search root.
-        candidates = [root for root in roots if root.id in existing_ids]
-        root = min(candidates or roots, key=lambda candidate: candidate.priority)
-        await comani.models.download(artifact, root=root, path=filename, reuse=True)
-        report.append({"phase": "model_download", "file": path, "revision": source.revision,
-                       "sha256": artifact.sha256, "root": root.path, "priority": root.priority,
-                       "seconds": time.perf_counter() - started})
-
-
 async def main(args):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=args.output_dir)).resolve()
-    with tempfile.TemporaryFile(dir=args.output_dir):
-        pass  # Check file creation before starting remote work.
     print(f"Output directory: {args.output_dir}", flush=True)
-    report = {"workflow": "https://civitai.com/models/2881362", "arguments": {
-        key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()},
-        "phases": [], "previews": []}
-    stages = report["phases"]
-    total_started = time.perf_counter()
-    try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
-            started = time.perf_counter()
-            info = await comani.comfyui.start()
-            required = {"MiniMaxH3ReferenceToVideo", "ModelAttentionBackend", "BlockSparseAttention",
-                        "MiniMaxH3LatentUpscaleWithModel", "LatentUpscaleModelLoader",
-                        "SamplerCustomAdvanced", "CreateVideo", "SaveVideo"}
-            available = info.extra.get("node_metadata", {}).get("nodes", {})
-            if missing := required - available.keys():
-                raise ValueError(f"Missing backend nodes: {sorted(missing)}")
-            stages.append({"phase": "connect_start", "seconds": time.perf_counter() - started})
-            report["comfyui"] = {"root": info.comfy_root, "runtime_python": info.runtime_python,
-                                 "runtime_epoch": info.runtime_epoch}
-            if args.download_models:
-                await acquire_models(stages)
-            started = time.perf_counter()
-            model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-            model = comani.node("ModelAttentionBackend", model=model, attention="comfy kitchen attention")
-            model = comani.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=0.75)
-            clip = comani.node("CLIPLoader", clip_name=CLIP, type="minimax", device="default")
-            video_vae = comani.node("VAELoader", vae_name=VIDEO_VAE)
-            audio_vae = comani.node("VAELoader", vae_name=AUDIO_VAE)
-            await asyncio.gather(model, clip, video_vae, audio_vae)
-            stages.append({"phase": "load_objects", "seconds": time.perf_counter() - started,
-                           "note": "GPU movement also occurs during encode/sample/decode."})
-            started = time.perf_counter()
-            positive, empty_latent = comani.node(
-                "MiniMaxH3ReferenceToVideo", clip=clip, vae=video_vae, audio_vae=audio_vae,
-                prompt=args.prompt, width=args.preview_width, height=args.preview_height,
-                length=args.frames, ref_image_size="max",
-            )
-            guider = comani.node("BasicGuider", model=model, conditioning=positive)
-            sampler = comani.node("KSamplerSelect", sampler_name="er_sde")
-            sigmas = comani.node("BasicScheduler", model=model, scheduler="beta", steps=args.steps, denoise=1.0)
-            await asyncio.gather(positive, empty_latent, guider, sampler, sigmas)
-            stages.append({"phase": "encode_schedule", "seconds": time.perf_counter() - started})
-            preview_indices = args.choose or [1, 2, 3]
-            report["preview_indices"] = preview_indices
-            report["selection_mode"] = "explicit_selected_subset" if args.choose else "three_previews_then_choose"
-            candidates = {}
-            for index in preview_indices:
-                seed = args.seed + (index - 1) * 1000
-                preview = {"index": index, "seed": seed, "phases": []}
-                report["previews"].append(preview)
-                started = time.perf_counter()
-                noise = comani.node("RandomNoise", noise_seed=seed)
-                _sampled, denoised = comani.node(
-                    "SamplerCustomAdvanced", noise=noise, guider=guider, sampler=sampler,
-                    sigmas=sigmas, latent_image=empty_latent,
-                )
-                ready = await denoised
-                candidates[index] = ready  # Live AV references retain each candidate with its own audio.
-                preview["latent_id"] = ready.id
-                preview["phases"].append({"phase": "sample", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                frames = comani.node("VAEDecode", samples=denoised, vae=video_vae)
-                audio = comani.node("VAEDecodeAudio", samples=denoised, vae=audio_vae)
-                await asyncio.gather(frames, audio)
-                preview["phases"].append({"phase": "decode_av", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                video = comani.node("CreateVideo", images=frames, audio=audio, fps=24.0)
-                saved = comani.node("SaveVideo", video=video, filename_prefix="comani/seed_hunter/preview",
-                                    format="mp4", codec="h264", return_call=True)
-                file = await saved.file()
-                preview["phases"].append({"phase": "encode_save", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                target = args.output_dir / f"preview-{index}-seed-{seed}.mp4"
-                await comani.files.download(file, target)
-                preview["phases"].append({"phase": "download", "bytes": file.size,
-                                           "seconds": time.perf_counter() - started})
-                print(target, flush=True)
+    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        info = await comani.comfyui.start()
+        required = {"MiniMaxH3ReferenceToVideo", "ModelAttentionBackend", "BlockSparseAttention",
+                    "MiniMaxH3LatentUpscaleWithModel", "LatentUpscaleModelLoader",
+                    "SamplerCustomAdvanced", "CreateVideo", "SaveVideo"}
+        if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
+            raise ValueError(f"Missing backend nodes: {sorted(missing)}")
+        if args.download_models:
+            sources = await asyncio.gather(*(comani.models.resolve({"repo_id": repo, "path": path})
+                                             for _, repo, path in WEIGHTS))
+            downloads = await asyncio.gather(*(comani.models.download(
+                source.files[0], category=category, path=Path(path).name, reuse=True)
+                for (category, _, path), source in zip(WEIGHTS, sources)), return_exceptions=True)
+            for result in downloads:
+                if isinstance(result, BaseException):
+                    raise result
 
-            choices = args.choose
-            if choices is None:
-                choices = [int(await asyncio.to_thread(input, "Choose a preview to refine (1, 2, or 3): "))]
-            if any(choice not in candidates for choice in choices):
-                raise ValueError("Choose a generated candidate: 1, 2, or 3")
-            report["selections"] = []
-            upscaler = comani.node("LatentUpscaleModelLoader", model_name=UPSCALER)
-            for choose in choices:
-                selected = candidates[choose]
-                selection = {"index": choose, "latent_id": selected.id,
-                             "seed": args.seed + (choose - 1) * 1000}
-                report["selections"].append(selection)
-                if len(choices) == 1:
-                    report["selected"] = selection
-                started = time.perf_counter()
-                enlarged = comani.node("MiniMaxH3LatentUpscaleWithModel", model=upscaler, samples=selected,
-                                       width=args.width, height=args.height)
-                await enlarged
-                stages.append({"candidate": choose, "phase": "selected_latent_upscale", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                # This is the workflow's second-pass model branch; the preview branch stays dense.
-                refine_model = comani.node(
-                    "BlockSparseAttention", model=model, selection="sla", **{"selection.keep_percent": 10.0},
-                    start_percent=0.2, end_percent=1.0, dense_blocks="", min_tokens=12288, extra_tokens=256,
-                    sink_conditioning="exact_kv_and_rows", verbose=False,
-                )
-                refine_guider = comani.node("BasicGuider", model=refine_model, conditioning=positive)
-                refine_sigmas = comani.node("BasicScheduler", model=refine_model, scheduler="linear_quadratic",
-                                            steps=args.refine_steps, denoise=0.35)
-                noise = comani.node("RandomNoise", noise_seed=args.refine_seed)
-                refined, _ = comani.node("SamplerCustomAdvanced", noise=noise, guider=refine_guider,
-                                         sampler=sampler, sigmas=refine_sigmas, latent_image=enlarged)
-                await refined
-                stages.append({"candidate": choose, "phase": "refine", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                frames = comani.node("VAEDecode", samples=refined, vae=video_vae)
-                audio = comani.node("VAEDecodeAudio", samples=refined, vae=audio_vae)
-                await asyncio.gather(frames, audio)
-                stages.append({"candidate": choose, "phase": "final_decode_av", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                video = comani.node("CreateVideo", images=frames, audio=audio, fps=24.0)
-                saved = comani.node("SaveVideo", video=video, filename_prefix=f"comani/seed_hunter/final-{choose}",
-                                    format="mp4", codec="h264", return_call=True)
-                file = await saved.file()
-                stages.append({"candidate": choose, "phase": "final_encode_save", "seconds": time.perf_counter() - started})
-                started = time.perf_counter()
-                target = args.output_dir / f"final-candidate-{choose}.mp4"
-                await comani.files.download(file, target)
-                stages.append({"candidate": choose, "phase": "final_download", "bytes": file.size,
-                               "seconds": time.perf_counter() - started})
-                print(target, flush=True)
-    except Exception as error:
-        report["error"] = f"{type(error).__name__}: {error}"
-        raise
-    finally:
-        report["total_seconds"] = time.perf_counter() - total_started
-        (args.output_dir / "profile.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        # Fixed preparation is shared by all preview seeds and selected refinements.
+        model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+        model = comani.node("ModelAttentionBackend", model=model, attention="comfy kitchen attention")
+        model = comani.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=0.75)
+        clip = comani.node("CLIPLoader", clip_name=CLIP, type="minimax", device="default")
+        video_vae = comani.node("VAELoader", vae_name=VIDEO_VAE)
+        audio_vae = comani.node("VAELoader", vae_name=AUDIO_VAE)
+        positive, empty_latent = comani.node(
+            "MiniMaxH3ReferenceToVideo", clip=clip, vae=video_vae, audio_vae=audio_vae,
+            prompt=args.prompt, width=args.preview_width, height=args.preview_height,
+            length=args.frames, ref_image_size="max")
+        guider = comani.node("BasicGuider", model=model, conditioning=positive)
+        sampler = comani.node("KSamplerSelect", sampler_name="er_sde")
+        sigmas = comani.node("BasicScheduler", model=model, scheduler="beta", steps=args.steps, denoise=1.0)
+
+        candidates = {}
+        for index in args.choose or (1, 2, 3):
+            seed = args.seed + (index - 1) * 1000
+            noise = comani.node("RandomNoise", noise_seed=seed)
+            _sampled, denoised = comani.node(
+                "SamplerCustomAdvanced", noise=noise, guider=guider, sampler=sampler,
+                sigmas=sigmas, latent_image=empty_latent)
+            # Keep the original AV latent together; the downloaded MP4 is only a preview.
+            candidates[index] = await denoised
+            frames = comani.node("VAEDecode", samples=candidates[index], vae=video_vae)
+            audio = comani.node("VAEDecodeAudio", samples=candidates[index], vae=audio_vae)
+            video = comani.node("CreateVideo", images=frames, audio=audio, fps=24.0)
+            saved = comani.node("SaveVideo", video=video, filename_prefix="comani/seed_hunter/preview",
+                                format="mp4", codec="h264", return_call=True)
+            target = args.output_dir / f"preview-{index}-seed-{seed}.mp4"
+            await comani.files.download(await saved.file(), target)
+            print(target, flush=True)
+
+        choices = args.choose
+        if choices is None:
+            choices = [int(await asyncio.to_thread(input, "Choose a preview to refine (1, 2, or 3): "))]
+        if any(choice not in candidates for choice in choices):
+            raise ValueError("Choose a generated candidate: 1, 2, or 3")
+
+        # This fixed second-pass branch is prepared once after the choice.
+        upscaler = comani.node("LatentUpscaleModelLoader", model_name=UPSCALER)
+        refine_model = comani.node(
+            "BlockSparseAttention", model=model, selection="sla", **{"selection.keep_percent": 10.0},
+            start_percent=0.2, end_percent=1.0, dense_blocks="", min_tokens=12288, extra_tokens=256,
+            sink_conditioning="exact_kv_and_rows", verbose=False)
+        refine_guider = comani.node("BasicGuider", model=refine_model, conditioning=positive)
+        refine_sigmas = comani.node("BasicScheduler", model=refine_model, scheduler="linear_quadratic",
+                                    steps=args.refine_steps, denoise=0.35)
+        for choose in choices:
+            enlarged = comani.node("MiniMaxH3LatentUpscaleWithModel", model=upscaler, samples=candidates[choose],
+                                   width=args.width, height=args.height)
+            noise = comani.node("RandomNoise", noise_seed=args.refine_seed)
+            refined, _ = comani.node("SamplerCustomAdvanced", noise=noise, guider=refine_guider,
+                                     sampler=sampler, sigmas=refine_sigmas, latent_image=enlarged)
+            frames = comani.node("VAEDecode", samples=refined, vae=video_vae)
+            audio = comani.node("VAEDecodeAudio", samples=refined, vae=audio_vae)
+            video = comani.node("CreateVideo", images=frames, audio=audio, fps=24.0)
+            saved = comani.node("SaveVideo", video=video, filename_prefix=f"comani/seed_hunter/final-{choose}",
+                                format="mp4", codec="h264", return_call=True)
+            target = args.output_dir / f"final-candidate-{choose}.mp4"
+            await comani.files.download(await saved.file(), target)
+            print(target, flush=True)
 
 
 if __name__ == "__main__":

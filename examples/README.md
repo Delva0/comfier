@@ -35,7 +35,7 @@ await comani.files.download(await saved.file(), "result.png")
 
 ## 图像工作流
 
-下面的命令复用已准备的实例；首次安装节点包或下载默认权重时，加上下一节对应的准备参数。每次运行在 `--output-dir` 下新建 `run-*` 目录，保存输出与 `profile.json`。
+下面的命令复用已准备的实例；首次安装节点包或下载默认权重时，加上后文对应的准备参数。本节图像脚本每次在 `--output-dir` 下新建 `run-*` 目录，保存输出与 `profile.json`。
 
 | 任务 | 最少命令 | 产物与来源 |
 | --- | --- | --- |
@@ -54,6 +54,8 @@ await comani.files.download(await saved.file(), "result.png")
 | --- | --- | --- |
 | 先看低成本候选，再精修选中的 AV latent | `python examples/h3_seed_hunter.py --prompt 'An adult walks through a sunlit garden.'` | [Seed Hunter](h3_seed_hunter.py)：三个预览和选中候选的精修 MP4；[foxydits 原工作流](https://civitai.com/models/2881362)。`--choose 2 3` 直接指定候选 |
 | 保存场景，重连同一项目后续写并导出 | `python examples/h3_longforge.py` | [LongForge](h3_longforge.py)：`film.mp4`、场景/导出记录，远端保留 takes；[AIBOB1199 官方来源](https://civitai.com/models/2926029)。默认是两段各 2 秒的小尺寸配置，`--project` 可续写已有项目 |
+
+Seed Hunter 和 LongForge 每次创建新的 `run-*` 输出目录。Seed Hunter 在候选之间复用固定条件；选定后，同一 AV latent 继续进入精修。LongForge 通过原生 `GENERATE NEXT` / `EXPORT FILM` 动作继续项目，重连时重新建立当前 Client 的模型引用。
 
 ### 尚在完善的工作流
 
@@ -79,7 +81,11 @@ await comani.files.download(await saved.file(), "result.png")
 
 LongForge/Score 的公开节点包来自官方附件。脚本中的 `NODE_ARCHIVE` 指定官方 URL、SHA256 与选定包目录，再交给 daemon 的 `plugins.install_archive()` 获取和安装；不需要在个人目录保存附件再上传。目标 daemon 必须能访问官方来源，这条附件下载路径尚待远端验证。
 
+Score、Seed Hunter、LongForge 将模型来源解析后直接交给 `models.download(..., category=..., path=..., reuse=True)`。daemon 按原生模型目录顺序选择已有文件或下载位置，并核验所选文件的 SHA；脚本不需要重写模型根目录的查询与选择。
+
 Score 默认使用 CPU LLM；`--llm-threads N` 按服务器实际 CPU 配额限制原工具线程。`--llm-device cuda` 选择原节点的 CUDA 构建与全部 GPU layers，目标实例需要兼容驱动和运行库。工具首次准备须显式加 `--prepare-llama`；普通运行不自动开始工具下载。
+
+原 PromptSplitter 的 Linux CUDA 工具存在找不到已缓存 CUDA 运行库的已知问题，工具检查会因此失败；遇到此问题需要先修复原工具安装。
 
 ## 从这些工作流复用什么
 

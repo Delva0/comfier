@@ -4,7 +4,7 @@ Independent adaptation of LongForge v7.8 (resource2926029/version3467080).
 The original MIT LongForge NodePack is published in the official archive
 declared below. --install-plugin permits daemon-side acquisition and installation;
 that official-source path still needs independent remote validation.
-Use --download-models to prepare the weights before execution. This small validation setup
+Use --download-models to prepare the weights before execution. This small REF2VA configuration
 uses existing Singularity REF2VA weights, 544x960/2 new seconds, HARD22 overlap,
 and original20-step Euler/simple sampling. The supplied GUI has model placeholders,
 768x1344/10 new seconds, SOFT5 overlap and optional Sage/VEDA preview patches.
@@ -23,9 +23,7 @@ import json
 import os
 import shlex
 import tempfile
-import time
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 
 import comani
@@ -53,91 +51,68 @@ WEIGHTS = (
 )
 
 
-async def acquire_model(category, repository, path, phases):
-    started = time.perf_counter()
-    source = await comani.models.resolve({"repo_id": repository, "path": path})
-    artifact, = source.files
-    filename = Path(path).name
-    roots = await comani.files.roots(category=category)
-    if not roots:
-        raise ValueError(f"No native model roots for {category}")
-    existing = await comani.models.list(category=category, prefix=filename)
-    present = {f["root"]["id"] for f in existing["files"] if f["relative_path"] == filename}
-    root = min([r for r in roots if r.id in present] or roots, key=lambda r: r.priority)
-    file = await comani.models.download(artifact, root=root, path=filename, reuse=True)
-    phases.append({"phase": "model_download", "file": filename, "sha256": file.sha256,
-                   "revision": source.revision, "seconds": time.perf_counter() - started})
-
-
 async def main(args):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=args.output_dir)).resolve()
-    with tempfile.TemporaryFile(dir=args.output_dir):
-        pass
     project = args.project or "comani-" + uuid.uuid4().hex[:12]
     story = json.loads(args.story.read_text()) if args.story else STORY
     if not isinstance(story, list) or len(story) != 2:
         raise ValueError("This continuation example needs exactly two scene cards")
-    profile = {"workflow_resource": 2926029, "workflow_version": 3467080,
-               "project": project, "story": story, "configuration": "small REF2VA validation variant",
-               "arguments": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
-               "phases": []}
-    started_all = time.perf_counter()
     print(f"Output directory: {args.output_dir}\nRemote project: {project}", flush=True)
-    try:
-        # Each scope has its own remote references. Only the project name/state survives.
-        for scene_number in (1, 2):
-            async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
-                started = time.perf_counter()
-                if scene_number == 1 and args.install_plugin:
-                    installed = await comani.plugins.list()
-                    missing = {name: path for name, path in NODE_ARCHIVE["packages"].items() if not any(
-                        Path(plugin.path).name.casefold() == name.casefold() for plugin in installed)}
-                    info = await comani.comfyui.info()
-                    dependencies = await comani.bash.run(shlex.join([info.runtime_python, "-c",
-                        "import importlib.metadata,importlib.util,shutil; "
-                        "assert int(importlib.metadata.version('filelock').split('.')[0]) >= 3; "
-                        "assert shutil.which('ffmpeg') or importlib.util.find_spec('imageio_ffmpeg')"]), check=False)
-                    if missing or dependencies.exit_code:
-                        await comani.comfyui.stop()
-                    if missing:
-                        profile["node_installation"] = asdict(await comani.plugins.install_archive(
-                            {**NODE_ARCHIVE, "packages": missing}))
-                    if dependencies.exit_code:
-                        await comani.bash.run(shlex.join([
-                            info.runtime_python, "-m", "pip", "install", "filelock>=3", "imageio-ffmpeg"]))
-                info = await comani.comfyui.start()
-                required = {"LongForgeProject", "LongForgeVideoSettings", "LongForgeSampling", "LongForgeRender"}
-                if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
-                    raise ValueError(f"Install original LongForge NodePack first; missing: {sorted(missing)}")
-                profile["phases"].append({"phase": "connect", "scene": scene_number,
-                                          "seconds": time.perf_counter() - started})
-                if scene_number == 1 and args.download_models:
-                    downloads = await asyncio.gather(
-                        *(acquire_model(*weight, profile["phases"]) for weight in WEIGHTS), return_exceptions=True)
-                    if errors := [result for result in downloads if isinstance(result, BaseException)]:
-                        raise errors[0]
-                started = time.perf_counter()
-                model = comani.node("UNETLoader", unet_name=args.model, weight_dtype="default")
-                clip = comani.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
-                video_vae = comani.node("VAELoader", vae_name=args.video_vae)
-                audio_vae = comani.node("VAELoader", vae_name=args.audio_vae)
-                await asyncio.gather(model, clip, video_vae, audio_vae)
-                profile["phases"].append({"phase": "load", "scene": scene_number,
-                                          "seconds": time.perf_counter() - started})
-                video = comani.node(
-                    "LongForgeVideoSettings", pipeline="REF2VA", width=args.width, height=args.height,
-                    frames=107, overlap_frames=args.overlap, continuity_mode="MANUAL",
-                    audio_continuity="HARD", audio_history_frames=0, reference_policy="EVERY SCENE",
-                    ref_image_size="max", last_frame_usage="LAST SCENE", audio_soft_steps=4,
-                    duration_mode="NEW SECONDS", new_seconds=args.new_seconds, continuation_method="PROTECTED")
-                sampling = comani.node("LongForgeSampling", steps=args.steps, sampler="euler", scheduler="simple",
-                                      denoise=1.0, cfg=1.0, seed=args.seed, increment_seed=True,
-                                      shift_video=12.0, shift_audio=3.0)
-                job = comani.node("LongForgeProject", project_name=project, action="GENERATE NEXT",
+
+    # Each Client owns its objects; only the native project/takes survive reconnecting.
+    for scene_number in (1, 2):
+        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+            if scene_number == 1 and args.install_plugin:
+                installed = await comani.plugins.list()
+                missing = {name: path for name, path in NODE_ARCHIVE["packages"].items() if not any(
+                    Path(plugin.path).name.casefold() == name.casefold() for plugin in installed)}
+                info = await comani.comfyui.info()
+                dependencies = await comani.bash.run(shlex.join([info.runtime_python, "-c",
+                    "import importlib.metadata,importlib.util,shutil; "
+                    "assert int(importlib.metadata.version('filelock').split('.')[0]) >= 3; "
+                    "assert shutil.which('ffmpeg') or importlib.util.find_spec('imageio_ffmpeg')"]), check=False)
+                if missing or dependencies.exit_code:
+                    await comani.comfyui.stop()
+                if missing:
+                    await comani.plugins.install_archive({**NODE_ARCHIVE, "packages": missing})
+                if dependencies.exit_code:
+                    await comani.bash.run(shlex.join([
+                        info.runtime_python, "-m", "pip", "install", "filelock>=3", "imageio-ffmpeg"]))
+            info = await comani.comfyui.start()
+            required = {"LongForgeProject", "LongForgeVideoSettings", "LongForgeSampling", "LongForgeRender"}
+            if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
+                raise ValueError(f"Install original LongForge NodePack first; missing: {sorted(missing)}")
+            if scene_number == 1 and args.download_models:
+                sources = await asyncio.gather(*(comani.models.resolve({"repo_id": repo, "path": path})
+                                                 for _, repo, path in WEIGHTS))
+                downloads = await asyncio.gather(*(comani.models.download(
+                    source.files[0], category=category, path=Path(path).name, reuse=True)
+                    for (category, _, path), source in zip(WEIGHTS, sources)), return_exceptions=True)
+                for result in downloads:
+                    if isinstance(result, BaseException):
+                        raise result
+
+            model = comani.node("UNETLoader", unet_name=args.model, weight_dtype="default")
+            clip = comani.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
+            video_vae = comani.node("VAELoader", vae_name=args.video_vae)
+            audio_vae = comani.node("VAELoader", vae_name=args.audio_vae)
+            await asyncio.gather(model, clip, video_vae, audio_vae)
+            video = comani.node(
+                "LongForgeVideoSettings", pipeline="REF2VA", width=args.width, height=args.height,
+                frames=107, overlap_frames=args.overlap, continuity_mode="MANUAL",
+                audio_continuity="HARD", audio_history_frames=0, reference_policy="EVERY SCENE",
+                ref_image_size="max", last_frame_usage="LAST SCENE", audio_soft_steps=4,
+                duration_mode="NEW SECONDS", new_seconds=args.new_seconds, continuation_method="PROTECTED")
+            sampling = comani.node("LongForgeSampling", steps=args.steps, sampler="euler", scheduler="simple",
+                                  denoise=1.0, cfg=1.0, seed=args.seed, increment_seed=True,
+                                  shift_video=12.0, shift_audio=3.0)
+            actions = ("GENERATE NEXT",) if scene_number == 1 else ("GENERATE NEXT", "EXPORT FILM")
+            for action in actions:
+                exporting = action == "EXPORT FILM"
+                job = comani.node("LongForgeProject", project_name=project, action=action,
                                   run_mode="ONE SCENE", scene_data=json.dumps(story), selected_scene=1,
-                                  run_stamp=scene_number, export_when_done=False)
-                started = time.perf_counter()
+                                  run_stamp=3 if exporting else scene_number, export_when_done=False)
                 rendered = comani.node(
                     "LongForgeRender", job=job, video_settings=video, sampling=sampling,
                     model=model, clip=clip, video_vae=video_vae, audio_vae=audio_vae,
@@ -145,38 +120,14 @@ async def main(args):
                     fade_film_edges=True, encoding_speed="medium", metadata_mode="NONE",
                     diagnostic_wavs=False, return_call=True)
                 report = json.loads(await (await rendered.output(1)).fetch())
-                profile["phases"].append({"phase": "render_save_preview", "scene": scene_number,
-                                          "seconds": time.perf_counter() - started})
-                (args.output_dir / f"scene-{scene_number}.json").write_text(json.dumps(report, indent=2))
-                print(f"Scene {scene_number}: {report['summary']}", flush=True)
-                if scene_number == 2:
-                    export_job = comani.node("LongForgeProject", project_name=project, action="EXPORT FILM",
-                                             run_mode="ONE SCENE", scene_data=json.dumps(story),
-                                             selected_scene=1, run_stamp=3, export_when_done=False)
-                    started = time.perf_counter()
-                    exported = comani.node(
-                        "LongForgeRender", job=export_job, video_settings=video, sampling=sampling,
-                        model=model, clip=clip, video_vae=video_vae, audio_vae=audio_vae,
-                        preview_new_scene=True, export_crf=18, repair_audio_seams=True,
-                        repair_video_seams=False, fade_film_edges=True, encoding_speed="medium",
-                        metadata_mode="NONE", diagnostic_wavs=False, return_call=True)
-                    export_report = json.loads(await (await exported.output(1)).fetch())
-                    file = await exported.file()
-                    profile["phases"].append({"phase": "export", "seconds": time.perf_counter() - started})
-                    (args.output_dir / "export.json").write_text(json.dumps(export_report, indent=2))
-                    started = time.perf_counter()
+                name = "export" if exporting else f"scene-{scene_number}"
+                (args.output_dir / f"{name}.json").write_text(json.dumps(report, indent=2))
+                print(f"{name}: {report.get('summary', 'completed')}", flush=True)
+                if exporting:
                     target = args.output_dir / "film.mp4"
-                    await comani.files.download(file, target)
-                    profile["phases"].append({"phase": "download", "bytes": file.size,
-                                              "seconds": time.perf_counter() - started})
+                    await comani.files.download(await rendered.file(), target)
                     print(target, flush=True)
-            print(f"Client {scene_number} closed; project takes remain on the daemon disk.", flush=True)
-    except Exception as error:
-        profile["error"] = f"{type(error).__name__}: {error}"
-        raise
-    finally:
-        profile["total_seconds"] = time.perf_counter() - started_all
-        (args.output_dir / "profile.json").write_text(json.dumps(profile, indent=2))
+        print(f"Client {scene_number} closed; project takes remain on the daemon disk.", flush=True)
 
 
 if __name__ == "__main__":
