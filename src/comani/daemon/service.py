@@ -21,9 +21,10 @@ from functools import partial
 import cloudpickle
 
 from comani._codec import has_lz4
-from comani.errors import PackageConflict
+from comani.errors import PackageConflict, error_to_wire
 from comani.files import FILE_CHUNK_SIZE, FILE_VERSION, _io
-from comani.protocol import BINARY_FETCH_LZ4_VERSION, BINARY_FETCH_VERSION
+from comani.protocol import (BINARY_FETCH_LZ4_VERSION, BINARY_FETCH_VERSION,
+                             SUBMIT_BATCH_VERSION, SUBMIT_BATCH_MAX_CALLS, SUBMIT_BATCH_MAX_BYTES)
 
 from . import file_http
 from .adapter import NativeAdapter, native_python_inputs
@@ -151,7 +152,8 @@ class NativeRuntime:
 
     def _handshake(self, session):
         capabilities = {"bounded_wait": True, "binary_fetch": BINARY_FETCH_VERSION,
-                        "files": FILE_VERSION, "session_resume": 1, "whole_call_refs": 1}
+                        "files": FILE_VERSION, "session_resume": 1, "whole_call_refs": 1,
+                        "submit_batch": SUBMIT_BATCH_VERSION}
         if has_lz4():
             capabilities["binary_fetch_lz4"] = BINARY_FETCH_LZ4_VERSION
         return {"session_id": session, "resume_token": self.session_tokens.get(session), "submission_window": self._submission_window(session), "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "recovery_limits": {"max_sessions": self.recovery_policy.max_sessions, "max_objects": self.recovery_policy.max_objects, "max_call_records": self.recovery_policy.max_call_records, "submission_seconds": self.recovery_policy.submission_seconds, "expiry_running": self.recovery_policy.expiry_running}, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}
@@ -448,6 +450,33 @@ class NativeRuntime:
             raise
         self._emit("accepted", state)
         return {"call_id": call_id, "status": "accepted"}
+
+    async def submit_batch(self, session_id, submissions, **_):
+        """Ordered individual admissions, not a workflow or an atomic transaction.
+
+        Replaying this same list uses submit's existing per-call digest/window
+        checks, including a prefix accepted before a lost response. A rejected
+        item does not prevent later independent items from being admitted.
+        """
+        if (not isinstance(submissions, list) or not 1 <= len(submissions) <= SUBMIT_BATCH_MAX_CALLS
+                or any(not isinstance(item, dict) or not isinstance(item.get("call_id"), str)
+                       or not item["call_id"] for item in submissions)):
+            raise ValueError("Expected a bounded ordered list of calls with explicit call_id values")
+        if len(json.dumps(submissions, separators=(",", ":"), ensure_ascii=False,
+                          allow_nan=False).encode()) > SUBMIT_BATCH_MAX_BYTES:
+            raise ValueError("Submission batch exceeds its framing byte limit")
+        await self.start()
+        self._session(session_id)
+        results = []
+        for item in submissions:
+            try:
+                if set(item) - {"call_id", "spec", "submission_window"}:
+                    raise ValueError("Unknown batch item fields")
+                accepted = await self.submit(session_id=session_id, **item)
+            except Exception as error:
+                accepted = {"call_id": item["call_id"], "error": error_to_wire(error)}
+            results.append(accepted)
+        return {"results": results}
 
     async def _locator_data(self, state, locator):
         producer = self._producer(state.session, locator)

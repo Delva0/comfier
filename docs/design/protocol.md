@@ -18,6 +18,7 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 | `resume` | 验证原 session、恢复授权及同 runtime epoch，恢复仍有效的原会话 |
 | `artifact_put` | 按 SHA256 上传代码 artifact |
 | `submit` | 登记原 session/call ID、spec digest、签名窗口和输入 reservations，返回接受状态 |
+| `submit_batch` | 协商后将已排队调用按原顺序交给逐项 submit，返回各自接受/失败回执 |
 | `wait_result` | 等整个 invocation，并带必要 JSON metadata；可指定 `node_id` 等 workflow 中一个 producer |
 | `fetch` | 按 ref ID/epoch 取回显式请求的 Python 值 |
 | `file_roots` / `file_stat` / `file_remove` | 显式文件根、元数据和删除；不产生远端对象引用 |
@@ -31,6 +32,8 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 这些是业务RPC连接池。HTTP keeper另用独立线程/event loop中的专用连接保活。支持恢复时暂态故障触发同session/epoch恢复；终态协议错误明确失败。heartbeat只更新有效session，不能恢复已过期会话。只有认证客户端接触更新seen，内部worker/排队或僵死TCP不续约。默认宽限3600秒，见[会话语义](ownership.md#会话续约与业务-loop-暂停)。
 
 ### 经过反向代理的等待
+
+服务器精确声明整数 `capabilities.submit_batch=1` 时，SDK 会把当前发送队列中可下发的有序前缀合为 `submissions` 列表；后项需要上传新代码 artifact 时先下发已有前缀，不等待后项上传。不增加收集等待，不捕获/编译 graph，也不等待输入 Future ready。每项仍有原 call_id、spec 和签名窗口，daemon 复用原 submit 按序受理，某项失败不会阻止后续独立项。回执不是批次事务；整批或仅前缀已受理后丢失 ACK，仍以原每项身份/内容/窗口重放，既有 digest、strict expiry、reservations 与 owned/borrowed 规则不变。每个 envelope 最多64项/8MiB，超出会拆包，单个较大调用仍走原 submit；这些是传输分帧界限，不改变逻辑调用配额。跨包及发送期间新入队的调用仍等前一包 ACK，不是全程 streaming。未声明该版本、包括布尔 true 的旧/不同 daemon，继续原逐条路径。结果观察仍逐 call 并行进行。
 
 服务器通过 `capabilities.bounded_wait=true` 声明有界长轮询。SDK 随后为 `wait_result` 发送 `wait_seconds=20`；在这段时间内尚未终态时，服务器返回 `{"pending": true}`，SDK 用相同 session/call/node ID 继续读取。超时只结束本次读取，不取消 producer，也不会重提计算。终态仍返回 outputs 或原有错误。服务器接受大于 0、不超过 60 的有限秒数；未指定时保留旧的无限等待语义。
 

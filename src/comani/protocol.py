@@ -8,6 +8,9 @@ from collections.abc import Mapping
 from typing import Any, Callable
 
 PROTOCOL_VERSION = 1
+SUBMIT_BATCH_VERSION = 1
+SUBMIT_BATCH_MAX_CALLS = 64
+SUBMIT_BATCH_MAX_BYTES = 8 * 1024 * 1024
 PYTHON_NODE = "ComaniPython"
 PICKLE_CONTENT_TYPE = "application/vnd.comani.pickle"
 BINARY_FETCH_VERSION = 1

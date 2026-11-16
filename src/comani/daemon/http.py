@@ -39,7 +39,7 @@ async def _binary_response(request, payload, content_type, *, headers=None):
 
 
 def create_app(runtime, *, token=None, close_runtime=True):
-    methods = {"handshake", "resume", "submission_window", "runtime_info", "file_invalidate", "submit", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat", "file_roots", "file_stat", "file_remove"}
+    methods = {"handshake", "resume", "submission_window", "runtime_info", "file_invalidate", "submit", "submit_batch", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat", "file_roots", "file_stat", "file_remove"}
 
     @web.middleware
     async def authenticate(request, handler):

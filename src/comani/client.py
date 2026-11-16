@@ -26,10 +26,12 @@ from .errors import (
     RemoteError,
     SessionClosed,
     UnknownOutputLayout,
+    error_from_wire,
 )
 from .files import Files
 from .management import Bash, ComfyUI, Models, Operations, Plugins
-from .protocol import PYTHON_NODE, encode_tree, lift_arguments, unpack_pickle
+from .protocol import (PYTHON_NODE, SUBMIT_BATCH_VERSION, SUBMIT_BATCH_MAX_CALLS,
+                       SUBMIT_BATCH_MAX_BYTES, encode_tree, lift_arguments, unpack_pickle)
 from .refs import Call, OutputFuture, RemoteRef, _CallState
 from .transport import HTTPTransport, retryable_transport_error
 
@@ -644,8 +646,13 @@ class Client:
 
     @staticmethod
     async def _send_loop(client_ref, queue, opening):
+        deferred = None
         while True:
-            item = await queue.get()
+            if deferred is None:
+                item = await queue.get()
+            else:
+                item, deferred = deferred, None
+            items, stop = [item], False
             try:
                 if item is None:
                     return
@@ -656,55 +663,144 @@ class Client:
                 client._check_heartbeat()
                 await client._attach()
                 handshake, uploaded = client.handshake, client._uploaded
-                recovery = client._recovery
-                session_id = client.session_id
-                item.state.client()
-                if item.state.check_outputs and item.state.declared_count is None and item.kind == "node":
-                    item.state.declared_count = client._output_count(item.payload["node_type"])
-                if item.kind == "node":
-                    spec = {"kind": "node", "node_type": item.payload["node_type"],
-                            "inputs": {k: encode_tree(v, client._encode_special)
-                                       for k, v in item.payload["inputs"].items()}}
-                else:
-                    spec = {"kind": "workflow", "graph": item.payload["graph"].to_wire(client),
-                            "bindings": {k: encode_tree(v, client._encode_special)
-                                         for k, v in item.payload["bindings"].items()}}
+                recovery, session_id = client._recovery, client.session_id
+                version = handshake.get("capabilities", {}).get("submit_batch")
+                batched = type(version) is int and version == SUBMIT_BATCH_VERSION
                 del client
-                await Client._upload(recovery, handshake, uploaded, session_id, item.artifacts)
-                if item.payload.get("extra_data") is not None:
-                    spec["extra_data"] = item.payload["extra_data"]
-                item.state.status = "submitting"
-                item.state.epoch = recovery.epoch
-                submission = {"session_id": session_id, "call_id": item.state.call_id, "spec": spec}
-                if recovery.submission_window is not None:
-                    window = recovery.submission_window
-                    if window.get("expires_at", 0) <= time.time() + 5:
-                        value = await recovery.request("submission_window", session_id=session_id,
-                                                       epoch=recovery.epoch)
-                        window = value.get("submission_window", value.get("window", value))
-                        recovery.submission_window = window
-                    submission["submission_window"] = dict(window)
-                await recovery.request("submit", **submission)
-                item.state.status = "accepted"
-                if not item.state.accepted.done():
-                    item.state.accepted.set_result(None)
-                client = client_ref()
-                if client is not None:
-                    client._watch(item.state)
-                del client
+                # Drain only work already queued. No debounce, graph capture or
+                # wait for an input Future: eager calls retain individual IDs.
+                if batched:
+                    while len(items) < SUBMIT_BATCH_MAX_CALLS:
+                        try:
+                            following = queue.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
+                        if following is None:
+                            queue.task_done()
+                            stop = True
+                            break
+                        # Do not delay a ready prefix for a later call's code
+                        # upload. Keep one lookahead outside the queue so FIFO
+                        # and queue.join() accounting remain unchanged.
+                        if any(artifact.artifact_id not in uploaded for artifact in following.artifacts):
+                            deferred = following
+                            break
+                        items.append(following)
+                prepared = []
+                for item in items:
+                    try:
+                        client = client_ref()
+                        if client is None:
+                            stop = True
+                            return
+                        item.state.client()
+                        if item.state.check_outputs and item.state.declared_count is None and item.kind == "node":
+                            item.state.declared_count = client._output_count(item.payload["node_type"])
+                        if item.kind == "node":
+                            spec = {"kind": "node", "node_type": item.payload["node_type"],
+                                    "inputs": {k: encode_tree(v, client._encode_special)
+                                               for k, v in item.payload["inputs"].items()}}
+                        else:
+                            spec = {"kind": "workflow", "graph": item.payload["graph"].to_wire(client),
+                                    "bindings": {k: encode_tree(v, client._encode_special)
+                                                 for k, v in item.payload["bindings"].items()}}
+                        del client
+                        await Client._upload(recovery, handshake, uploaded, session_id, item.artifacts)
+                        if item.payload.get("extra_data") is not None:
+                            spec["extra_data"] = item.payload["extra_data"]
+                        item.state.status = "submitting"
+                        item.state.epoch = recovery.epoch
+                        submission = {"call_id": item.state.call_id, "spec": spec}
+                        # Framing errors belong to this item, not its unrelated
+                        # neighbours in the same already-queued envelope.
+                        json.dumps(submission, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
+                        prepared.append((item, submission))
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as error:
+                        item.state.fail(error)
+                        item.payload, item.artifacts = None, ()
+                # Byte framing is an internal envelope bound; an individual
+                # large call still uses the existing single-submit route.
+                groups, group, size = [], [], 2
+                for entry in prepared:
+                    length = len(json.dumps(entry[1], separators=(",", ":"), ensure_ascii=False,
+                                            allow_nan=False).encode()) + 512
+                    if group and size + length > SUBMIT_BATCH_MAX_BYTES:
+                        groups.append(group)
+                        group, size = [], 2
+                    group.append(entry)
+                    size += length
+                if group:
+                    groups.append(group)
+                for group in groups:
+                    try:
+                        window = recovery.submission_window
+                        if window is not None:
+                            if window.get("expires_at", 0) <= time.time() + 5:
+                                value = await recovery.request("submission_window", session_id=session_id,
+                                                               epoch=recovery.epoch)
+                                window = value.get("submission_window", value.get("window", value))
+                                recovery.submission_window = window
+                            for _, submission in group:
+                                submission["submission_window"] = dict(window)
+                        if len(group) == 1:
+                            await recovery.request("submit", session_id=session_id, **group[0][1])
+                            replies = [{"call_id": group[0][0].state.call_id}]
+                        else:
+                            payload = await recovery.request("submit_batch", session_id=session_id,
+                                                             submissions=[request for _, request in group])
+                            replies = payload.get("results") if isinstance(payload, dict) else None
+                            if (not isinstance(replies, list) or len(replies) != len(group)
+                                    or any(not isinstance(reply, dict) or reply.get("call_id") != entry[0].state.call_id
+                                           for entry, reply in zip(group, replies))):
+                                raise RemoteError("Daemon returned invalid ordered submission receipts")
+                        for (entry, _), reply in zip(group, replies):
+                            if reply.get("error"):
+                                entry.state.fail(error_from_wire(reply["error"]))
+                                continue
+                            entry.state.status = "accepted"
+                            if not entry.state.accepted.done():
+                                entry.state.accepted.set_result(None)
+                            client = client_ref()
+                            if client is not None:
+                                client._watch(entry.state)
+                            del client
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as error:
+                        for entry, _ in group:
+                            entry.state.fail(error)
+                    finally:
+                        for entry, _ in group:
+                            entry.payload, entry.artifacts = None, ()
+                if stop:
+                    return
             except asyncio.CancelledError:
+                stop = True
                 client = client_ref()
-                if item is not None and (client is None or not client._abort_started):
-                    item.state.fail(SessionClosed("Submission was interrupted"))
+                if client is None or not client._abort_started:
+                    for entry in items:
+                        if entry is not None and not entry.state.accepted.done():
+                            entry.state.fail(SessionClosed("Submission was interrupted"))
                 del client
                 raise
             except Exception as error:
-                if item is not None:
-                    item.state.fail(error)
+                for entry in items:
+                    if entry is not None and not entry.state.accepted.done():
+                        entry.state.fail(error)
             finally:
                 client = None
-                queue.task_done()
-                del item  # transfer input ownership at ACK; do not retain the last request
+                for _ in range(len(items)):
+                    queue.task_done()
+                if stop and deferred is not None:
+                    deferred.state.fail(SessionClosed("Submission was interrupted"))
+                    deferred.payload, deferred.artifacts = None, ()
+                    queue.task_done()
+                    deferred = None
+                # Input ownership transfers at admission. Never retain the last
+                # queue item/group while the sender waits for more work.
+                item = items = prepared = groups = group = entry = following = None
 
     def _watch(self, state):
         task = self._task(self._wait_result(state))
