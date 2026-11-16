@@ -163,6 +163,7 @@ class PluginInfo:
     repository: str | None = None
     source: Any = None
     live_imported: bool | None = None
+    archive: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -518,6 +519,18 @@ class ComfyUI(_Namespace):
 
 class Plugins(_Namespace):
     namespace = "plugins"
+
+    async def begin_install_archive(self, archive: Mapping, *, no_deps=False,
+                                    timeout=None) -> ManagementOperation:
+        """Install SHA-pinned ZIP package directories; install.py may execute."""
+        return await self._begin("install_archive", archive=archive,
+                                 no_deps=no_deps, timeout=timeout)
+
+    async def install_archive(self, archive: Mapping, *, no_deps=False,
+                              timeout=None) -> PluginChanges:
+        """Fetch/install in the daemon; no_deps skips requirements, not install.py."""
+        return await (await self.begin_install_archive(archive, no_deps=no_deps,
+                                                       timeout=timeout)).result()
 
     async def begin_install_git(self, repository: str, *, commit=None, name=None,
                                 no_deps=False, timeout=None) -> ManagementOperation:

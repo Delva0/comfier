@@ -6,7 +6,7 @@ import asyncio
 import contextvars
 from contextlib import asynccontextmanager
 
-from . import bash, comfyui, git_plugins, plugins
+from . import archive_plugins, bash, comfyui, git_plugins, plugins
 from .models import ModelService
 from .operations import ManagementError, OperationRegistry
 from .providers import ProviderResolver
@@ -59,7 +59,7 @@ class ManagementService:
 
     def validate_action(self, namespace, action):
         actions = {"bash": {"run"}, "comfyui": {"configure", "install", "update", "start", "stop", "restart", "prepare_runtime", "prepare_tools", "create_environment"},
-                   "plugins": {"install", "update", "remove", "uninstall", "enable", "disable", "install_git", "update_git"},
+                   "plugins": {"install", "update", "remove", "uninstall", "enable", "disable", "install_git", "update_git", "install_archive"},
                    "models": {"download", "remove", "snapshot"}}
         if action not in actions.get(namespace, set()):
             raise ManagementError("UnknownMethod", "Unknown management operation")
@@ -108,6 +108,8 @@ class ManagementService:
                 return await getattr(self.supervisor, action)(**params)
             return await comfyui.change(self.supervisor, context, action, **params)
         if namespace == "plugins":
+            if action == "install_archive":
+                return await archive_plugins.install(self.supervisor, context, self.providers, **params)
             if action in {"install_git", "update_git"}:
                 if "_locked" in params:
                     raise ManagementError("InvalidArgument", "Invalid Git plugin argument")

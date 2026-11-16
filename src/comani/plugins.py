@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Coroutine
 
 from ._context import invoke_async as _invoke_async
@@ -14,6 +15,25 @@ async def versions(package: str):
     from .management import _decode
 
     return _decode("plugins", "versions", await ProviderQueries().registry_versions(package))
+
+
+
+def begin_install_archive(
+    archive: Mapping, *, no_deps=False, timeout=None
+) -> Coroutine[Any, Any, ManagementOperation]:
+    """Install SHA-pinned ZIP directories using the current daemon."""
+    return _invoke_async(
+        ("plugins", "begin_install_archive"), archive, no_deps=no_deps, timeout=timeout
+    )
+
+
+def install_archive(
+    archive: Mapping, *, no_deps=False, timeout=None
+) -> Coroutine[Any, Any, PluginChanges]:
+    """no_deps skips requirements; install.py may still execute, as with Git."""
+    return _invoke_async(
+        ("plugins", "install_archive"), archive, no_deps=no_deps, timeout=timeout
+    )
 
 
 def begin_install_git(

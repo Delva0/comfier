@@ -498,14 +498,19 @@ class ModelService:
                 await _io(shutil.rmtree, staging)
 
     @staticmethod
-    def _rename_directory(source, destination):
+    def _rename_directory(source, destination, *, source_fd=None, destination_fd=None):
+        if source_fd is not None:
+            _relative(os.fspath(source))
+        if destination_fd is not None:
+            _relative(os.fspath(destination))
         try:
             rename = ctypes.CDLL(None, use_errno=True).renameat2
         except AttributeError:
             raise ManagementError("UnsupportedFileSystem", "Atomic create-only directories require Linux renameat2") from None
         rename.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
         rename.restype = ctypes.c_int
-        if rename(-100, os.fsencode(source), -100, os.fsencode(destination), 1) != 0:
+        if rename(-100 if source_fd is None else source_fd, os.fsencode(source),
+                  -100 if destination_fd is None else destination_fd, os.fsencode(destination), 1) != 0:
             number = ctypes.get_errno()
             if number == errno.EEXIST:
                 raise ManagementError("FileExists", "Snapshot destination already exists")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import tomllib
 from pathlib import Path
@@ -77,11 +78,25 @@ async def listing(supervisor):
             if marker.is_file():
                 identifier = marker.read_text().strip()
             facts = await git_fact(path)
+            receipt = path / ".comani-archive.json"
+            archive = None
+            try:
+                if receipt.is_file() and not receipt.is_symlink() and receipt.stat().st_size <= 65536:
+                    value = json.loads(receipt.read_text())
+                    if (isinstance(value, dict) and re.fullmatch(r"[0-9a-f]{64}", value.get("sha256", ""))
+                            and isinstance(value.get("url"), str)
+                            and isinstance(value.get("subdirectory"), str)
+                            and (value.get("size") is None or type(value["size"]) is int and value["size"] >= 0)):
+                        from .providers import safe_url
+                        archive = {key: value.get(key) for key in ("sha256", "size", "subdirectory")}
+                        archive["url"] = safe_url(value["url"])
+            except (OSError, ValueError, TypeError):
+                pass
             result.append({"id": identifier or path.name.split("@")[0].removesuffix(".disabled"),
                            "name": path.name, "path": str(path), "enabled": enabled,
                            "version": project.get("version"), **facts,
-                           "source": "git" if facts["commit"] else "registry" if project else "directory",
-                           "live_imported": None})
+                           "source": "git" if facts["commit"] else "archive" if archive else "registry" if project else "directory",
+                           "archive": archive, "live_imported": None})
     return result
 
 

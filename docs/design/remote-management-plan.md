@@ -49,7 +49,7 @@ CPU 安装需 `configure(cpu=True)` 和 `install(skip_torch=False)`。GPU 环境
 | namespace | 查询 | 明确变更 |
 | --- | --- | --- |
 | comfyui | info/config/logs | configure/create_environment/prepare_tools/prepare_runtime/install/update/start/stop/restart |
-| plugins | backend/list；模块 versions(package) 为本地查询 | install/update/enable/disable/uninstall；install_git/update_git |
+| plugins | backend/list；模块 versions(package) 为本地查询 | install/update/enable/disable/uninstall；install_git/update_git；install_archive |
 | models | categories/list；模块 versions/resolve/manifest 为本地查询 | download/snapshot/remove |
 | bash | 无独立本地查询 | run/begin |
 
@@ -70,6 +70,21 @@ await remote.plugins.install_git(
     "https://example.org/owner/nodes.git", commit=SELECTED_FULL_COMMIT,
 )
 ```
+
+ZIP-only 原包使用显式归档安装，无需先下载到客户端或伪造 Git 仓库：
+
+```python
+changes = await remote.plugins.install_archive({
+    "url": OFFICIAL_ARCHIVE_URL,
+    "sha256": EXPECTED_ARCHIVE_SHA256,
+    "size": EXPECTED_OPTIONAL_BYTE_COUNT,
+    "packages": {"custom-node-name": "release/custom_nodes/original-package"},
+})
+```
+
+`begin_install_archive` 返回同一管理 Operation，可导出 handle、重新观察和取消。获取、SHA/可选长度校验、ZIP 路径/类型校验和流式解包均在 daemon；一个 ZIP 的多个选定子目录只下载一次。仅接受 HTTP(S) ZIP、明确 SHA256 与包目录映射，最多100个包和10000个ZIP条目，当前原子发布需要Linux renameat2与no-follow目录句柄；不枚举猜测包、不把 custom_nodes 开放为数据文件根、不导入包代码。默认处理 requirements；`no_deps=True` 和 Git 路径相同，只跳过 requirements，仍可能执行 install.py，回执记录该事实并最终 pip check。需要的额外系统工具仍由调用方明确准备。归档安装要求运行时已显式停止并遵循维护锁；各目录以接受时持有的目录句柄锚定 create-only 原子发布，拒绝路径替换重定向；同名活动/禁用目录不会覆盖，多包之间发生失败会按 `PluginChanges.partial_changes` 保留真实已发布项，而不是多目录事务。成功不自动启动或证明节点已导入。目标根路径/身份和压缩包 stage 检查不隔离拥有 daemon 同等权限的恶意 writer。
+
+归档 URL 使用 daemon 独立 provider 凭据及既有安全 HTTP 重定向规则，客户端凭据不自动透传；公开回执只保留净化 URL、SHA、包内目录与安装位置。安装来源标记为 archive，不伪报 Git/CNR。此通用入口经 loopback HTTP 覆盖；具体受限 provider 的权限与真实下载必须单独验收，通用接口不能证明任意站点授权或许可。
 
 示例中的包 ID、版本和 Git URL 是调用方的选择，不能直接作为存在证明。Registry 安装先远端解析固定版本，再交给 Manager；nightly 对应 Git 来源。Git install/update 将未给定的 HEAD 在 daemon 固定一次，拒绝 dirty，读回实际 commit。更新只接指定包，拒绝 all/comfy/comfyui，避免扩展成隐式 core 更新。
 
