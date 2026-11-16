@@ -335,14 +335,14 @@ class ModelService:
 
     async def _acquire(self, context, artifact, target, max_bytes, transport, connections, timeout):
         hf_available = False
-        if artifact.get("provider") == "huggingface" and transport in {"auto", "hf"}:
+        if artifact.get("provider") == "huggingface" and transport == "hf":
             if not hasattr(context, "provider_environment"):
                 context.provider_environment = await python_metadata(self.supervisor.config.runtime_python)
             hf_available = "huggingface-hub" in context.provider_environment["packages"]
             if transport == "hf" and not hf_available:
                 raise ManagementError("MissingDownloadTool", "Install an explicit huggingface-hub version with comfyui.prepare_tools before selecting hf")
         selected = select_transport(artifact, transport, hf_available=hf_available)
-        context.progress(phase="downloading", transport=selected)
+        context.progress(phase="downloading", requested_transport=transport, transport=selected)
         if selected == "http":
             stage, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
             if artifact.get("git_sha1"):
@@ -356,24 +356,7 @@ class ModelService:
         if type(artifact.get("size")) is int and max_bytes is not None and artifact["size"] > max_bytes:
             raise ManagementError("FileTooLarge", "Artifact exceeds the configured file limit")
         self._space(target.parent, artifact.get("size"))
-        try:
-            await self._external(context, artifact, target, selected, connections, timeout, max_bytes)
-        except ManagementError as exc:
-            if exc.code != "UnsafeDownloadTransport" and (
-                transport != "auto" or exc.code not in {"ProviderTransferFailed", "MissingDownloadTool"}
-            ):
-                raise
-            context.log("Optional engine could not acquire this artifact; falling back to validated HTTP\n")
-            context.progress(transport="http", transport_fallback={"from": selected,
-                "reason": exc.code, "exit_code": exc.details.get("exit_code"),
-                "diagnostic": exc.details.get("diagnostic", "")})
-            target.write_bytes(b"")
-            stage, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
-            if artifact.get("git_sha1"):
-                await _io(verify_git_blob, target, artifact["git_sha1"])
-                verified = verified or "git-sha1"
-            stage.check()
-            return stage, verified, "http"
+        await self._external(context, artifact, target, selected, connections, timeout, max_bytes)
         stage = await _io(verify_staged, target)
         size, actual = stage.size, stage.sha256
         if (max_bytes is not None and size > max_bytes) or (artifact.get("provider") != "civitai" and artifact.get("size") is not None and size != artifact["size"]):

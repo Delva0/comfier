@@ -14,6 +14,10 @@ comani daemon --comfy-root /server/ComfyUI \
 
 ComfyUI 和计算环境路径可以尚不存在；此时先执行下面的显式准备。`python -m comani daemon` 与 console 入口相同。默认前台监听 127.0.0.1:8190，由 Ctrl-C/SIGTERM 或部署者进程管理器停止。`--no-start` 只启动管理，不加时 CLI 尝试启动计算；Client 连接始终只做管理握手。
 
+daemon 命令展开时会先检查可用的 `aria2c`，缺失时通过目标系统包管理器自动安装；下载选择 aria2 时也会独立检查并补装，复用同一安装锁。`--no-start` 只禁止计算启动，仍准备下载工具；`--print-config` 只打印配置，不安装。直接构造管理服务或导入 Comani 不会安装系统包。
+
+工具准备在后台运行，管理入口保持可连接，与 CLI 原有的自动计算启动相互独立。工具准备缓慢或失败不会阻止已有模型运行；失败会输出明确错误，并通过 `comfyui.info().extra["download_tools"]` 暴露工具状态、部署失败与 Operation 回执，保留 bash/管理接口用于修复。修复权限或包源后可以重新展开 daemon；后续 aria2 下载也会重新检查实际可执行文件并重试准备。安装不要求用户额外手动预装或确认；无可用包管理器、无权限或安装失败会返回具体错误，不会静默切换下载器。
+
 通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMANI_TOKEN 或 --token，非 loopback 绑定必须有 token。
 
 ## 模型目录与代码更新分开
@@ -137,7 +141,7 @@ python examples/minimax_h3_remote.py --prepare \
 
 本地 `models.resolve` 查询 Civitai version3462708/file3365259 和 HF commit0bb149f5… 的 encoder/VAE，保留模型内容 SHA 校验；真正下载由 daemon 完成。`HF_TOKEN/CIVITAI_TOKEN` 的本地查询权限与 daemon 下载权限独立配置。每类只有一个模型根时直接选它；多个根时必须给 `--diffusion-root/--encoder-root/--vae-root`，值是服务器实际绝对路径。三路下载使用 asyncio.gather，全部成功才构图；它不是跨根的原子事务。
 
-脚本启动后检查实际 registry 是否有 H3 所需节点，不对软件 commit 做默认等式检查。loader 类型、输入端口和实际模型兼容性仍由 ComfyUI 原生验证/执行检查；节点存在不代表模型或硬件一定可用。`--transport auto` 复用目标已装 hub/Xet/aria2 能力，`http|aria2` 可显式选择；不自动安装系统工具。
+脚本启动后检查实际 registry 是否有 H3 所需节点，不对软件 commit 做默认等式检查。loader 类型、输入端口和实际模型兼容性仍由 ComfyUI 原生验证/执行检查；节点存在不代表模型或硬件一定可用。`http|aria2` 可显式选择；aria2 路径检查并在缺失时自动安装下载工具，安装失败明确报错，不静默改用 HTTP。
 
 普通输出只有 native SaveImage 8-bit PNG，无计时 sidecar 或精确 Tensor 对照。[minimax_h3_source_remote.py](../../examples/minimax_h3_source_remote.py) 在同一 source 文件定义纯函数和 async 入口，用 `source=Path(__file__)` 向上述图插入计算；本地入口的 imports 放在 main guard 中，不要求服务器存在本地 example 模块。inline 字符串、源码文件、目录包与 callable 的选择见 [Python artifacts](python-artifacts.md)。
 

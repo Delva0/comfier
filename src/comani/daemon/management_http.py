@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import ipaddress
+import logging
 import secrets
 from urllib.parse import urlsplit
 
@@ -50,7 +51,7 @@ class ManagedFiles:
 
 
 def create_management_app(supervisor, *, token=None, service=None, auto_start=False,
-                          management_limits=None):
+                          management_limits=None, prepare_download_tools=False):
     if service is not None and management_limits is not None:
         raise ValueError("Pass service or management_limits, not both")
     if service is None:
@@ -61,6 +62,7 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
     identity = "configured-owner"
     management_session = secrets.token_urlsafe(24)
     startup_task = None
+    deployment_task = None
 
     @web.middleware
     async def authenticate(request, handler):
@@ -105,6 +107,7 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
                       "capabilities": {"management": 1, "files": FILE_VERSION, "files_resume": 1},
                       "file_transfer_epoch": app["file_transfers"].epoch,
                       "file_limits": supervisor.file_limits(),
+                      "download_tools": service.download_tools_status(),
                       "node_metadata": supervisor.observed_nodes()}
         elif method in {"file_roots", "file_stat", "file_remove"}:
             await supervisor.get_file_store()
@@ -177,7 +180,16 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
         return outgoing
 
     async def startup(app):
-        nonlocal startup_task
+        nonlocal startup_task, deployment_task
+        if prepare_download_tools:
+            async def prepare():
+                try:
+                    await service.prepare_download_tools(identity)
+                except Exception as error:
+                    # Download readiness is independent of compute readiness.
+                    logging.getLogger(__name__).error(
+                        "aria2 deployment preparation failed; management remains available: %s", error)
+            deployment_task = asyncio.create_task(prepare())
         if auto_start:
             async def launch():
                 try:
@@ -189,9 +201,10 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
             startup_task = asyncio.create_task(launch())
 
     async def cleanup(app):
-        if startup_task and not startup_task.done():
-            startup_task.cancel()
-            await asyncio.gather(startup_task, return_exceptions=True)
+        pending = [task for task in (startup_task, deployment_task) if task and not task.done()]
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
         await service.close()
         await supervisor.close()
 

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import shutil
 
 import pytest
 from aiohttp import web
@@ -79,8 +80,8 @@ async def test_metadata_cross_origin_redirect_drops_authorization(monkeypatch):
 async def test_authenticated_aria2_never_forwards_provider_token_to_redirect(tmp_path, monkeypatch, transport):
     monkeypatch.delenv("CIVITAI_TOKEN", raising=False)
     monkeypatch.setenv("CIVITAI_API_TOKEN", "daemon-private")
-    # The guard runs before starting aria2; the test needs no optional binary.
-    monkeypatch.setattr(transports.shutil, "which", lambda name: "/unused/aria2c")
+    if not shutil.which("aria2c"):
+        pytest.skip("The actual aria2 redirect boundary requires an installed test binary")
     payload = b"private provider model fixture"
     seen = []
 
@@ -118,9 +119,12 @@ async def test_authenticated_aria2_never_forwards_provider_token_to_redirect(tmp
                     "artifact": artifact, "root": root.id, "transport": transport})
                 result = await finish(service, accepted)
                 assert result["state"] == "succeeded", result
-                assert result["result"]["transport"] == "http"
-                assert result["progress"]["transport_fallback"]["reason"] == "UnsafeDownloadTransport"
-                assert seen == [("origin", "Bearer daemon-private"), ("target", None)]
+                assert result["result"]["transport"] == "aria2"
+                assert result["progress"]["source_route"] == "resolved_anonymous"
+                assert "transport_fallback" not in result["progress"]
+                assert any(name == "origin" for name, _ in seen)
+                assert all(header == ("Bearer daemon-private" if name == "origin" else None)
+                           for name, header in seen)
                 assert (root.path / "toy.bin").read_bytes() == payload
                 record = service.operations.get(accepted["operation_id"], accepted["daemon_epoch"], "user")
                 assert "daemon-private" not in json.dumps(result)

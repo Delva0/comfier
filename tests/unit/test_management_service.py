@@ -458,7 +458,7 @@ async def test_civitai_keeps_multiple_files_and_refreshes_selected_download_addr
     assert await resolver.address(artifact) == address
 
 
-async def test_auto_aria2_access_failure_falls_back_without_reusing_sparse_prefix(tmp_path):
+async def test_auto_aria2_access_failure_is_explicit_without_http_fallback(tmp_path):
     if not shutil.which("aria2c"):
         pytest.skip("Optional aria2 binary is not installed")
     payload = b"verified model" * 10000
@@ -488,12 +488,13 @@ async def test_auto_aria2_access_failure_falls_back_without_reusing_sparse_prefi
     try:
         _, accepted = await submit(service, "models", "download", {"artifact": artifact, "root": root.id})
         result = await asyncio.wait_for(finish(service, accepted), 10)
-        assert result["state"] == "succeeded", result
-        assert result["result"]["transport"] == "http"
-        assert result["progress"]["transport_fallback"]["from"] == "aria2"
+        assert result["state"] == "failed", result
+        assert result["error"]["code"] == "ProviderTransferFailed"
+        assert result["progress"]["transport"] == "aria2"
+        assert "transport_fallback" not in result["progress"]
         assert "signed-secret" not in str(result)
-        assert any("aria2" in value.lower() for value in agents)
-        assert (root.path / "weights.bin").read_bytes() == payload
+        assert agents and all("aria2" in value.lower() for value in agents)
+        assert not (root.path / "weights.bin").exists()
     finally:
         await service.close()
         await runner.cleanup()

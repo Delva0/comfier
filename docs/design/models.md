@@ -33,7 +33,7 @@ model = remote.node("UNETLoader", unet_name=file.native_name, weight_dtype="defa
 
 Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`comani.models.versions(source)` 是本地 provider 查询；categories() 和 list(category=..., root=..., prefix=...) 才查询远端。list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
 
-本地 provider 查询使用客户端进程的 `HF_TOKEN`、`CIVITAI_TOKEN`（兼容别名 `CIVITAI_API_TOKEN`），也可显式传 `token=...`；显式参数优先，两个 Civitai 环境变量同时存在时 `CIVITAI_TOKEN` 优先。返回值不携带 provider token。真正下载使用 daemon 的网络及其独立配置的凭证，本地查询成功不保证远端可下载；授权失败分别报告。需要受限模型时，应明确将该 provider 凭据配置给目标 daemon；客户端全部凭据不会自动透传。带 provider 鉴权的下载使用 HTTP 或官方 HF 传输；选择 aria2（含 `auto`）时，因该引擎无法安全限定重定向凭据范围而回退 HTTP，Operation 记录实际传输及回退原因。匿名 aria2 下载不受影响。
+本地 provider 查询使用客户端进程的 `HF_TOKEN`、`CIVITAI_TOKEN`（兼容别名 `CIVITAI_API_TOKEN`），也可显式传 `token=...`；显式参数优先，两个 Civitai 环境变量同时存在时 `CIVITAI_TOKEN` 优先。返回值不携带 provider token。真正下载使用 daemon 的网络及其独立配置的凭证，本地查询成功不保证远端可下载；授权失败分别报告。需要受限模型时，应明确将该 provider 凭据配置给目标 daemon；客户端全部凭据不会自动透传。aria2 不接收 provider Bearer header：先按原 origin 安全解析重定向，能取得匿名或签名下载 URL 时直接交给 aria2；仍需 Bearer 的源才使用本次 Operation 的临时 loopback Range relay，凭据只发给原 origin，跨 origin 重定向不携带。relay 流式转发且连接数有界，Operation 结束即关闭；匿名下载不经过 relay。
 
 普通或 signed HTTP(S) URL 可直接交给 `models.download(url, root=..., path=...)`；daemon 在接纳下载时管理实际来源，公开结果/日志净化秘密 query。不要把本地生成的 source_id 当成远端来源。signed URL 仍受上游有效期限制，不能从净化后的 URL 恢复秘密参数。
 
@@ -45,9 +45,11 @@ Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须�
 4. 核对身份、长度、上游摘要/Git blob hash。
 5. 重验所选 root 的配置与目录身份、同名 shadow 和 create-only 目标，原子发布。
 
-`download(..., transport="auto"|"http"|"aria2"|"hf", connections=8)` 显式控制引擎。auto 对 HF 在目标解释器已装官方 hub 时优先 hub/Xet；有 SHA 且已有 aria2c 时可用 aria2 多连接，否则使用 HTTP。强制 hf/aria2 缺工具明确失败，不自动 pip 或 apt。官方 hub 在配置的目标解释器运行，复用该账号/缓存机制；现有 aria2c 二进制复用。
+`download(..., transport="auto"|"http"|"aria2"|"hf", connections=8)` 控制引擎。默认 `auto` 使用 aria2。daemon 部署启动会预先准备下载依赖；每次需要默认或显式 aria2 传输时仍独立检查实际二进制，缺失时通过宿主的 APT/APK/DNF/YUM 自动安装，再执行 `aria2c --version` 验证，不依赖“曾部署成功”的标记。完整 SHA 命中的 `reuse=True` 不发生传输，也不为补装下载器打断离线复用。同 daemon 的并发准备共用一次安装尝试；不同 daemon 进程仍依赖包管理器原生锁。root 可直接安装，非 root 仅尝试非交互 sudo；没有合法权限或安装失败时，`DownloadToolInstallationFailed` 返回实际阶段与原因，不切换为 HTTP。安装过程使用既有 Operation/进程组清理；部署失败不关闭带外管理端。已有的显式 `http`、`hf` 是调用者主动覆盖；官方 hub 在配置的目标解释器运行。aria2 使用受控参数，不加载用户 aria2 配置或 netrc；默认 8 个分段连接，允许 1–16，最小分段 1 MiB，实际连接数仍受文件大小和源的 Range 支持限制。
 
-引擎错误允许同一个不可变 artifact 安全从零 fallback；revision/hash 校验失败不能通过换引擎掩盖。支持官方 hub/Xet 路由不等于 private/gated、账号权限和大 LFS 已做真实远端验收；新报告应分别说明 public metadata、小文件、LFS/Xet 和受限仓库覆盖。
+Operation 的 progress 返回请求与实际引擎（`requested_transport`、`transport`），以及 aria2 的 `source_route`、实际连接配置、完整性策略和尝试次数。引擎缺失或失败保留该引擎的明确错误，不静默换用另一实现；revision/hash 校验失败也不会通过换引擎掩盖。SHA256 或 Git blob SHA1 仍在发布前完整校验。无预期 digest 的 URL 也可下载：强 ETag 使用 `If-Match` 钉住分段版本；没有强 validator 时限单连接，失败后清空 partial 并重新探测、从零有界重试，避免混拼不同响应。
+
+本轮断点恢复只覆盖同一 Operation 中 aria2 的有界重试。失败、取消或正常关闭会清除临时 partial 与 `.aria2` 控制文件；后续 Operation、daemon 重启或代码重部署不承诺复用未完成下载。已完成模型的跨运行复用依赖持久原生模型目录、相同目标路径与 `reuse=True` 的完整 SHA 检查，不依赖这个临时目录。支持官方 hub/Xet 路由不等于 private/gated、账号权限和大 LFS 已做真实远端验收；新报告应分别说明覆盖范围，受控每连接限速测试的收益不代表互联网吞吐承诺。
 
 Provider→daemon 断流与 SDK→daemon 断流不同：SDK 恢复观察同一个 Operation；provider 的字节恢复必须绑定原 artifact/revision、validators、长度/hash。HTTP 核对 206 与 Content-Range，200 从零重下，416 重新校验；不盲 append。来源变化或无法证明安全时明确失败或在同操作从零重新获取，重试有界。
 

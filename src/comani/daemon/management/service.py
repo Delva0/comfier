@@ -20,7 +20,41 @@ class ManagementService:
         self.models = ModelService(supervisor, self.providers)
         self._emergency_active = False
         self._control_record = contextvars.ContextVar("management_control_record", default=None)
+        self._download_tool_deployment = None
         supervisor.control_barrier = self.control_barrier
+
+    def download_tools_status(self):
+        from .download_tools import aria2_status
+
+        return {"aria2": aria2_status(self.providers),
+                "deployment": self._download_tool_deployment}
+
+    async def prepare_download_tools(self, identity):
+        """Explicit daemon deployment work, using the downloader's shared owner."""
+        from .download_tools import ensure_aria2
+
+        self._download_tool_deployment = {"state": "preparing"}
+        window = self.operations.window(identity)
+        operation = await self.operations.begin(
+            identity, "models", "prepare_download_tool", {"tool": "aria2"},
+            "daemon-deployment-aria2", window["daemon_epoch"], window["window"],
+            lambda context: ensure_aria2(context, self.providers,
+                                         cwd=self.supervisor.config.workspace))
+        record = self.operations.get(operation["operation_id"], operation["daemon_epoch"], identity)
+        self._download_tool_deployment = {
+            "state": "preparing", "operation_id": record.id,
+            "daemon_epoch": self.operations.epoch, "namespace": record.namespace,
+            "action": record.action}
+        await asyncio.shield(record.task)
+        self._download_tool_deployment = {
+            **self._download_tool_deployment,
+            "state": "ready" if record.state == "succeeded" else record.state,
+            "error": record.error}
+        if record.state != "succeeded":
+            error = record.error or {"code": "DownloadToolInstallationFailed",
+                                     "message": "aria2 deployment preparation did not complete"}
+            raise ManagementError(error["code"], error["message"], error.get("details"))
+        return record.result
 
     async def dispatch(self, method, params, identity):
         if not isinstance(params, dict):
@@ -69,7 +103,9 @@ class ManagementService:
             raise ManagementError("InvalidArgument", "Read params must be an object")
         if namespace == "comfyui":
             if action in {"info", "config"}:
-                return await comfyui.info(self.supervisor)
+                result = await comfyui.info(self.supervisor)
+                result["download_tools"] = self.download_tools_status()
+                return result
             if action == "logs":
                 return {"entries": list(self.supervisor.logs)}
         elif namespace == "plugins":

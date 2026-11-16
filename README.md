@@ -23,6 +23,8 @@ comani daemon --comfy-root /srv/ComfyUI \
 
 如果服务器还没有 ComfyUI，先用相同 daemon 命令启动纯管理入口，路径可以尚不存在，然后按 [空白 CPU 环境准备](docs/design/development.md#空白-cpu-环境) 创建环境。GPU 的 Torch/CUDA 包由调用者选择；[H3 完整脚本](examples/minimax_h3_remote.py) 展示同一脚本中的显式准备、模型、插件和推理。
 
+daemon 部署启动时会准备 `aria2c`；默认或显式选择 aria2 的模型下载在需要传输时也会自行检查，缺失时通过宿主系统包管理器自动安装并验证版本。安装需要 daemon 的 root 或非交互 sudo 权限；失败会记录阶段与原因，带外管理仍可用于修复，不会静默换引擎。完整 SHA 命中的 `reuse=True` 无须网络或下载器，保留离线复用。调用者仍可主动选择 `transport="http"` 或 `transport="hf"`；HF 使用目标解释器中的官方 Hub 包。详见[模型下载](docs/design/models.md)。
+
 准备好实例后，给一张本地图片即可运行第一个示例：
 
 ```sh

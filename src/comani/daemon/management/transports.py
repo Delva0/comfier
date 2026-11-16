@@ -1,4 +1,4 @@
-"""Optional existing download engines; no implicit package/system installation."""
+"""Explicit download engines with origin-scoped credentials and bounded streaming."""
 
 from __future__ import annotations
 
@@ -9,7 +9,14 @@ import re
 import shutil
 import sys
 import tempfile
+import uuid
+from contextlib import asynccontextmanager
 
+import aiohttp
+from aiohttp import web
+from yarl import URL
+
+from .download_tools import ensure_aria2
 from .operations import ManagementError
 from .processes import run_process
 from .providers import provider_headers, safe_url
@@ -41,54 +48,159 @@ def select_transport(artifact, transport, *, hf_available=False):
         raise ManagementError("InvalidArgument", "transport must be auto, http, aria2, or hf")
     if transport != "auto":
         return transport
-    if artifact.get("provider") == "huggingface" and hf_available:
-        return "hf"
-    if artifact.get("sha256") and shutil.which("aria2c"):
-        return "aria2"
-    return "http"
+    return "aria2"
+
+
+@asynccontextmanager
+async def _scoped_response(session, method, address, credentials, request_headers=None):
+    """Follow redirects without ever forwarding credentials to another origin."""
+    original, current, response = URL(address).origin(), URL(address), None
+    try:
+        for _ in range(10):
+            headers = {"Accept-Encoding": "identity", **(request_headers or {})}
+            if current.origin() == original:
+                headers.update(credentials)
+            response = await session.request(method, current, headers=headers, allow_redirects=False)
+            if response.status not in {301, 302, 303, 307, 308}:
+                break
+            destination = current.join(URL(response.headers.get("Location", "")))
+            if (not response.headers.get("Location") or destination.scheme not in {"http", "https"}
+                    or destination.user is not None):
+                raise ManagementError("ProviderError", "Provider returned an unsafe redirect")
+            response.close()
+            current = destination
+        else:
+            raise ManagementError("ProviderError", "Provider exceeded the redirect limit")
+        yield response
+    finally:
+        if response is not None:
+            response.close()
+
+
+@asynccontextmanager
+async def _aria_source(address, credentials, connections, timeout, *, probe_validator):
+    if not credentials and not probe_validator:
+        yield address, "direct", None
+        return
+    client_timeout = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=timeout or 60)
+    async with aiohttp.ClientSession(timeout=client_timeout, auto_decompress=False,
+                                    cookie_jar=aiohttp.DummyCookieJar(),
+                                    connector=aiohttp.TCPConnector(limit=connections)) as session:
+        async with _scoped_response(session, "HEAD", address, credentials) as probe:
+            status, final = probe.status, probe.url
+            validator = probe.headers.get("ETag")
+            encoding, content_type = probe.headers.get("Content-Encoding", "identity"), probe.headers.get("Content-Type", "")
+        if status not in {200, 206}:
+            async with _scoped_response(session, "GET", address, credentials, {"Range": "bytes=0-0"}) as probe:
+                status, final = probe.status, probe.url
+                validator = probe.headers.get("ETag")
+                encoding, content_type = probe.headers.get("Content-Encoding", "identity"), probe.headers.get("Content-Type", "")
+        if status not in {200, 206}:
+            raise ManagementError("ProviderError", f"Download source probe returned HTTP {status}",
+                                  {"transport": "aria2", "phase": "source_probe", "status": status})
+        if encoding != "identity" or "text/html" in content_type.lower():
+            raise ManagementError("ProviderError", "Download source did not return an unencoded model response",
+                                  {"transport": "aria2", "phase": "source_probe"})
+        if not re.fullmatch(r'"[\x21\x23-\x7e\x80-\xff]*"', validator or ""):
+            validator = None
+        if not credentials or final.origin() != URL(address).origin():
+            yield str(final), "resolved_anonymous" if credentials else "direct", validator
+            return
+        # Only persistent Bearer sources need this operation-local fixed upstream.
+        # aria2 receives no credential; each upstream request is independently scoped.
+        route = "/" + uuid.uuid4().hex
+
+        async def relay(request):
+            response = None
+            wanted = {name: request.headers[name] for name in ("Range", "If-Range", "If-Match")
+                      if name in request.headers}
+            try:
+                async with _scoped_response(session, request.method, address, credentials, wanted) as source:
+                    headers = {name: source.headers[name] for name in (
+                        "Content-Type", "Content-Length", "Content-Range", "Content-Encoding",
+                        "Accept-Ranges", "ETag", "Last-Modified") if name in source.headers}
+                    response = web.StreamResponse(status=source.status, headers=headers)
+                    await response.prepare(request)
+                    if request.method != "HEAD":
+                        async for chunk in source.content.iter_chunked(65536):
+                            await response.write(chunk)
+                        await response.write_eof()
+                    return response
+            except (aiohttp.ClientError, ConnectionError, TimeoutError):
+                if response is not None and response.prepared:
+                    response.force_close()
+                    return response
+                return web.Response(status=502)
+
+        app = web.Application()
+        app.router.add_get(route, relay)
+        runner = web.AppRunner(app, access_log=None, shutdown_timeout=1)
+        await runner.setup()
+        site = web.TCPSite(runner, "127.0.0.1", 0)
+        await site.start()
+        try:
+            yield f"http://127.0.0.1:{site._server.sockets[0].getsockname()[1]}{route}", "credential_relay", validator
+        finally:
+            await runner.cleanup()
+
+
+async def _run_aria2(context, binary, address, target, connections, timeout, *, validator, tries, relay):
+    # Signed URIs and validators stay in an owner-only input file, never argv.
+    fd, name = tempfile.mkstemp(prefix="aria-input-", dir=target.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            stream.write(address + "\n dir=" + str(target.parent) + "\n out=" + target.name + "\n")
+            if validator:
+                if "\n" in validator or "\r" in validator:
+                    raise ManagementError("ProviderError", "Provider returned an invalid entity validator")
+                stream.write(" header=If-Match: " + validator + "\n")
+        command = [binary, "--no-conf=true", "--no-netrc=true",
+            "--input-file=" + name, "--dir=" + str(target.parent), "--out=" + target.name,
+            "--max-connection-per-server=" + str(connections), "--split=" + str(connections),
+            "--min-split-size=1M", "--allow-overwrite=true", "--auto-file-renaming=false",
+            "--continue=false", "--check-certificate=true", "--file-allocation=none",
+            "--max-tries=" + str(tries), "--retry-wait=1", "--connect-timeout=30", "--timeout=60",
+            "--quiet=false", "--show-console-readout=false", "--summary-interval=0",
+            "--download-result=hide", "--console-log-level=error"]
+        if relay:
+            command.append("--no-proxy=127.0.0.1,localhost")
+        return await run_process(QuietContext(context), command, cwd=target.parent,
+                                 timeout=timeout, output_limit=4096)
+    finally:
+        os.unlink(name)
+        target.with_name(target.name + ".aria2").unlink(missing_ok=True)
 
 
 async def external_download(context, resolver, artifact, target, *, transport, connections, timeout,
                             python=sys.executable):
     if transport == "aria2":
-        binary = shutil.which("aria2c")
-        if not binary:
-            raise ManagementError("MissingDownloadTool", "aria2c is not installed; install it explicitly or select http")
+        tool = await ensure_aria2(context, resolver, cwd=target.parent, timeout=timeout)
+        binary = tool["binary"]
         if type(connections) is not int or not 1 <= connections <= 16:
             raise ManagementError("InvalidArgument", "connections must be between 1 and 16")
-        if not artifact.get("sha256"):
-            raise ManagementError("UnverifiableTransport", "aria2 requires an expected SHA256; select http for validator-based acquisition")
-        address = await resolver.address(artifact)
-        headers = provider_headers(address)
-        if headers:
-            # aria2 forwards custom Authorization headers across redirects.
-            raise ManagementError("UnsafeDownloadTransport",
-                                  "aria2 cannot scope provider credentials across redirects; select http")
-        # Signed URIs stay in an owner-only input file, never in argv.
-        fd, name = tempfile.mkstemp(prefix="aria-input-", dir=target.parent)
-        try:
-            os.fchmod(fd, 0o600)
-            with os.fdopen(fd, "w") as stream:
-                stream.write(address + "\n")
-                # aria2's global --out is ignored for --input-file entries.
-                stream.write(" dir=" + str(target.parent) + "\n")
-                stream.write(" out=" + target.name + "\n")
-            command = await run_process(QuietContext(context), [binary,
-                "--input-file=" + name, "--dir=" + str(target.parent), "--out=" + target.name,
-                "--max-connection-per-server=" + str(connections), "--split=" + str(connections),
-                "--min-split-size=1M", "--allow-overwrite=true", "--auto-file-renaming=false",
-                "--continue=false", "--check-certificate=true", "--file-allocation=none",
-                "--max-tries=3", "--retry-wait=1", "--connect-timeout=30", "--timeout=60",
-                "--quiet=false", "--show-console-readout=false", "--summary-interval=0",
-                "--download-result=hide", "--console-log-level=error"],
-                cwd=target.parent, timeout=timeout, output_limit=4096)
-        finally:
-            os.unlink(name)
-            target.with_name(target.name + ".aria2").unlink(missing_ok=True)
-        if command["exit_code"]:
-            raise ManagementError("ProviderTransferFailed", "aria2 download failed; no model was published",
-                                  {"transport": "aria2", "exit_code": command["exit_code"], "diagnostic": diagnostic(command)})
-        return
+        immutable = bool(artifact.get("sha256") or artifact.get("git_sha1"))
+        for attempt in range(1 if immutable else 4):
+            address = await resolver.address(artifact)
+            async with _aria_source(address, provider_headers(address), connections, timeout,
+                                    probe_validator=not immutable) as (address, route, validator):
+                parallel = connections if immutable or validator else 1
+                context.progress(phase="downloading", transport="aria2", source_route=route, connections=parallel,
+                                 integrity="digest" if immutable else "etag" if validator else "single_response",
+                                 attempt=attempt + 1)
+                command = await _run_aria2(context, binary, address, target, parallel, timeout,
+                                          validator=validator if not immutable else None,
+                                          tries=3 if immutable else 1, relay=route == "credential_relay")
+            if not command["exit_code"]:
+                return
+            if immutable or attempt == 3:
+                raise ManagementError("ProviderTransferFailed", "aria2 download failed; no model was published",
+                                      {"transport": "aria2", "exit_code": command["exit_code"], "diagnostic": diagnostic(command)})
+            # Without a digest, a new process may not splice an old sparse file
+            # or a changed representation. Re-probe and restart from byte zero.
+            target.write_bytes(b"")
+            context.log("aria2 source changed or disconnected; retrying from byte zero\n")
+            await asyncio.sleep(min(.25 * 2 ** attempt, 2))
     if artifact.get("provider") != "huggingface":
         raise ManagementError("InvalidArgument", "hf transport requires an HF artifact")
     # The official Hub client selects its installed HTTP/Xet implementation and

@@ -74,5 +74,6 @@ def main(argv=None):
         print(json.dumps(asdict(config), indent=2))
         return
     supervisor = RuntimeSupervisor(config, config_path=args.config)
-    web.run_app(create_management_app(supervisor, token=args.token, auto_start=not args.no_start),
+    web.run_app(create_management_app(supervisor, token=args.token, auto_start=not args.no_start,
+                                      prepare_download_tools=True),
                 host=args.host, port=args.port, handler_cancellation=True)
