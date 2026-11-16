@@ -1,0 +1,189 @@
+"""Save a scene, disconnect, continue its project in a new Client, then export.
+
+Independent adaptation of LongForge v7.8 (resource2926029/version3467080).
+Use --plugin-dir with the locally extracted original MIT LongForge NodePack
+and --download-models to prepare the workflow before execution. This small validation setup
+uses existing Singularity REF2VA weights, 544x960/2 new seconds, HARD22 overlap,
+and original20-step Euler/simple sampling. The supplied GUI has model placeholders,
+768x1344/10 new seconds, SOFT5 overlap and optional Sage/VEDA preview patches.
+Assistant, RefMods, HQ, cache, VFX and interpolation are omitted explicitly.
+No LoRA is added: the source Turbo and Extra LoRA loaders are bypassed.
+
+python examples/h3_longforge.py --output-dir .local/longforge
+Models and outputs retain the H3 license restrictions. Each invocation creates
+a fresh local run-* directory and, by default, a unique remote project name.
+The final export is downloaded; native immutable takes remain in the project.
+"""
+
+import argparse
+import asyncio
+import json
+import os
+import shlex
+import tempfile
+import time
+import uuid
+from pathlib import Path
+
+from local_node_package import install_local_node_package
+
+import comani
+
+STORY = [
+    {"name": "Lake", "prompt": "VIDEO: A copper toy sailboat drifts across a calm garden pond in warm morning light. "
+     "The camera tracks gently beside it in one continuous shot. SOUND: Quiet ripples and distant birds. MUSIC: N/A"},
+    {"name": "Reeds", "prompt": "VIDEO: The same copper toy sailboat continues beside tall green reeds at the edge "
+     "of the pond. Preserve the boat, warm morning light and smooth camera motion. "
+     "SOUND: The same quiet ripples and distant birds continue. MUSIC: N/A"},
+]
+WEIGHTS = (
+    ("diffusion_models", "WarmBloodAban/Minimax-h3_Singularity",
+     "Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors"),
+    ("text_encoders", "Comfy-Org/MiniMax-H3", "text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors"),
+    ("vae", "Kijai/MiniMax-H3-experimental", "minimax_h3_video_vae_int8_convrot.safetensors"),
+    ("vae", "Comfy-Org/MiniMax-H3", "vae/minimax_h3_audio_vae_fp32.safetensors"),
+)
+
+
+async def acquire_model(category, repository, path, phases):
+    started = time.perf_counter()
+    source = await comani.models.resolve({"repo_id": repository, "path": path})
+    artifact, = source.files
+    filename = Path(path).name
+    roots = await comani.files.roots(category=category)
+    if not roots:
+        raise ValueError(f"No native model roots for {category}")
+    existing = await comani.models.list(category=category, prefix=filename)
+    present = {f["root"]["id"] for f in existing["files"] if f["relative_path"] == filename}
+    root = min([r for r in roots if r.id in present] or roots, key=lambda r: r.priority)
+    file = await comani.models.download(artifact, root=root, path=filename, reuse=True)
+    phases.append({"phase": "model_download", "file": filename, "sha256": file.sha256,
+                   "revision": source.revision, "seconds": time.perf_counter() - started})
+
+
+async def main(args):
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    args.output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=args.output_dir)).resolve()
+    with tempfile.TemporaryFile(dir=args.output_dir):
+        pass
+    project = args.project or "comani-" + uuid.uuid4().hex[:12]
+    story = json.loads(args.story.read_text()) if args.story else STORY
+    if not isinstance(story, list) or len(story) != 2:
+        raise ValueError("This continuation example needs exactly two scene cards")
+    profile = {"workflow_resource": 2926029, "workflow_version": 3467080,
+               "project": project, "story": story, "configuration": "small REF2VA validation variant",
+               "arguments": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+               "phases": []}
+    started_all = time.perf_counter()
+    print(f"Output directory: {args.output_dir}\nRemote project: {project}", flush=True)
+    try:
+        # Each scope has its own remote references. Only the project name/state survives.
+        for scene_number in (1, 2):
+            async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+                started = time.perf_counter()
+                if scene_number == 1 and args.plugin_dir:
+                    profile["installed_original_package"] = await install_local_node_package(
+                        args.plugin_dir, "ComfyUI-H3-LongForge-NodePack", required_files=("__init__.py", "LICENSE"))
+                    if not profile["installed_original_package"]["reused"]:
+                        info = await comani.comfyui.info()
+                        await comani.bash.run(shlex.join([
+                            info.runtime_python, "-m", "pip", "install", "filelock>=3", "imageio-ffmpeg"]))
+                info = await comani.comfyui.start()
+                required = {"LongForgeProject", "LongForgeVideoSettings", "LongForgeSampling", "LongForgeRender"}
+                if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
+                    raise ValueError(f"Install original LongForge NodePack first; missing: {sorted(missing)}")
+                profile["phases"].append({"phase": "connect", "scene": scene_number,
+                                          "seconds": time.perf_counter() - started})
+                if scene_number == 1 and args.download_models:
+                    downloads = await asyncio.gather(
+                        *(acquire_model(*weight, profile["phases"]) for weight in WEIGHTS), return_exceptions=True)
+                    if errors := [result for result in downloads if isinstance(result, BaseException)]:
+                        raise errors[0]
+                started = time.perf_counter()
+                model = comani.node("UNETLoader", unet_name=args.model, weight_dtype="default")
+                clip = comani.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
+                video_vae = comani.node("VAELoader", vae_name=args.video_vae)
+                audio_vae = comani.node("VAELoader", vae_name=args.audio_vae)
+                await asyncio.gather(model, clip, video_vae, audio_vae)
+                profile["phases"].append({"phase": "load", "scene": scene_number,
+                                          "seconds": time.perf_counter() - started})
+                video = comani.node(
+                    "LongForgeVideoSettings", pipeline="REF2VA", width=args.width, height=args.height,
+                    frames=107, overlap_frames=args.overlap, continuity_mode="MANUAL",
+                    audio_continuity="HARD", audio_history_frames=0, reference_policy="EVERY SCENE",
+                    ref_image_size="max", last_frame_usage="LAST SCENE", audio_soft_steps=4,
+                    duration_mode="NEW SECONDS", new_seconds=args.new_seconds, continuation_method="PROTECTED")
+                sampling = comani.node("LongForgeSampling", steps=args.steps, sampler="euler", scheduler="simple",
+                                      denoise=1.0, cfg=1.0, seed=args.seed, increment_seed=True,
+                                      shift_video=12.0, shift_audio=3.0)
+                job = comani.node("LongForgeProject", project_name=project, action="GENERATE NEXT",
+                                  run_mode="ONE SCENE", scene_data=json.dumps(story), selected_scene=1,
+                                  run_stamp=scene_number, export_when_done=False)
+                started = time.perf_counter()
+                rendered = comani.node(
+                    "LongForgeRender", job=job, video_settings=video, sampling=sampling,
+                    model=model, clip=clip, video_vae=video_vae, audio_vae=audio_vae,
+                    preview_new_scene=True, export_crf=18, repair_audio_seams=True, repair_video_seams=False,
+                    fade_film_edges=True, encoding_speed="medium", metadata_mode="NONE",
+                    diagnostic_wavs=False, return_call=True)
+                report = json.loads(await (await rendered.output(1)).fetch())
+                profile["phases"].append({"phase": "render_save_preview", "scene": scene_number,
+                                          "seconds": time.perf_counter() - started})
+                (args.output_dir / f"scene-{scene_number}.json").write_text(json.dumps(report, indent=2))
+                print(f"Scene {scene_number}: {report['summary']}", flush=True)
+                if scene_number == 2:
+                    export_job = comani.node("LongForgeProject", project_name=project, action="EXPORT FILM",
+                                             run_mode="ONE SCENE", scene_data=json.dumps(story),
+                                             selected_scene=1, run_stamp=3, export_when_done=False)
+                    started = time.perf_counter()
+                    exported = comani.node(
+                        "LongForgeRender", job=export_job, video_settings=video, sampling=sampling,
+                        model=model, clip=clip, video_vae=video_vae, audio_vae=audio_vae,
+                        preview_new_scene=True, export_crf=18, repair_audio_seams=True,
+                        repair_video_seams=False, fade_film_edges=True, encoding_speed="medium",
+                        metadata_mode="NONE", diagnostic_wavs=False, return_call=True)
+                    export_report = json.loads(await (await exported.output(1)).fetch())
+                    file = await exported.file()
+                    profile["phases"].append({"phase": "export", "seconds": time.perf_counter() - started})
+                    (args.output_dir / "export.json").write_text(json.dumps(export_report, indent=2))
+                    started = time.perf_counter()
+                    target = args.output_dir / "film.mp4"
+                    await comani.files.download(file, target)
+                    profile["phases"].append({"phase": "download", "bytes": file.size,
+                                              "seconds": time.perf_counter() - started})
+                    print(target, flush=True)
+            print(f"Client {scene_number} closed; project takes remain on the daemon disk.", flush=True)
+    except Exception as error:
+        profile["error"] = f"{type(error).__name__}: {error}"
+        raise
+    finally:
+        profile["total_seconds"] = time.perf_counter() - started_all
+        (args.output_dir / "profile.json").write_text(json.dumps(profile, indent=2))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--project", help="existing project name to continue; default creates a new unique project")
+    parser.add_argument("--story", type=Path, help="JSON list of exactly two scene cards with name/prompt")
+    parser.add_argument("--plugin-dir", type=Path,
+                        help="local extracted original LongForge NodePack; install only if missing")
+    parser.add_argument("--download-models", action="store_true",
+                        help="acquire the four default H3 weights through the daemon")
+    parser.add_argument("--model", default="Minimax-h3_Singularity_ref2va_Pruned_v1.3_int8.safetensors")
+    parser.add_argument("--clip", default="qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors")
+    parser.add_argument("--video-vae", default="minimax_h3_video_vae_int8_convrot.safetensors")
+    parser.add_argument("--audio-vae", default="minimax_h3_audio_vae_fp32.safetensors")
+    parser.add_argument("--width", type=int, default=544)
+    parser.add_argument("--height", type=int, default=960)
+    parser.add_argument("--new-seconds", type=float, default=2.0)
+    parser.add_argument("--overlap", type=int, default=22)
+    parser.add_argument("--steps", type=int, default=20)
+    parser.add_argument("--seed", type=int, default=201)
+    parser.add_argument("--output-dir", type=Path, default=Path(".local/longforge"))
+    args = parser.parse_args()
+    if args.download_models and (args.model, args.clip, args.video_vae, args.audio_vae) != tuple(
+        Path(weight[2]).name for weight in WEIGHTS
+    ):
+        parser.error("--download-models prepares the default weight set; preinstall custom selections")
+    asyncio.run(main(args))
