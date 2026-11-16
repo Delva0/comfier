@@ -15,7 +15,7 @@ from dataclasses import astuple, dataclass, field, replace
 
 from aiohttp import web
 
-from comani.files import FILE_CHUNK_SIZE, FILE_CONTENT_TYPE, FILE_METADATA_LIMIT, _io
+from comani.files import FILE_CHUNK_SIZE, FILE_CONTENT_TYPE, FILE_METADATA_LIMIT, _descriptor, _io
 
 from .files import FileChangedError, Revision
 from .objects import SessionClosed
@@ -62,17 +62,33 @@ async def file_roots(runtime, session_id, directory=None, category=None, **_):
     return [root_wire(store, root) for root in roots]
 
 
-async def file_stat(runtime, session_id, checksum=False, **params):
+async def file_stat(runtime, session_id, checksum=False, descriptor=None, **params):
     runtime._session(session_id)
     if type(checksum) is not bool:
         raise ValueError("checksum must be bool")
     store = runtime._file_store()
-    root, path = selection(store, params)
+    if descriptor is None:
+        root, path = selection(store, params)
+    else:
+        saved = _descriptor(descriptor)
+        if any(key in params for key in ("root_id", "directory", "path", "revision", "sha256")):
+            raise ValueError("A file descriptor cannot be combined with another file selector")
+        # The saved path is a constraint on current configuration, never a root
+        # grant. In particular, do not fall back to another same-named file.
+        roots = store.roots(directory=saved.directory, category=saved.category)
+        matching = [candidate for candidate in roots if str(candidate.path) == saved.root_path]
+        if len(matching) != 1:
+            raise ValueError("The saved file root is not in the current native configuration")
+        root, path = matching[0], saved.relative_path
+        checksum = True
     download = await _io(store.open_download, root, path,
                          checksum=checksum,
                          _cancel_cleanup=lambda value: value.close())
     try:
         verify_expected(download.metadata, params)
+        if descriptor is not None and (download.metadata.size != saved.size
+                                       or download.metadata.sha256 != saved.sha256):
+            raise FileChangedError("The saved file size or SHA256 does not match")
         return metadata_wire(store, download.metadata)
     finally:
         download.close()

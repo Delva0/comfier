@@ -14,7 +14,7 @@ import tempfile
 import time
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from functools import partial
 from pathlib import Path
 from typing import Any, Coroutine
@@ -67,6 +67,48 @@ class FileRoot:
 
 
 @dataclass(frozen=True)
+class FileDescriptor:
+    """Saved location and expected bytes, without a session or root grant.
+
+    The root path is only matched against the receiving daemon's current
+    configured roots. It never authorizes opening an arbitrary server path.
+    """
+
+    root_path: str
+    relative_path: str
+    size: int
+    sha256: str
+    directory: str | None = None
+    category: str | None = None
+    version: int = 1
+
+    def __post_init__(self):
+        if type(self.version) is not int or self.version != 1:
+            raise ValueError("Unsupported file descriptor version")
+        if (self.directory is None) == (self.category is None):
+            raise ValueError("A file descriptor selects one native directory or model category")
+        if self.directory is not None and self.directory not in {"input", "temp", "output"}:
+            raise ValueError("Unknown native data directory")
+        if self.category is not None and (not isinstance(self.category, str) or not self.category):
+            raise ValueError("Expected a native model category")
+        if any(not isinstance(value, str) or not value
+               for value in (self.root_path, self.relative_path)):
+            raise ValueError("A file descriptor requires a root path and relative file path")
+        if type(self.size) is not int or self.size < 0:
+            raise ValueError("A file descriptor requires a nonnegative file size")
+        if not isinstance(self.sha256, str) or re.fullmatch(r"[0-9a-f]{64}", self.sha256) is None:
+            raise ValueError("A file descriptor requires a SHA256 checksum")
+
+
+def _descriptor(value):
+    if isinstance(value, FileDescriptor):
+        return value
+    if not isinstance(value, Mapping):
+        raise TypeError("descriptor must be a FileDescriptor or its saved mapping")
+    return FileDescriptor(**value)
+
+
+@dataclass(frozen=True)
 class RemoteFile:
     root: FileRoot
     relative_path: str
@@ -79,6 +121,18 @@ class RemoteFile:
     def name(self):
         """The root-relative path; use native_name as a native node input."""
         return self.relative_path
+
+    def describe(self) -> FileDescriptor:
+        """Export a checksum-bearing locator; save with ``dataclasses.asdict``.
+
+        This is local metadata conversion, not I/O. Obtain a missing checksum
+        with ``await files.stat(file, checksum=True)`` before saving it.
+        """
+        if self.sha256 is None:
+            raise ValueError("File SHA256 is unknown; call files.stat(file, checksum=True) first")
+        return FileDescriptor(root_path=self.root.path, relative_path=self.relative_path,
+                              size=self.size, sha256=self.sha256,
+                              directory=self.root.directory, category=self.root.category)
 
 
 @dataclass(frozen=True)
@@ -222,6 +276,19 @@ class Files:
         async def operation(transport, session):
             return _remote(await transport.request("file_stat", session_id=session,
                                                     checksum=checksum, **selection))
+        return await self._run(operation)
+
+    async def resolve(self, descriptor: FileDescriptor | Mapping) -> RemoteFile:
+        """Relocate saved metadata on the daemon and verify its expected bytes.
+
+        This always requests a complete SHA256 scan. A changed or no-longer
+        configured root, missing file, or content mismatch fails explicitly.
+        """
+        saved = asdict(_descriptor(descriptor))
+
+        async def operation(transport, session):
+            return _remote(await transport.request("file_stat", session_id=session,
+                                                    checksum=True, descriptor=saved))
         return await self._run(operation)
 
     async def remove(self, remote_file, *, directory=None, root=None, missing_ok=False) -> None:
@@ -769,6 +836,10 @@ def from_ui(ui, *, node_id=None, key=None) -> Coroutine[Any, Any, tuple[RemoteFi
 
 def stat(remote_file, *, directory=None, root=None, checksum=False) -> Coroutine[Any, Any, RemoteFile]:
     return _invoke_async(('files', 'stat'), remote_file, directory=directory, root=root, checksum=checksum)
+
+
+def resolve(descriptor: FileDescriptor | Mapping) -> Coroutine[Any, Any, RemoteFile]:
+    return _invoke_async(('files', 'resolve'), descriptor)
 
 
 def remove(remote_file, *, directory=None, root=None, missing_ok=False) -> Coroutine[Any, Any, None]:

@@ -45,6 +45,7 @@ for index, file in enumerate(files):
 | `await files.upload(local_path, *, directory=None, root=None, path=None, recovery_timeout=None)` | 从本地常规文件上传，返回 `RemoteFile`；默认 input 根和 UUID 文件名，保留合法后缀 |
 | `await files.download(remote_file, local_path, *, directory=None, root=None, overwrite=False, recovery_timeout=None)` | 下载并校验后发布到本地，返回 `DownloadedFile`；覆盖现有本地目标必须显式 `overwrite=True` |
 | `await files.stat(remote_file, *, directory=None, root=None, checksum=False)` | 返回 `RemoteFile`；默认只读元数据，`checksum=True` 才完整扫描文件计算 SHA256 |
+| `await files.resolve(descriptor)` | 在 daemon 当前允许的精确根内重新定位 `FileDescriptor` 或其保存的 Mapping，完整扫描并核对大小、SHA256，返回新的 `RemoteFile` |
 | `await files.remove(remote_file, *, directory=None, root=None, missing_ok=False)` | 显式删除一个文件，返回 `None` |
 | `await files.roots(*, directory=None, category=None)` | 返回 `tuple[FileRoot, ...]`；无筛选时列出 input、temp、output 三根 |
 
@@ -102,3 +103,31 @@ recovery_timeout 默认使用服务器 transfer_idle_timeout=3600 秒，从观�
 已完成文件由原生文件系统持有，可供其他授权会话使用，不属于 session 的 owned refs。GC、`RemoteRef.release()`、Client close 和 daemon 正常关闭都不删除已完成文件；temp 根的后续清理由原生环境或部署者策略决定，Comani 不提供永久保留保证。删除通过 `files.remove()` 明确进行；传入 `RemoteFile` 时会拒绝删除 revision 已改变的文件。
 
 保存 `files = remote.files` 会强持有所属 Client；Client 每次访问都返回新代理，不缓存它，因此没有反向所有权环。只保存 `RemoteFile`/`FileRoot`/`DownloadedFile` 不保活会话。显式 Client close 优先取消活动文件 I/O，关闭后需新建 Client 才能再次操作文件。
+
+## 保存文件描述并在新 daemon 中核验
+
+`RemoteFile` 没有 Client，但其中 `root.id` 仍属于当前 daemon 的文件配置实例；管理 daemon 重建后，不能把旧 ID 当成持久授权。应用可以显式保存 `FileDescriptor`，在新的 Client 中重新取得当前有效的 `RemoteFile`：
+
+```python
+import json
+from dataclasses import asdict
+from pathlib import Path
+from comani import Client
+
+# 在成功保存文件后，记录已核验内容。普通 stat/from_ui 的 SHA256 可能为空。
+async with Client(url, token=token) as remote:
+    file = await remote.files.stat("shots/front.png", directory="output", checksum=True)
+    Path("front-file.json").write_text(json.dumps(asdict(file.describe())), encoding="utf-8")
+
+# 可以在另一个 Python 进程、计算重启或管理 daemon 重建后执行。
+async with Client(url, token=token) as remote:
+    saved = json.loads(Path("front-file.json").read_text(encoding="utf-8"))
+    file = await remote.files.resolve(saved)
+    await remote.files.download(file, "verified-front.png")
+```
+
+`file.describe()` 是本地元数据转换，不执行 I/O；SHA256 为空时明确报 `ValueError`，要求先执行 `stat(file, checksum=True)`。上传或完整下载得到的 `RemoteFile` 已有 SHA256，可以直接 describe。`FileDescriptor` 是无 Client 的不可变 dataclass，字段为 `version=1`、`directory` 或 `category`、服务端已规范化的 `root_path`、`relative_path`、`size` 和必需的 `sha256`；用 `dataclasses.asdict` 和 JSON 保存，也可通过 `FileDescriptor(**saved)` 重建。它不保存 session、root ID 或 inode/revision。
+
+`files.resolve` 是真实文件 RPC，复用 daemon 的 stat 实现，始终完整读取文件计算 SHA256。daemon 仅在当前原生配置允许的目录或模型类别中匹配精确 `root_path`，然后检查相对路径、常规文件、大小和 SHA256。保存的路径是定位约束，不授予任意服务端目录权限；客户端不使用本地操作系统解释远端路径。根已更换、目录不再允许、文件缺失、路径越界、内容变化或未知描述版本均明确失败，不搜索全盘，也不改绑到其他根的同名文件。旧 daemon 不支持描述参数时会拒绝解析，不降低为仅按名称查找。
+
+这是对已知位置和预期字节的重新核验：同位置恢复为相同内容的文件可以通过，成功返回的新 revision 仅用于后续文件操作的变化检测。它不保证文件不可变、永久保留或核验后不会再变化；并发修改仍受现有 revision 检查约束。根迁移需要应用显式选择新位置并重新核对，描述本身不自动搬运文件、不提供全局资产数据库，也不让 tensor、模型对象或 `RemoteRef` 跨 Client 持久化。

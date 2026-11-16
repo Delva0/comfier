@@ -34,7 +34,7 @@ from .errors import (
     SubmissionKeyConflict,
     UnknownOutputLayout,
 )
-from .files import DownloadedFile, FileRoot, Files, RemoteFile
+from .files import DownloadedFile, FileDescriptor, FileRoot, Files, RemoteFile
 from .management import (
     Bash,
     ComfyUI,
@@ -105,7 +105,7 @@ __all__ = [
     "HTTPTransport", "InProcessTransport", "ComaniError", "RemoteError", "SessionClosed",
     "InvalidReference", "NotSubmitted", "Expired", "Released", "NotProduced", "Skipped",
     "UnknownOutputLayout", "CodeCompatibilityError", "PackageConflict",
-    "Files", "FileRoot", "RemoteFile", "DownloadedFile",
+    "Files", "FileRoot", "RemoteFile", "DownloadedFile", "FileDescriptor",
     "FileTransferExpired", "FileTransferBusy",
     "Bash", "ComfyUI", "ComfyUIInfo", "Plugins", "Models", "Operations",
     "ManagementOperation", "OperationHandle", "OperationStatus", "CommandResult",
