@@ -646,12 +646,14 @@ class Client:
 
     @staticmethod
     async def _send_loop(client_ref, queue, opening):
-        deferred = None
+        deferred = deferred_upload = None
         while True:
             if deferred is None:
                 item = await queue.get()
+                first_upload = None
             else:
                 item, deferred = deferred, None
+                first_upload, deferred_upload = deferred_upload, None
             items, stop = [item], False
             try:
                 if item is None:
@@ -705,7 +707,10 @@ class Client:
                                     "bindings": {k: encode_tree(v, client._encode_special)
                                                  for k, v in item.payload["bindings"].items()}}
                         del client
-                        await Client._upload(recovery, handshake, uploaded, session_id, item.artifacts)
+                        if first_upload is None:
+                            await Client._upload(recovery, handshake, uploaded, session_id, item.artifacts)
+                        else:
+                            await first_upload
                         if item.payload.get("extra_data") is not None:
                             spec["extra_data"] = item.payload["extra_data"]
                         item.state.status = "submitting"
@@ -720,6 +725,12 @@ class Client:
                     except Exception as error:
                         item.state.fail(error)
                         item.payload, item.artifacts = None, ()
+                    finally:
+                        if first_upload is not None:
+                            if not first_upload.done():
+                                first_upload.cancel()
+                                await asyncio.gather(first_upload, return_exceptions=True)
+                            first_upload = None
                 # Byte framing is an internal envelope bound; an individual
                 # large call still uses the existing single-submit route.
                 groups, group, size = [], [], 2
@@ -733,6 +744,15 @@ class Client:
                     size += length
                 if group:
                     groups.append(group)
+                if prepared and deferred is not None:
+                    # Prepare at most the one held lookahead while this prefix
+                    # awaits admission. Its submit still waits for this ACK.
+                    deferred_upload = asyncio.create_task(
+                        Client._upload(recovery, handshake, uploaded, session_id, deferred.artifacts),
+                        context=contextvars.Context())
+                    deferred_upload.add_done_callback(
+                        lambda task: None if task.cancelled() else task.exception(),
+                        context=contextvars.Context())
                 for group in groups:
                     try:
                         window = recovery.submission_window
@@ -791,6 +811,13 @@ class Client:
                         entry.state.fail(error)
             finally:
                 client = None
+                for upload in (first_upload, deferred_upload if stop else None):
+                    if upload is not None and not upload.done():
+                        upload.cancel()
+                        await asyncio.gather(upload, return_exceptions=True)
+                first_upload = upload = None
+                if stop:
+                    deferred_upload = None
                 for _ in range(len(items)):
                     queue.task_done()
                 if stop and deferred is not None:
