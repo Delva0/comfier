@@ -132,6 +132,8 @@ Call 只有在 metadata.ui 含标准 ComfyUI 文件描述符时才产出文件�
 
 Comani 提供原生后端节点、对象和 API prompt graph。WebUI、前端 canvas JSON、所有第三方 HTTP route、机器租用和多实例调度不在统一兼容范围。模型、插件与节点必须适合所选硬件和 backend。
 
+项目附带 [Vast 官方 skill](.agents/skills/vastai/SKILL.md)，配合单独安装的官方 CLI 租用与管理机器；连接可用后按 [Comani 交接说明](.agents/skills/vastai/references/comani.md) 转到现有 daemon、SDK 和示例。
+
 历史 GPU/H3 结果属于各报告记录的源码、wheel 和硬件；改写后的示例不自动继承旧脚本的数值认证。
 
 ![历史 H3 INT8 2048×2048 实际样图](artifacts/remote/60741609-20261115/eager.png)
