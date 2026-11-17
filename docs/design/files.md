@@ -55,6 +55,8 @@ for index, file in enumerate(files):
 
 `FileRoot` 包含不透明 `id`、远端 `path`、`directory`、`category` 和原生查找顺序 `priority`。这些是当前 daemon 文件配置的定位信息，不能作为跨 daemon 的持久 ID。`DownloadedFile` 包含本地绝对 `local_path`、`size`、`sha256` 和更新后的 `remote` 元数据。这些不可变本地值不保留 Client，没有 `fetch()` 或 `release()`。
 
+Comani 的默认 temp 根为原生 `base_path/.comani/temp`，冷态文件 API 与运行中的节点使用同一路径，避免另一个官方 ComfyUI 服务启动时清空 `base_path/temp` 影响当前计算。升级前默认使用的 `base_path/temp` 不会迁移或删除；指向旧根的 `FileDescriptor` 不会自动解析到新根。要保留旧路径，可显式传入原生参数 `--temp-directory <base_path>`（实际根仍为 `<参数>/temp`）。同一 base 的多个 Comani 进程仍共享默认 temp；需要分别保留临时文件的实例应各自设置不同的 `--temp-directory`。这不隔离 GPU 或其他共享目录。
+
 ## 模型多根与命名
 
 模型类别和路径来自实际 ComfyUI `folder_paths` 配置，包括额外模型路径。运行中取得 live snapshot，停止后使用 last-observed；冷实例通过只加载原生路径配置的 helper 发现，既不导入 Torch，也不导入插件，不能凭空发现插件运行时新增类别。原生路径源码/YAML 变化触发重新发现，发布前复查所选 root 的配置；模型下载另按[模型发布规则](models.md)核对目标目录身份，避免无关配置变化造成重传。路径/category/directory tuple 未变的 root 保持稳定 ID；已观察移除的 ID 退役，重新注册同一路径会取得新 ID。上传到模型类别时，先取根并显式选择：

@@ -7,6 +7,8 @@ import os
 import sys
 from pathlib import Path
 
+from ._paths import configure_temp
+
 # These belong to services Comani does not host, rather than native node execution.
 _SERVER_OPTIONS = {
     "listen", "port", "tls_keyfile", "tls_certfile", "enable_cors_header",
@@ -69,8 +71,7 @@ def initialize(root, arguments, *, custom_nodes):
     # The native module applies custom paths, governance/prestartup scripts and
     # backend initialization itself. Do not call start_comfyui(): we own execution.
     native = importlib.import_module("main")
-    if args.temp_directory:
-        native.folder_paths.set_temp_directory(os.path.join(os.path.abspath(args.temp_directory), "temp"))
+    configure_temp(native.folder_paths, args)
     os.makedirs(native.folder_paths.get_temp_directory(), exist_ok=True)
     return native, args
 

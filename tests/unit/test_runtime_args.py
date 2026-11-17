@@ -98,7 +98,10 @@ def startup_parser(monkeypatch, tmp_path):
     monkeypatch.setitem(sys.modules, "torch", object())
     monkeypatch.delitem(sys.modules, "main", raising=False)
     imports = []
-    native = SimpleNamespace(folder_paths=SimpleNamespace(get_temp_directory=lambda: str(tmp_path)))
+    paths = SimpleNamespace(base_path=str(tmp_path), temp_directory=str(tmp_path / "temp"))
+    paths.get_temp_directory = lambda: paths.temp_directory
+    paths.set_temp_directory = lambda directory: setattr(paths, "temp_directory", directory)
+    native = SimpleNamespace(folder_paths=paths)
 
     def import_native(name):
         imports.append(name)

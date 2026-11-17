@@ -19,6 +19,15 @@ class NoCompute(importlib.abc.MetaPathFinder):
         return None
 
 
+def configure_temp(folder_paths, args):
+    if args.temp_directory:
+        directory = os.path.join(os.path.abspath(args.temp_directory), "temp")
+    else:
+        # Native ComfyUI removes its own base/temp during server startup.
+        directory = os.path.join(folder_paths.base_path, ".comani", "temp")
+    folder_paths.set_temp_directory(directory)
+
+
 def configured_paths(config):
     """Apply only the target revision's native path configuration."""
     root = Path(config["comfy_root"]).expanduser().resolve()
@@ -68,8 +77,7 @@ def _configure(root):
         namespace,
     )
     namespace["apply_custom_paths"]()
-    if args.temp_directory:
-        folder_paths.set_temp_directory(os.path.join(os.path.abspath(args.temp_directory), "temp"))
+    configure_temp(folder_paths, args)
     assert "torch" not in sys.modules and "nodes" not in sys.modules and "main" not in sys.modules
     return folder_paths
 

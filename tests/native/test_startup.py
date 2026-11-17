@@ -89,6 +89,53 @@ finally:
 """, str(tmp_path), json.dumps(arguments))
 
 
+@pytest.mark.parametrize("explicit_temp", [False, True])
+def test_cold_and_live_temp_roots_survive_another_native_startup(tmp_path, explicit_temp):
+    probe("""
+import json, shutil, subprocess, sys
+from pathlib import Path
+from comani.daemon.adapter import NativeAdapter
+
+root = Path(sys.argv[2])
+base = root / 'base'
+native_temp = base / 'temp'
+native_temp.mkdir(parents=True)
+old = native_temp / 'old.bin'
+old.write_bytes(b'old temporary file')
+arguments = ['--disable-partner-nodes', '--base-directory', str(base)]
+explicit = sys.argv[3] == 'True'
+if explicit:
+    arguments += ['--temp-directory', str(root / 'temporary')]
+config = {'comfy_root': sys.argv[1], 'comfy_args': arguments}
+cold = subprocess.run([sys.executable, '-B', '-c',
+    'import json,sys;from comani.daemon._paths import snapshot;'
+    'print(json.dumps(snapshot(json.loads(sys.argv[1]))))', json.dumps(config)],
+    capture_output=True, text=True, check=True)
+directories = json.loads(cold.stdout)['directories']
+expected = root / 'temporary' / 'temp' if explicit else base / '.comani' / 'temp'
+assert directories['temp'] == str(expected)
+assert not expected.exists()  # Cold discovery only selects the effective root.
+assert old.read_bytes() == b'old temporary file'
+
+adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False, comfy_args=arguments)
+try:
+    adapter.boot()
+    import folder_paths as paths
+    for name, value in directories.items():
+        assert getattr(paths, 'get_' + name + '_directory')() == value
+    assert expected.is_dir()
+    assert old.read_bytes() == b'old temporary file'
+    assert not (expected / 'old.bin').exists()
+    active = expected / 'active.bin'
+    active.write_bytes(b'active temporary file')
+    # Another native server removes base/temp during its startup.
+    shutil.rmtree(native_temp)
+    assert active.read_bytes() == b'active temporary file'
+finally:
+    adapter.close()
+""", str(tmp_path), str(explicit_temp))
+
+
 def test_sequential_default_runtimes_do_not_treat_native_auto_detection_as_new_options():
     probe("""
 import asyncio, sys
