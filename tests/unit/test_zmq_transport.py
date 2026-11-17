@@ -1,14 +1,16 @@
 """Real-socket checks for optional compute transport boundary guarantees."""
 
 import asyncio
+import gc
 import time
+import weakref
 
 import pytest
 
-from comani import ZMQTransport
+from comani import Client, ZMQTransport
 from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
 from comani.daemon.zmq import ZMQServer
-from comani.errors import RemoteError, SessionClosed
+from comani.errors import Expired, RemoteError, SessionClosed
 
 zmq = pytest.importorskip("zmq")
 
@@ -176,3 +178,142 @@ async def test_server_removes_only_its_own_ipc_socket_on_close(tmp_path, replace
         assert path.read_text() == "external replacement"
     else:
         assert not path.exists()
+
+
+async def sending(transport, method="fetch"):
+    task = asyncio.create_task(transport.request(method))
+    async with asyncio.timeout(1):
+        while not transport._pending:
+            await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    return task
+
+
+@pytest.mark.parametrize("close", [False, True])
+async def test_socket_shutdown_does_not_cancel_the_calling_task(tmp_path, close):
+    transport = ZMQTransport("ipc://" + str(tmp_path / "absent.sock"), token="secret", timeout=1)
+    task = await sending(transport)
+    try:
+        await (transport.close() if close else transport.reconnect())
+        with pytest.raises(SessionClosed if close else ConnectionError):
+            await task
+        assert task.cancelling() == 0
+        assert not transport._pending
+    finally:
+        await transport.close()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+async def test_caller_cancel_remains_cancelled_during_socket_shutdown(tmp_path):
+    transport = ZMQTransport("ipc://" + str(tmp_path / "absent.sock"), token="secret", timeout=1)
+    task = await sending(transport)
+    try:
+        task.cancel()
+        await transport.reconnect()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert task.cancelling() == 1
+        assert not transport._pending
+    finally:
+        await transport.close()
+
+
+async def test_one_request_deadline_does_not_cancel_another_sender(tmp_path):
+    transport = ZMQTransport("ipc://" + str(tmp_path / "absent.sock"), token="secret", timeout=.1)
+    first = await sending(transport)
+    transport.timeout = 1
+    second = await sending(transport)
+    try:
+        with pytest.raises(TimeoutError, match="deadline"):
+            await first
+        with pytest.raises(ConnectionError):
+            await second
+        assert second.cancelling() == 0 and not transport._pending
+    finally:
+        await transport.close()
+        await asyncio.gather(first, second, return_exceptions=True)
+
+
+async def test_internal_send_reset_resumes_the_original_session_and_preserves_its_terminal_error(tmp_path):
+    from comani.client import _ConnectionRecovery
+
+    class ClosedRuntime(Runtime):
+        def __init__(self):
+            self.handshakes, self.resumes, self.fetches = 0, [], 0
+
+        async def handshake(self, **params):
+            self.handshakes += 1
+            return {**await super().handshake(**params), "resume_token": "original-resume-token"}
+
+        async def resume(self, **params):
+            self.resumes.append(params)
+            raise SessionClosed("The original session expired")
+
+        async def fetch_bytes(self, **params):
+            self.fetches += 1
+            raise AssertionError("An expired session must not replay its business request")
+
+    runtime = ClosedRuntime()
+    async with ZMQServer(runtime, endpoints=["tcp://127.0.0.1:*"], token="secret") as server:
+        transport = ZMQTransport(server.endpoints[0], token="secret", timeout=1)
+        task = None
+        try:
+            handshake = await transport.request("handshake")
+            recovery = _ConnectionRecovery(transport, handshake, handshake["session_id"])
+            await transport.reconnect("ipc://" + str(tmp_path / "absent.sock"))
+            task = asyncio.create_task(recovery.request("fetch", session_id=handshake["session_id"]))
+            async with asyncio.timeout(1):
+                while not transport._pending:
+                    await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            await transport.reconnect(server.endpoints[0])
+            with pytest.raises(SessionClosed, match="original session expired"):
+                await task
+            assert task.cancelling() == 0
+            assert runtime.handshakes == 1 and runtime.fetches == 0
+            assert runtime.resumes == [{"session_id": "issued", "resume_token": "original-resume-token", "epoch": "same-runtime"}]
+        finally:
+            await transport.close()
+            if task is not None:
+                await asyncio.gather(task, return_exceptions=True)
+
+
+@pytest.mark.parametrize("kind", ["ipc", "tcp"])
+async def test_reader_does_not_keep_client_alive_through_the_last_error_traceback(tmp_path, kind):
+    class FailingRuntime(Runtime):
+        async def fetch_bytes(self, **params):
+            raise Expired("The remote reference expired")
+
+        async def close_session(self, **params):
+            return {}
+
+        async def runtime_info(self, **params):
+            return {"epoch": "same-runtime"}
+
+    endpoint = "ipc://" + str(tmp_path / "compute.sock") if kind == "ipc" else "tcp://127.0.0.1:*"
+    async with ZMQServer(FailingRuntime(), endpoints=[endpoint], token="secret") as server:
+        transport = ZMQTransport(server.endpoints[0], token="secret", timeout=1)
+
+        async def fail_and_drop():
+            client = await Client(transport=transport).start()
+            lease = client._lease
+            with pytest.raises(Expired, match="reference expired"):
+                await client._fetch({"id": "invalid", "epoch": "same-runtime"})
+            # A following successful response must not leave the old exception
+            # in a reader local either.
+            await transport.request("runtime_info")
+            return weakref.ref(client), lease
+
+        client_ref, lease = await fail_and_drop()
+        try:
+            async with asyncio.timeout(1):
+                while client_ref() is not None or transport._context is not None or not lease.done.done():
+                    gc.collect()
+                    await asyncio.sleep(.01)
+            assert transport._closed and not transport._pending
+        finally:
+            client = client_ref()
+            if client is not None:
+                await client.close(wait=False)
+            await transport.close()
+            await lease.close()

@@ -93,27 +93,32 @@ class ZMQTransport:
                         frames = await socket.recv_multipart()
                 except TimeoutError:
                     continue
-                if len(frames) not in {2, 3}:
-                    raise ConnectionError("Invalid compute response frame count")
-                request_id, metadata = frames[:2]
-                future = self._pending.get(request_id)
-                if future is None or future.done():
-                    continue
-                if sum(map(len, frames[1:])) > self.max_response_bytes:
-                    raise ConnectionError("Compute response exceeds the configured byte limit")
-                payload = json.loads(metadata)
-                if not isinstance(payload, dict):
-                    raise ConnectionError("Expected a compute response object")
-                if "error" in payload:
-                    error = (ConnectionError(payload["error"].get("message", "Compute request unavailable")) if payload.get("retryable")
-                             else error_from_wire(payload["error"]))
-                    future.set_exception(error)
-                elif payload.get("binary") == "pickle" and len(frames) == 3:
-                    future.set_result(frames[2])
-                elif "result" in payload and len(frames) == 2:
-                    future.set_result(payload["result"])
-                else:
-                    raise ConnectionError("Invalid compute response envelope")
+                try:
+                    if len(frames) not in {2, 3}:
+                        raise ConnectionError("Invalid compute response frame count")
+                    request_id, metadata = frames[:2]
+                    future = self._pending.get(request_id)
+                    if future is None or future.done():
+                        continue
+                    if sum(map(len, frames[1:])) > self.max_response_bytes:
+                        raise ConnectionError("Compute response exceeds the configured byte limit")
+                    payload = json.loads(metadata)
+                    if not isinstance(payload, dict):
+                        raise ConnectionError("Expected a compute response object")
+                    if "error" in payload:
+                        error = (ConnectionError(payload["error"].get("message", "Compute request unavailable")) if payload.get("retryable")
+                                 else error_from_wire(payload["error"]))
+                        future.set_exception(error)
+                    elif payload.get("binary") == "pickle" and len(frames) == 3:
+                        future.set_result(frames[2])
+                    elif "result" in payload and len(frames) == 2:
+                        future.set_result(payload["result"])
+                    else:
+                        raise ConnectionError("Invalid compute response envelope")
+                finally:
+                    # Completed errors gain caller tracebacks, and binary
+                    # frames may be large. An idle reader must retain neither.
+                    frames = request_id = metadata = future = payload = error = None
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -157,18 +162,28 @@ class ZMQTransport:
             async with asyncio.timeout(self.timeout):
                 async with self._lanes[lane], self._credit:
                     await self.open()
+                    socket = self._socket
                     request_id = uuid.uuid4().hex.encode()
                     future = asyncio.get_running_loop().create_future()
                     self._pending[request_id] = future
                     async with self._sending:
-                        await self._socket.send_multipart([request_id, encoded])
+                        if socket is not self._socket:
+                            if self._closed:
+                                raise SessionClosed("Transport is closed")
+                            raise ConnectionError("Compute connection reset")
+                        await socket.send_multipart([request_id, encoded])
                     return await future
         except TimeoutError:
             await self.reconnect()
             raise TimeoutError("Compute request deadline exceeded") from None
         except asyncio.CancelledError:
-            # Cancellation releases socket credit, never computation ownership.
-            raise
+            # pyzmq also cancels send futures when another request resets the
+            # socket. Only an actual Task cancellation belongs to the caller.
+            if asyncio.current_task().cancelling():
+                raise
+            if self._closed:
+                raise SessionClosed("Transport is closed") from None
+            raise ConnectionError("Compute connection reset") from None
         except Exception as error:
             zmq = dependency()
             if isinstance(error, zmq.ZMQError):
