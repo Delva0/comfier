@@ -39,7 +39,7 @@ await comani.files.download(await saved.file(), "result.png")
 
 | 任务 | 最少命令 | 产物与来源 |
 | --- | --- | --- |
-| 点选物体后局部重绘 | `python examples/qwen_click_mask.py --input desk.png --point 400 300 --prompt 'Replace the cup with a glass of orange juice.'` | [Click to Mask](qwen_click_mask.py)：编辑结果与遮罩等 PNG；[AusBoss 原工作流](https://civitai.com/models/3000390) |
+| 点选物体后局部重绘 | `python examples/qwen_click_mask.py --input desk.png --point 400 300 --prompt 'Replace the cup with a glass of orange juice.' --editable` | [Click to Mask](qwen_click_mask.py)：扁平预览；可选 `--editable` 交接独立 RGBA patch、两层 ORA、两种 mask 与源版本/几何 manifest；[改稿交付](../docs/editable-workflows.md)；[AusBoss 原工作流](https://civitai.com/models/3000390) |
 | 抠出物体并修补原位置 | `python examples/qwen_cut_out_remove.py --input desk.png --object 'the mug'` | [Cut Out & Remove](qwen_cut_out_remove.py)：RGBA 前景与修补后背景；[AusBoss 原工作流](https://civitai.com/models/2987326)。透明边缘需按素材调整 alpha 参数 |
 | 分块修复并拼回大图 | `python examples/qwen_tiled_upscale.py --input small-photo.png` | [Tiled Upscale](qwen_tiled_upscale.py)：放大修复 PNG；[AusBoss 原工作流](https://civitai.com/models/2988629)。`--no-turbo --steps 25` 选择慢分支 |
 | 从服装图描述衣物并换装 | `python examples/qwen_outfit_swap.py --person adult.png --garment outfit.png` | [Outfit Swap](qwen_outfit_swap.py)：换装 PNG；[AusBoss 原工作流](https://civitai.com/models/2983126)。`--description` 可提供人工描述 |
@@ -53,9 +53,30 @@ await comani.files.download(await saved.file(), "result.png")
 | 任务 | 最少命令 | 产物与来源 |
 | --- | --- | --- |
 | 先看低成本候选，再精修选中的 AV latent | `python examples/h3_seed_hunter.py --prompt 'An adult walks through a sunlit garden.'` | [Seed Hunter](h3_seed_hunter.py)：三个预览和选中候选的精修 MP4；[foxydits 原工作流](https://civitai.com/models/2881362)。`--choose 2 3` 直接指定候选 |
-| 保存场景，重连同一项目后续写并导出 | `python examples/h3_longforge.py` | [LongForge](h3_longforge.py)：`film.mp4`、场景/导出记录，远端保留 takes；[AIBOB1199 官方来源](https://civitai.com/models/2926029)。默认是两段各 2 秒的小尺寸配置，`--project` 可续写已有项目 |
+| 保存场景，续写或替换中段后导出 | `python examples/h3_longforge.py` | [LongForge](h3_longforge.py)：`film.mp4`、场景/导出记录，远端保留 takes；`--project NAME --inspect` 检查工程，`--edit edit.json` 明确替换与 trim；[改稿交付](../docs/editable-workflows.md)；[AIBOB1199 官方来源](https://civitai.com/models/2926029)。默认是两段各 2 秒的小尺寸配置 |
 
 Seed Hunter 和 LongForge 每次创建新的 `run-*` 输出目录。Seed Hunter 在候选之间复用固定条件；选定后，同一 AV latent 继续进入精修。LongForge 通过原生 `GENERATE NEXT` / `EXPORT FILM` 动作继续项目，重连时重新建立当前 Client 的模型引用。
+
+Click 的 ORA 保存生成所见的源版本；已有后改底图时，应审阅后单独采用 patch，避免旧背景覆盖新笔触。LongForge 替换会重置本段 trim，`--edit` 因而要求明确选择导出范围。两例的 CPU 编辑合同与格式已验证，生成质量、原生编辑器导入和视听接缝仍需作者验收。
+
+LongForge 已有工程的最小改稿流程，先取回当前版本与导出区间：
+
+```sh
+python examples/h3_longforge.py --project my-film --inspect
+```
+
+从输出的 `before-project.json` 复制 `head.revision`，从 `scene-2.json` 复制 `export_trim.revision`（可能为 `null`），写入 `edit.json`：
+
+```json
+{"scene": 2, "prompt": "VIDEO: Reach more slowly, pause, then touch the cup. SOUND: Continue room tone. MUSIC: N/A",
+ "revision": "复制 head.revision", "trim_revision": null, "trim": "restore"}
+```
+
+```sh
+python examples/h3_longforge.py --project my-film --edit edit.json
+```
+
+`restore` 明确恢复原区间；也可选 `full` 或 `{"in_frame":3,"out_frame":80}`。脚本保存改稿计划，替换选中段、提交批准的 trim，再导出下载；`film.mp4` 仍需审阅表演及音视频接缝。完整产物、失败后处理和适用工程范围见[改稿交付](../docs/editable-workflows.md)。
 
 ### 尚在完善的工作流
 
