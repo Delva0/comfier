@@ -30,6 +30,8 @@ function、code、source 三种参数互斥。inline/file/package 都是用户�
 
 Callable 使用 cloudpickle，SDK 和 daemon 检查确切 Python/cloudpickle 版本。捕获 SDK RemoteRef/Future/GraphRef 的闭包会拒绝，应把引用放进 inputs。环境不匹配不会自动翻译或 fallback 为源码，也没有自动提取任意函数依赖的 helper。
 
+`args` 和 `inputs` 作为同一个对象图传递，保留重复对象的别名和循环；其中 SDK 引用继续成为原生依赖端口。参数中的动态闭包或动态类也使用 cloudpickle，并要求双方 Python/cloudpickle 精确版本匹配；源码模式携带普通可 pickle 数据仍允许跨 Python 版本。锁、生成器等不可序列化资源会报告明确的参数错误。代码和 pickle 的接收执行属于同一受信任代码执行边界，不是安全沙箱。
+
 ## 一份脚本包含本地入口与远端逻辑
 
 ```python

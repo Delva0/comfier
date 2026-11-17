@@ -19,6 +19,7 @@ class FakeRuntime:
 
     async def handshake(self, session_id):
         return {"epoch": self.epoch, "python": list(sys.version_info[:3]),
+                "capabilities": {"python_inputs": 1},
                 "cloudpickle": cloudpickle.__version__, "nodes": {
                     name: {"outputs": ["*"] * count} for name, count in
                     [("Echo", 1), ("Block", 1), ("Pair", 2), ("Effect", 0),

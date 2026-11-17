@@ -25,7 +25,7 @@ comfier daemon --comfy-root /srv/ComfyUI \
 
 管理入口默认是 `127.0.0.1:8190`。远端连接使用部署者提供的 SSH 转发或鉴权 HTTPS，通过 `COMFIER_URL`、`COMFIER_TOKEN` 选择入口。**Client 连接只做管理握手，不安装或启动计算。** CLI 不加 `--no-start` 时会尝试启动计算。
 
-HTTP 保持默认。需要本地 IPC 和远端 TCP 共用计算通道时，可安装本仓库的 `zmq` extra（`python -m pip install -e ".[zmq]"`）并选择 `--compute-transport zmq` / `--zmq-bind`；同一个 Client 通过 HTTP companion 使用管理和文件接口，部署与 CURVE 配置见 [ZMQ 计算通道](docs/design/compute-transport.md)。
+`cf.Client(url, token=...)` 自动发现并验证可达计算通道：本机优先私有 IPC，远端可使用已部署的加密计算端点，其余情况保留 HTTP。管理、文件、Range 和原生控制接口继续使用 HTTP，无需选择协议或安装额外传输包。部署边界与诊断方式见 [自动计算通道](docs/design/compute-transport.md)。
 
 如果服务器还没有 ComfyUI，先用相同 daemon 命令启动纯管理入口，路径可以尚不存在，然后按 [空白 CPU 环境准备](docs/design/development.md#空白-cpu-环境) 创建环境。GPU 的 Torch/CUDA 包由调用者选择；[H3 完整脚本](examples/minimax_h3_remote.py) 展示同一脚本中的显式准备、模型、插件和推理。
 

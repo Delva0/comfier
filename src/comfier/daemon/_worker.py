@@ -36,7 +36,13 @@ def run(config, *, socket_fd=None, port=None, token=None, compute_endpoint=None)
             server = ZMQServer(runtime, endpoints=[compute_endpoint], token=token)
 
             async def compute_channel(app):
-                await server.start()
+                try:
+                    await server.start()
+                except Exception:
+                    await server.close()
+                    if config.get("compute_transport") != "auto":
+                        raise
+                    print("Private IPC unavailable; retaining the native HTTP channel", flush=True)
                 try:
                     yield
                 finally:

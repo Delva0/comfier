@@ -28,10 +28,10 @@ def main(argv=None):
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8190)
     parser.add_argument("--token", default=os.environ.get("COMFIER_TOKEN", os.environ.get("COMANI_TOKEN")))
-    parser.add_argument("--compute-transport", choices=("http", "zmq"),
-                        help="Controller to native worker compute channel (default: http)")
+    parser.add_argument("--compute-transport", choices=("auto", "http", "zmq"),
+                        help="Diagnostic override for the native worker channel (default: auto)")
     parser.add_argument("--zmq-bind", action="append", default=[], metavar="ENDPOINT",
-                        help="Additional compute endpoint, repeat for ipc:// and tcp://; requires comfier[zmq] and COMFIER_TOKEN")
+                        help="Additional deployed compute endpoint; remote TCP requires CURVE and COMFIER_TOKEN")
     parser.add_argument("--cpu", action="store_true", default=None)
     parser.add_argument("--no-custom-nodes", action="store_true", default=None)
     parser.add_argument("--no-start", action="store_true", help="Start only management; runtime starts explicitly through the API")

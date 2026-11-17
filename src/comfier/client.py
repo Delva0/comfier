@@ -15,6 +15,7 @@ from functools import partial
 
 import aiohttp
 
+from ._auto_transport import AutoTransport
 from ._context import enter_client, exit_client
 from ._graph import Graph, GraphInput, GraphRef, _receiver
 from ._outputs import _OutputProxy, declared_outputs
@@ -35,6 +36,7 @@ from .protocol import (
     SUBMIT_BATCH_MAX_BYTES,
     SUBMIT_BATCH_MAX_CALLS,
     SUBMIT_BATCH_VERSION,
+    _PythonLayout,
     encode_tree,
     lift_arguments,
     unpack_pickle,
@@ -182,7 +184,7 @@ class Client:
             if transport is not None:
                 raise TypeError("Set fetch_compression on HTTPTransport when supplying a transport")
         compression = "auto" if fetch_compression is _FETCH_COMPRESSION else fetch_compression
-        self.transport = transport or HTTPTransport(url, token=token, fetch_compression=compression)
+        self.transport = transport or AutoTransport(url, token=token, fetch_compression=compression)
         self.session_id = uuid.uuid4().hex
         self.epoch = ""
         self.handshake = {}
@@ -366,6 +368,8 @@ class Client:
         self._cleanup.session_close_confirmed = True
         if isinstance(self.transport, HTTPTransport):
             self.transport._reset_runtime_capabilities()
+        if callable(getattr(self.transport, "reset_compute", None)):
+            await self.transport.reset_compute()
 
     async def _open_compute(self):
         try:
@@ -530,7 +534,11 @@ class Client:
         if type(return_call) is not bool:
             raise TypeError("return_call must be bool")
         artifact = prepare_code(function, code=code, source=source, entry=entry)
-        layout, ports = lift_arguments(tuple(args), dict(inputs or {}))
+        layout, ports = lift_arguments(
+            tuple(args), dict(inputs or {}),
+            lambda value: isinstance(value, (Call, RemoteRef, OutputFuture, _OutputProxy,
+                                             GraphRef, GraphInput)),
+        )
         return self._node(PYTHON_NODE, {"code": artifact.descriptor(), "layout": layout, **ports},
                           (artifact,), return_call=return_call, check=True)
 
@@ -632,6 +640,8 @@ class Client:
         return call
 
     def _encode_special(self, value):
+        if isinstance(value, _PythonLayout):
+            return encode_tree(value.wire(self.handshake))
         if isinstance(value, Call):
             raise TypeError(
                 "A Call is an execution handle, not an input value; pass call.output(slot_or_name) "

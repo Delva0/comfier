@@ -40,15 +40,19 @@ class CodeArtifact:
     def check_compatibility(self, handshake):
         if self.kind != "pickle":
             return
-        remote_python = tuple(handshake.get("python", ()))
-        remote_pickle = handshake.get("cloudpickle")
-        if remote_python != tuple(sys.version_info[:3]) or remote_pickle != cloudpickle.__version__:
-            raise CodeCompatibilityError(
-                "Callable transfer requires exactly matching Python and cloudpickle versions; "
-                "explicitly select a self-contained source file/package for another environment",
-                details={"local_python": list(sys.version_info[:3]), "remote_python": list(remote_python),
-                         "local_cloudpickle": cloudpickle.__version__, "remote_cloudpickle": remote_pickle},
-            )
+        _check_pickle_compatibility(handshake)
+
+
+def _check_pickle_compatibility(handshake, *, description="Callable transfer"):
+    remote_python = tuple(handshake.get("python", ()))
+    remote_pickle = handshake.get("cloudpickle")
+    if remote_python != tuple(sys.version_info[:3]) or remote_pickle != cloudpickle.__version__:
+        raise CodeCompatibilityError(
+            f"{description} requires exactly matching Python and cloudpickle versions; "
+            "explicitly select a self-contained source file/package and ordinary data for another environment",
+            details={"local_python": list(sys.version_info[:3]), "remote_python": list(remote_python),
+                     "local_cloudpickle": cloudpickle.__version__, "remote_cloudpickle": remote_pickle},
+        )
 
 
 def prepare_code(function=None, *, code=None, source=None, entry=None):

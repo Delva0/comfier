@@ -16,6 +16,7 @@ from pathlib import Path
 import cloudpickle
 
 from comfier.errors import PackageConflict
+from comfier.protocol import restore_arguments
 
 # These are protocol v1 node IDs, independent of the public package name.
 PYTHON_NODE = "ComaniPython"
@@ -175,8 +176,11 @@ def register_python_nodes(nodes, artifacts: Artifacts):
 
             function = artifacts.load(json.loads(code) if isinstance(code, str) else code)
             tree = json.loads(layout) if isinstance(layout, str) else layout
-            args = unpack_layout(tree["args"], ports)
-            kwargs = unpack_layout(tree["kwargs"], ports)
+            if "pickle" in tree:
+                args, kwargs = restore_arguments(tree, ports)
+            else:
+                args = unpack_layout(tree["args"], ports)
+                kwargs = unpack_layout(tree["kwargs"], ports)
             result = function(*args, **kwargs)
             if inspect.isawaitable(result):
                 result = await result

@@ -81,7 +81,9 @@ SDK 采用握手返回的服务器 session ID，首批调用在握手完成后�
 
 仅在原生 graph lowering 时，内部端口才转为 ComfyUI `[node_id, slot]`；raw API prompt 已处于这种语言中。外部 refs 先解析为对象，再由内部 BoundInput/cache-provider 供执行器读取。
 
-Python args/kwargs 的容器结构保存在 layout 中，叶值提升为 `v0/v1/...` 原生端口，layout 用 `$port` 引用它们。这样嵌套的 Future/Ref 不会被 cloudpickle 暗中复制为模型或 Tensor 数据。
+Python 参数使用 `capabilities.python_inputs=1` 协商的内部 layout：args/kwargs 在同一 pickle memo 中序列化，保留跨参数别名、自循环和对象内部的共享关系。CloudPickler 的 `persistent_id` 将遇到的 SDK 引用提升为 `v0/v1/...` 原生端口，接收端 `persistent_load` 在执行时恢复它们；包括自定义对象和闭包内部的引用，仍由原有依赖、session 和 epoch 校验管理，不会将 Client 或远端堆复制进参数。layout 的 base64 pickle 与引用端口仍通过 JSON 提交，Python 返回值仍占一个原生输出槽。
+
+普通可 pickle 数据不要求 Python patch/cloudpickle 版本相同；参数使用 cloudpickle 专用 reducer（例如动态闭包、动态类或 code object）时，layout 标记来源版本并沿用 callable 的精确版本检查。源码模式携带普通数据的跨 Python 支持保持不变。不可序列化的资源明确报 args/inputs 错误并保留底层原因；pickle/cloudpickle 不负责搬运活动进程、锁或外部资源。新服务端兼容旧 `$port` tree layout；缺少该能力的旧服务端会在客户端提交前被明确拒绝。
 
 ## 状态、错误与重试
 
@@ -103,6 +105,6 @@ driver 还提供 `/prompt`、`/history`、`/queue`、`/ws` 的小型辅助接口
 
 ## 网络入口
 
-HTTP 是默认传输。显式安装 `comfier[zmq]` 后可选择同协议 IPC/TCP 计算通道；管理、文件与 Range 保留 HTTP。端点、逐请求 token、CURVE、credit 和截止时间的部署约定见 [可选 ZMQ 计算通道](compute-transport.md)。
+Client 默认从 HTTP 入口发现并验证可达 IPC/CURVE 计算通道；缺少能力时保留 HTTP，管理、文件与 Range 始终保留 HTTP。通道选择不改变 session、epoch、提交身份与对象所有权。端点、逐请求 token、CURVE、credit 和截止时间约定见 [自动计算通道](compute-transport.md)。
 
 配置 token 时使用 Bearer 鉴权；无 token 时仅接受 loopback peer、local Host 与同源浏览器请求。代码执行属于授权能力，实际远端网络、转发和鉴权部署应以独立远端报告为准。

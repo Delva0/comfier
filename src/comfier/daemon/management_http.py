@@ -7,15 +7,27 @@ import base64
 import hmac
 import ipaddress
 import logging
+import os
 import secrets
+import tempfile
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import aiohttp
 from aiohttp import web
 from multidict import CIMultiDict
 
+from comfier._codec import compress_pickle, has_lz4
 from comfier.files import FILE_CHUNK_SIZE, FILE_VERSION
-from comfier.protocol import PICKLE_CONTENT_TYPE
+from comfier.protocol import (
+    BINARY_FETCH_LZ4_VERSION,
+    LZ4_ACCEPT_HEADER,
+    LZ4_CODEC,
+    LZ4_PICKLE_CONTENT_TYPE,
+    PICKLE_CONTENT_TYPE,
+    PICKLE_LENGTH_HEADER,
+)
+from comfier.transport import retryable_transport_error
 
 from . import file_http
 from .supervisor import SupervisorError
@@ -28,6 +40,17 @@ def _headers(headers):
     removed = _HOP | {part.strip().lower() for part in headers.get("Connection", "").split(",")}
     return CIMultiDict((key, value) for key, value in headers.items()
                         if key.lower() not in removed)
+
+
+def _advertised_endpoint(bound, request):
+    if bound.startswith("tcp://"):
+        host, port = bound[6:].rsplit(":", 1)
+        if host in {"*", "0.0.0.0", "[::]"}:
+            hostname = urlsplit("//" + request.host).hostname
+            if hostname:
+                host = f"[{hostname}]" if ":" in hostname else hostname
+                return f"tcp://{host}:{port}"
+    return bound
 
 
 class ManagedFiles:
@@ -54,12 +77,15 @@ class ManagedFiles:
 
 def create_management_app(supervisor, *, token=None, service=None, auto_start=False,
                           management_limits=None, prepare_download_tools=False,
-                          compute_endpoints=(), curve_public_key=None, curve_secret_key=None):
+                          compute_endpoints=(), curve_public_key=None, curve_secret_key=None,
+                          auto_compute=True):
     compute = None
+    gateway_fallback = "local_ipc_unsupported" if auto_compute and os.name != "posix" else None
+    compute_token = token or secrets.token_urlsafe(32)
     if compute_endpoints:
         from .zmq import ZMQServer
 
-        compute = ZMQServer(supervisor, endpoints=compute_endpoints, token=token,
+        compute = ZMQServer(supervisor, endpoints=compute_endpoints, token=compute_token,
                             curve_public_key=curve_public_key, curve_secret_key=curve_secret_key)
     if service is not None and management_limits is not None:
         raise ValueError("Pass service or management_limits, not both")
@@ -99,7 +125,8 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
         except Exception as error:
             return web.json_response({"error": {
                 "code": getattr(error, "code", type(error).__name__), "message": str(error),
-                "details": getattr(error, "details", None)}}, status=400)
+                "details": getattr(error, "details", None)}},
+                status=503 if request.path == "/rpc" and retryable_transport_error(error) else 400)
 
     app = web.Application(middlewares=[authenticate], client_max_size=128 * 1024**2)
     app["supervisor"] = supervisor
@@ -120,9 +147,14 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
                       "node_metadata": supervisor.observed_nodes()}
             if compute is not None:
                 result["capabilities"]["compute_zmq"] = 1
-                result["compute_endpoints"] = [{"endpoint": item, "protocol": "zmq-v1",
+                result["compute_endpoints"] = [{"endpoint": _advertised_endpoint(item, request), "protocol": "zmq-v1",
+                    "server_id": compute.server_id,
                     "curve_server_key": compute.curve_public_key.decode() if compute.curve_public_key else None}
                     for item in compute.endpoints]
+                if not token:
+                    result["compute_token"] = compute_token
+            elif gateway_fallback:
+                result["compute_fallback"] = gateway_fallback
         elif method in {"file_roots", "file_stat", "file_remove"}:
             await supervisor.get_file_store()
             result = await getattr(file_http, method)(files, **params)
@@ -168,7 +200,7 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
     async def compute_rpc(request):
         # The HTTP public entry remains compatible when the private compute
         # channel is IPC. Files and native helper routes retain their HTTP path.
-        if supervisor.config.compute_transport != "zmq":
+        if supervisor._compute_transport is None:
             return await proxy(request)
         from comfier._zmq_protocol import METHODS
 
@@ -182,8 +214,16 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
         if method not in METHODS or not isinstance(params, dict):
             raise ValueError("Unknown compute RPC method or object params")
         result = await supervisor.runtime_request(method, **params)
+        if method in {"handshake", "resume"} and has_lz4():
+            result = {**result, "capabilities": {**result.get("capabilities", {}),
+                "binary_fetch_lz4": BINARY_FETCH_LZ4_VERSION}}
         if method == "fetch":
             if request.headers.get("Accept") == PICKLE_CONTENT_TYPE:
+                if request.headers.get(LZ4_ACCEPT_HEADER) == LZ4_CODEC:
+                    compressed = compress_pickle(result)
+                    if compressed is not None:
+                        return await _binary_response(request, compressed, LZ4_PICKLE_CONTENT_TYPE,
+                            headers={PICKLE_LENGTH_HEADER: str(len(result))})
                 return await _binary_response(request, result, PICKLE_CONTENT_TYPE)
             result = {"codec": "pickle", "data": base64.b64encode(result).decode("ascii")}
         return web.json_response({"result": result})
@@ -247,13 +287,35 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
 
     app.router.add_post("/manage", manage)
     app.router.add_post("/rpc", compute_rpc)
-    if compute is not None:
+    if compute is not None or (auto_compute and os.name == "posix"):
         async def compute_channel(app):
-            await compute.start()
+            nonlocal compute, gateway_fallback
+            directory = None
+            automatic = compute is None
             try:
+                try:
+                    if automatic:
+                        from .zmq import ZMQServer
+
+                        directory = tempfile.TemporaryDirectory(prefix="cf-gateway-")
+                        os.chmod(directory.name, 0o700)
+                        compute = ZMQServer(supervisor, token=compute_token,
+                            endpoints=["ipc://" + str(Path(directory.name) / "rpc.sock")])
+                    await compute.start()
+                except Exception as error:
+                    if not automatic:
+                        raise
+                    if compute is not None:
+                        await compute.close()
+                    compute = None
+                    gateway_fallback = "local_gateway_unavailable:" + type(error).__name__
+                    logging.getLogger(__name__).info("Local compute gateway unavailable; retaining HTTP")
                 yield
             finally:
-                await compute.close()
+                if compute is not None:
+                    await compute.close()
+                if directory is not None:
+                    directory.cleanup()
 
         app.cleanup_ctx.append(compute_channel)
     install_file_routes = file_http.install_file_routes

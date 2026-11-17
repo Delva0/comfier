@@ -160,10 +160,11 @@ async def test_supervisor_lifecycle_rpc_uses_the_selected_compute_channel(tmp_pa
                     ("file_invalidate", {"category": "checkpoints"})]
 
 
-def test_runtime_config_compute_transport_is_explicit(tmp_path):
-    assert RuntimeConfig(str(tmp_path)).compute_transport == "http"
+def test_runtime_config_defaults_to_auto_and_keeps_diagnostic_overrides(tmp_path):
+    assert RuntimeConfig(str(tmp_path)).compute_transport == "auto"
+    assert RuntimeConfig(str(tmp_path), compute_transport="http").compute_transport == "http"
     with pytest.raises(ValueError, match="compute_transport"):
-        RuntimeConfig(str(tmp_path), compute_transport="auto")
+        RuntimeConfig(str(tmp_path), compute_transport="unknown")
 
 
 @pytest.mark.parametrize("replace", [False, True])

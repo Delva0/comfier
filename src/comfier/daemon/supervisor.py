@@ -25,6 +25,7 @@ from pathlib import Path
 import aiohttp
 
 from comfier.files import FILE_CHUNK_SIZE, _io
+from comfier.transport import retryable_transport_error
 
 from .files import FileStore
 
@@ -53,11 +54,11 @@ class RuntimeConfig:
     transfer_limit: int = 128
     transfer_owner_limit: int = 8
     startup_timeout: float = 180
-    compute_transport: str = "http"
+    compute_transport: str = "auto"
 
     def __post_init__(self):
-        if self.compute_transport not in {"http", "zmq"}:
-            raise ValueError("compute_transport must be 'http' or 'zmq'")
+        if self.compute_transport not in {"auto", "http", "zmq"}:
+            raise ValueError("compute_transport must be 'auto', 'http' or 'zmq'")
         if self.compute_transport == "zmq" and os.name != "posix":
             raise ValueError("The supervised ZMQ worker currently requires Unix IPC")
         object.__setattr__(self, "comfy_root", str(Path(self.comfy_root).expanduser().absolute()))
@@ -123,6 +124,9 @@ class RuntimeSupervisor:
         self._token = secrets.token_urlsafe(32)
         self._client = None
         self._compute_transport = None
+        self._compute_retired = []
+        self._http_fetch = False
+        self._compute_fallback = "runtime_not_started"
         self._compute_directory = None
         self._monitor = self._reader = None
         self.file_store = None
@@ -153,6 +157,8 @@ class RuntimeSupervisor:
                 "state": self.state, "pid": self.process.pid if self.process and self.process.returncode is None else None,
                 "runtime_epoch": self.runtime_epoch, "installed": (Path(self.config.comfy_root) / "execution.py").is_file(),
                 "error": self.error, "runtime_bridge_digest": self.runtime_bridge_digest, "roots_generation": self.roots_generation,
+                "compute_channel": "zmq" if self._compute_transport is not None else "http",
+                "compute_fallback": self._compute_fallback,
                 "roots_state": "live" if self.state == "running" else "last-observed" if self._snapshot else "unknown",
                 "node_metadata": self.observed_nodes()}
 
@@ -190,7 +196,7 @@ class RuntimeSupervisor:
             return await self.info()
 
     async def runtime_rpc(self, method, params=None):
-        if self.config.compute_transport == "zmq":
+        if self._compute_transport is not None:
             return await self.runtime_request(method, **(params or {}))
         if self.endpoint is None or self.process is None or self.process.returncode is not None:
             raise SupervisorError("RuntimeStopped", "The runtime is stopped; call comfyui.start() explicitly")
@@ -204,10 +210,25 @@ class RuntimeSupervisor:
             return payload.get("result", payload)
 
     async def runtime_request(self, method, **params):
-        if self.config.compute_transport == "zmq":
-            if self._compute_transport is None or self.process is None or self.process.returncode is not None:
+        compute = self._compute_transport
+        if compute is not None and not (method == "fetch" and self._http_fetch):
+            if self.process is None or self.process.returncode is not None:
                 raise SupervisorError("RuntimeStopped", "The runtime is stopped; call comfyui.start() explicitly")
-            return await self._compute_transport.request(method, **params)
+            try:
+                return await compute.request(method, **params)
+            except Exception as error:
+                if method == "fetch" and (getattr(error, "details", None) or {}).get("code") == "ResponseTooLarge":
+                    # Only this read may change routes without session recovery.
+                    self._http_fetch = True
+                    return await self.runtime_request(method, **params)
+                if (self.config.compute_transport == "auto" and retryable_transport_error(error)
+                        and compute is self._compute_transport):
+                    self._compute_transport = None
+                    self._compute_retired.append(compute)
+                    self._compute_fallback = "compute_connection_lost"
+                # HTTP/ZMQ frontends expose transport uncertainty as retryable.
+                # The owning Client must resume before replaying an admission.
+                raise
         if method == "fetch":
             from comfier.protocol import PICKLE_CONTENT_TYPE
 
@@ -349,7 +370,8 @@ class RuntimeSupervisor:
         code = """import importlib.util,json,sys
 names=json.loads(sys.argv[1])
 missing=[name for name in names if importlib.util.find_spec(name) is None]
-print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
+print(json.dumps({'missing':missing,'python':list(sys.version_info[:3]),
+                  'zmq':importlib.util.find_spec('zmq') is not None}))
 """
         process = await asyncio.create_subprocess_exec(
             self.config.runtime_python, "-I", "-c", code,
@@ -361,7 +383,7 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                 raise SupervisorError("InvalidRuntimePython", "The selected runtime interpreter could not execute its environment check")
             info = json.loads(output)
             if info["python"] < [3, 11, 0] or info["missing"]:
-                requirements = "Python 3.11+, aiohttp and cloudpickle" + (" and the comfier[zmq] extra" if self.config.compute_transport == "zmq" else "")
+                requirements = "Python 3.11+, aiohttp and cloudpickle" + (" and pyzmq" if self.config.compute_transport == "zmq" else "")
                 raise SupervisorError("RuntimeEnvironmentIncomplete", "The selected runtime Python needs " + requirements + "; prepare it explicitly with comfyui.prepare_runtime(package=...) before start")
             return info
         except BaseException:
@@ -381,7 +403,7 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
         try:
             if not (Path(self.config.comfy_root) / "execution.py").is_file():
                 raise SupervisorError("ComfyUINotInstalled", "ComfyUI is not installed at comfy_root; install it explicitly before start")
-            await self._validate_environment()
+            environment = await self._validate_environment()
         except BaseException as error:
             self.state, self.error = "failed", str(error)
             raise
@@ -404,20 +426,45 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
         socket_fd = listener.fileno() if os.name == "posix" else None
         payload = {"config": asdict(self.config), "socket_fd": socket_fd, "port": port}
         options = {}
+        candidate = None
         if os.name == "posix":
             options = {"pass_fds": (listener.fileno(),), "start_new_session": True}
         else:
             listener.close()
         try:
-            if self.config.compute_transport == "zmq":
-                from comfier import ZMQTransport
+            selected = self.config.compute_transport == "zmq"
+            if self.config.compute_transport == "auto" and os.name == "posix" and environment.get("zmq"):
+                from comfier._zmq_protocol import dependency
 
-                self._compute_directory = tempfile.TemporaryDirectory(prefix="comfier-compute-")
-                os.chmod(self._compute_directory.name, 0o700)
-                compute_endpoint = "ipc://" + str(Path(self._compute_directory.name) / "rpc.sock")
-                payload["compute_endpoint"] = compute_endpoint
-                self._compute_transport = ZMQTransport(compute_endpoint, token=self._token, timeout=60)
-                await self._compute_transport.open()
+                try:
+                    dependency()
+                    selected = True
+                except ImportError:
+                    pass
+            self._compute_fallback = "explicit_http" if self.config.compute_transport == "http" else "zmq_unavailable"
+            if selected:
+                try:
+                    from comfier import ZMQTransport
+
+                    self._compute_directory = tempfile.TemporaryDirectory(prefix="cf-worker-")
+                    os.chmod(self._compute_directory.name, 0o700)
+                    compute_endpoint = "ipc://" + str(Path(self._compute_directory.name) / "rpc.sock")
+                    payload["compute_endpoint"] = compute_endpoint
+                    candidate = ZMQTransport(compute_endpoint, token=self._token,
+                        timeout=1 if self.config.compute_transport == "auto" else 60)
+                    await candidate.open()
+                    if self.config.compute_transport == "zmq":
+                        self._compute_transport, candidate = candidate, None
+                        self._compute_fallback = None
+                except Exception:
+                    if self.config.compute_transport != "auto":
+                        raise
+                    if candidate is not None:
+                        await candidate.close()
+                    candidate = None
+                    payload.pop("compute_endpoint", None)
+                    await self._close_compute()
+                    self._compute_fallback = "private_ipc_unavailable"
             self.process = await asyncio.create_subprocess_exec(
                 *args, cwd=self.config.workspace, env=env,
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
@@ -434,6 +481,19 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                     raise SupervisorError("RuntimeStartFailed", "Native runtime exited during startup; inspect its logs")
                 try:
                     info = await asyncio.wait_for(self.runtime_rpc("runtime_info", {"include_node_metadata": True}), timeout=1)
+                    if candidate is not None:
+                        try:
+                            probe = await candidate.request("runtime_info")
+                            if probe.get("epoch") != info["epoch"]:
+                                raise ConnectionError("Private compute runtime identity did not match")
+                        except Exception:
+                            await candidate.close()
+                            candidate = None
+                            self._compute_fallback = "private_ipc_unavailable"
+                        else:
+                            candidate.timeout = 60
+                            self._compute_transport, candidate = candidate, None
+                            self._compute_fallback = None
                     self.runtime_epoch = info["epoch"]
                     self._node_metadata = info.get("node_metadata")
                     self.state = "running"
@@ -443,6 +503,8 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                     await asyncio.sleep(0.1)
             raise SupervisorError("RuntimeStartTimeout", "The native runtime did not become ready before startup_timeout")
         except BaseException as error:
+            if candidate is not None:
+                await candidate.close()
             await self._terminate(interrupt=isinstance(error, asyncio.CancelledError))
             self.state, self.error = "failed", str(error)
             raise
@@ -468,8 +530,10 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
     async def _close_compute(self):
         transport, directory = self._compute_transport, self._compute_directory
         self._compute_transport = self._compute_directory = None
-        if transport is not None:
-            await transport.close()
+        retired, self._compute_retired = self._compute_retired, []
+        self._http_fetch = False
+        for item in [*retired, *([transport] if transport is not None else [])]:
+            await item.close()
         if directory is not None:
             directory.cleanup()
 

@@ -33,7 +33,7 @@ class ZMQTransport:
 
     def __init__(self, endpoint, *, token, timeout=60, max_inflight=16,
                  max_request_bytes=MAX_REQUEST_BYTES, max_response_bytes=MAX_RESPONSE_BYTES,
-                 curve_server_key=None, management_url=None):
+                 curve_server_key=None, management_url=None, expected_server_id=None):
         if not isinstance(token, str) or not token:
             raise ValueError("ZMQ compute requires a nonempty authentication token")
         curve_server_key = curve_key(curve_server_key, "curve_server_key")
@@ -43,6 +43,7 @@ class ZMQTransport:
         self.max_request_bytes = limit(max_request_bytes, "max_request_bytes")
         self.max_response_bytes = limit(max_response_bytes, "max_response_bytes")
         self._token, self.curve_server_key = token, curve_server_key
+        self.expected_server_id = expected_server_id
         self._context = self._socket = self._reader = None
         self._pending = {}
         self._credit = asyncio.Semaphore(self.max_inflight)
@@ -105,6 +106,8 @@ class ZMQTransport:
                     payload = json.loads(metadata)
                     if not isinstance(payload, dict):
                         raise ConnectionError("Expected a compute response object")
+                    if self.expected_server_id is not None and payload.get("server_id") != self.expected_server_id:
+                        raise ConnectionError("Compute server identity changed")
                     if "error" in payload:
                         error = (ConnectionError(payload["error"].get("message", "Compute request unavailable")) if payload.get("retryable")
                                  else error_from_wire(payload["error"]))

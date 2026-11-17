@@ -21,7 +21,7 @@ def dependency():
         import zmq
         import zmq.asyncio
     except ImportError:
-        raise ImportError("ZMQ compute requires the optional dependency: pip install 'comfier[zmq]'") from None
+        raise ImportError("The compute socket dependency is unavailable; reinstall comfier in this interpreter") from None
     return zmq
 
 

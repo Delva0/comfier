@@ -27,6 +27,7 @@ from comfier.protocol import (
     BINARY_FETCH_LZ4_VERSION,
     BINARY_FETCH_VERSION,
     CALL_OBSERVATION_VERSION,
+    PYTHON_INPUTS_VERSION,
     SUBMIT_BATCH_MAX_BYTES,
     SUBMIT_BATCH_MAX_CALLS,
     SUBMIT_BATCH_VERSION,
@@ -160,7 +161,8 @@ class NativeRuntime:
     def _handshake(self, session):
         capabilities = {"bounded_wait": True, "binary_fetch": BINARY_FETCH_VERSION,
                         "files": FILE_VERSION, "session_resume": 1, "whole_call_refs": 1,
-                        "submit_batch": SUBMIT_BATCH_VERSION, "call_observation": CALL_OBSERVATION_VERSION}
+                        "submit_batch": SUBMIT_BATCH_VERSION, "call_observation": CALL_OBSERVATION_VERSION,
+                        "python_inputs": PYTHON_INPUTS_VERSION}
         if has_lz4():
             capabilities["binary_fetch_lz4"] = BINARY_FETCH_LZ4_VERSION
         return {"session_id": session, "resume_token": self.session_tokens.get(session), "submission_window": self._submission_window(session), "epoch": self.epoch, "python": list(sys.version_info[:3]), "cloudpickle": cloudpickle.__version__, "nodes": self.adapter.node_types(), "session_ttl": self.session_ttl, "recovery_limits": {"max_sessions": self.recovery_policy.max_sessions, "max_objects": self.recovery_policy.max_objects, "max_call_records": self.recovery_policy.max_call_records, "submission_seconds": self.recovery_policy.submission_seconds, "expiry_running": self.recovery_policy.expiry_running}, "capabilities": capabilities, "file_limits": {"max_file_bytes": self.max_file_bytes, "chunk_bytes": FILE_CHUNK_SIZE}}

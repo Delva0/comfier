@@ -4,7 +4,7 @@ version = "0.5.0"
 description = "Python SDK for remote ComfyUI execution and management"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["aiohttp>=3.11", "cloudpickle>=3.1"]
+dependencies = ["aiohttp>=3.11", "cloudpickle>=3.1", "pyzmq>=27"]
 
 [project.scripts]
 comfier = "comfier.cli:main"
@@ -20,6 +20,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/comfier"]
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  "/.git/**", "/.local/**", "/.venv*/**", "/artifacts/**", "/dist/**", "/build/**",
+  "**/__pycache__/**", "**/.pytest_cache/**", "**/.ruff_cache/**", "**/*.egg-info/**",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -20,7 +20,7 @@ daemon 命令展开时会先检查可用的 `aria2c`，缺失时通过目标系�
 
 通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMFIER_TOKEN 或 --token，非 loopback 绑定必须有 token。
 
-计算通道默认 HTTP。显式配置 `compute_transport="zmq"` 或 `--compute-transport zmq` 可让 daemon 到 worker 使用私有 IPC，`--zmq-bind` 可重复开放 IPC/TCP gateway；管理、文件与原生 JSON 控制继续通过 HTTP。可选依赖、同一个 Client 的 HTTP companion 和远端 CURVE 部署见 [ZMQ 计算通道](compute-transport.md)。
+计算通道默认自动选择：本机验证私有 IPC，远端验证已部署的 CURVE 端点，缺少可达能力时保留 HTTP。daemon 到 worker 同样默认自动验证 IPC；管理、文件与原生 JSON 控制继续通过 HTTP。诊断覆盖、同 session 恢复和远端部署见 [自动计算通道](compute-transport.md)。
 
 ## 模型目录与代码更新分开
 

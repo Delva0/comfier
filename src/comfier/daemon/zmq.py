@@ -6,6 +6,7 @@ import asyncio
 import hmac
 import inspect
 import json
+import secrets
 import stat
 from pathlib import Path
 
@@ -22,6 +23,11 @@ from comfier._zmq_protocol import (
     positive,
 )
 from comfier.errors import SessionClosed, error_to_wire
+from comfier.transport import retryable_transport_error
+
+
+class _ResponseTooLarge(ValueError):
+    code = "ResponseTooLarge"
 
 
 class ZMQServer:
@@ -29,7 +35,8 @@ class ZMQServer:
 
     A single ROUTER may bind both endpoint kinds. Authentication is required on
     every request. Remote TCP additionally requires CURVE; the token is carried
-    inside that encrypted connection, never in endpoint discovery or logs.
+    inside that encrypted connection, never in endpoint strings or logs. Local
+    gateway credentials may be issued by the authenticated HTTP control plane.
     """
 
     def __init__(self, runtime, *, endpoints, token, timeout=60, max_inflight=64,
@@ -42,6 +49,7 @@ class ZMQServer:
         if bool(curve_public_key) != bool(curve_secret_key):
             raise ValueError("CURVE requires both server public and secret keys")
         self.runtime, self._token = runtime, token
+        self.server_id = secrets.token_urlsafe(24)
         self.timeout = positive(timeout, "timeout")
         self.max_inflight = limit(max_inflight, "max_inflight")
         self.max_request_bytes = limit(max_request_bytes, "max_request_bytes")
@@ -158,7 +166,7 @@ class ZMQServer:
                     if not isinstance(result, bytes):
                         raise TypeError("Binary fetch did not return bytes")
                     if len(result) > self.max_response_bytes:
-                        raise ValueError("Compute response exceeds the configured byte limit")
+                        raise _ResponseTooLarge("Compute response exceeds the configured byte limit")
                     response = [{"binary": "pickle"}, result]
                 else:
                     if method in {"handshake", "resume"}:
@@ -167,16 +175,18 @@ class ZMQServer:
                 await self._reply(identity, request_id, response)
         except Exception as error:
             response = {"error": error_to_wire(error)}
-            if isinstance(error, TimeoutError):
+            if (isinstance(error, TimeoutError) or (callable(getattr(self.runtime, "runtime_request", None))
+                                                   and retryable_transport_error(error))):
                 response["retryable"] = True
             await self._reply(identity, request_id, [response])
         finally:
             self._counts[lane] -= 1
 
     async def _reply(self, identity, request_id, response):
-        metadata = json.dumps(response[0], separators=(",", ":")).encode()
+        metadata = json.dumps({**response[0], "server_id": self.server_id}, separators=(",", ":")).encode()
         if len(metadata) + sum(map(len, response[1:])) > self.max_response_bytes:
-            metadata = b'{"error":{"code":"ResponseTooLarge","message":"Compute response exceeds the configured byte limit"}}'
+            metadata = json.dumps({"server_id": self.server_id, "error": {
+                "code": "ResponseTooLarge", "message": "Compute response exceeds the configured byte limit"}}).encode()
             response = [None]
         try:
             async with asyncio.timeout(self.timeout):

@@ -21,7 +21,7 @@ class RecoverableRuntime(FakeRuntime):
         self.handshakes += 1
         value = await super().handshake(session_id)
         return {**value, "session_id": session_id, "resume_token": "original-authorization",
-                "capabilities": {"session_resume": 1},
+                "capabilities": {**value.get("capabilities", {}), "session_resume": 1},
                 "submission_window": {"token": "original-window", "expires_at": time.time() + 60}}
 
     async def resume(self, session_id, resume_token, epoch):

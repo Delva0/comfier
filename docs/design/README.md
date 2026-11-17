@@ -6,10 +6,10 @@ Comfier 用一个 Python 入口管理远端实例并调用原生 ComfyUI。管�
 客户端 Python
   模块 API / Client / Files / Call / Graph / refs
   HF/Civitai/registry 纯查询直接访问上游
-                  │ HTTP 管理/文件；可选 ZMQ 计算 gateway
+                  │ HTTP 管理/文件；自动验证可达计算 gateway
                   ▼
 带外 daemon：配置、生命周期、Operation、bash、插件、模型、文件 I/O
-                  │ 默认 HTTP 计算；显式可选 IPC 计算；文件/辅助路由 HTTP
+                  │ 自动验证私有 IPC，HTTP 兜底；文件/辅助路由 HTTP
                   ▼
 带内 ComfyUI 子进程：一个 native worker、执行器、cache、计算 session、对象
 ```
@@ -24,7 +24,7 @@ Comfier 用一个 Python 入口管理远端实例并调用原生 ComfyUI。管�
 | [Runtime](runtime.md) | [service](../../src/comfier/daemon/service.py)、[adapter](../../src/comfier/daemon/adapter.py) | 依赖 admission、原生计算、cache 与观察 |
 | [所有权与恢复](ownership.md) | [refs](../../src/comfier/refs.py)、[objects](../../src/comfier/daemon/objects.py) | Owned/borrowed、GC、会话恢复与失效 |
 | [协议](protocol.md) | [transport](../../src/comfier/transport.py)、[管理 HTTP](../../src/comfier/daemon/management_http.py)、[计算 HTTP](../../src/comfier/daemon/http.py) | 分层握手、RPC、二进制、去重与续传 |
-| [可选 ZMQ 计算通道](compute-transport.md) | [ZMQ SDK](../../src/comfier/_zmq_transport.py)、[ZMQ server](../../src/comfier/daemon/zmq.py) | 同协议 IPC/TCP、显式内部通道、HTTP companion 与 CURVE |
+| [自动计算通道](compute-transport.md) | [自动选路](../../src/comfier/_auto_transport.py)、[ZMQ server](../../src/comfier/daemon/zmq.py) | 发现和身份验证、私有 IPC、HTTP 恢复与 CURVE |
 | [Python artifacts](python-artifacts.md) | [code](../../src/comfier/code.py)、[python_node](../../src/comfier/daemon/python_node.py) | callable/source/package 传输与正常 imports |
 | [文件 I/O](files.md) | [客户端 files](../../src/comfier/files.py)、[FileStore](../../src/comfier/daemon/files.py)、[file_http](../../src/comfier/daemon/file_http.py) | 原生 roots、显式流、自动字节续传与持久文件 |
 | [运行与开发](development.md) | [CLI](../../src/comfier/cli/)、[pyproject](../../pyproject.toml) | 必要启动入口、示例、开发和冻结验证 |
