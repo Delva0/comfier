@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import inspect
+import json
 import threading
 import weakref
 from concurrent.futures import Future
@@ -60,6 +61,47 @@ def _native_path(path):
     if parts.path.split("/", 2)[1] in {"manage", "rpc", "files", "prompt", "history", "queue", "ws"}:
         raise ValueError("Use the dedicated SDK interface for management, compute, files or prompt routes")
     return path
+
+
+async def _native_failure(response):
+    """Preserve a bounded plugin error without adding request credentials."""
+    byte_limit, message_limit = 16 * 1024, 2048
+    details = {"status": response.status}
+    try:
+        try:
+            body = await response.content.readexactly(byte_limit + 1)
+        except asyncio.IncompleteReadError as error:
+            body = error.partial
+        if len(body) > byte_limit:
+            details.update(body_state="too_large", body_limit=byte_limit)
+            explanation = f"native control error body exceeds {byte_limit} bytes"
+        elif not body.strip():
+            details["body_state"] = "empty"
+            explanation = "native control error body is empty"
+        else:
+            try:
+                payload = json.loads(body)
+            except (ValueError, RecursionError):
+                details["body_state"] = "invalid_json"
+                explanation = "native control error body is not valid JSON"
+            else:
+                value = payload.get("error", payload) if isinstance(payload, dict) else payload
+                details.update(body_state="json", error=value)
+                explanation = value
+                if isinstance(value, dict):
+                    explanation = value.get("message", value.get("error", value))
+                if not isinstance(explanation, str):
+                    explanation = json.dumps(explanation, ensure_ascii=False, separators=(",", ":"))
+                if len(explanation) > message_limit:
+                    explanation = explanation[:message_limit - 1] + "…"
+                    details["message_truncated"] = True
+    except (aiohttp.ClientError, TimeoutError) as error:
+        details.update(body_state="unavailable", body_error=type(error).__name__)
+        explanation = "native control error body could not be read"
+    failure = aiohttp.ClientResponseError(response.request_info, response.history,
+        status=response.status, message=f"{response.reason}: {explanation}", headers=response.headers)
+    failure.details = details
+    return failure
 
 
 async def _post(session, url, method, params, *, retry_http=False, binary=False, lz4=False,
@@ -295,10 +337,8 @@ class HTTPTransport:
         # after a timeout, redirect, HTTP failure or disconnected response.
         async with self._session.request(method, self.url[:-4] + "/native" + path, params=params,
                                          json=json, allow_redirects=False) as response:
-            response.raise_for_status()
             if not 200 <= response.status < 300:
-                raise aiohttp.ClientResponseError(response.request_info, response.history,
-                    status=response.status, message=response.reason, headers=response.headers)
+                raise await _native_failure(response)
             if response.status == 204 or not (await response.read()).strip():
                 return None
             try:

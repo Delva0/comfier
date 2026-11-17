@@ -11,7 +11,7 @@ async with comani.Client(url, token=token):
 
 `remote.comfyui.request()` 与模块代理使用同一个 Client。路径是原生绝对路径；SDK 透明加上 `/native`，沿当前 daemon 的 HTTP 认证通道访问。query 用 `params`，JSON body 用 `json`。显式 ZMQ Client 使用其 `management_url` HTTP companion；没有 companion 时不支持此接口。
 
-成功返回原 JSON；204 或空 body 返回 `None`，非空非 JSON 的成功响应报 `ValueError`。HTTP 失败保留 `aiohttp.ClientResponseError` 的 status/message；不自动重试或跟随重定向。写请求超时不代表未执行，调用者应先查询原生状态再决定下一步。接口拒绝外站 URL、内嵌 query/fragment、路径跳转和 Comani 管理/计算/文件保留路径。
+成功返回原 JSON；204 或空 body 返回 `None`，非空非 JSON 的成功响应报 `ValueError`。HTTP 失败仍抛 `aiohttp.ClientResponseError` 并保留 status；最多读取 16 KiB 错误正文，合法 JSON 的 `error`（没有该字段时为完整 JSON 值）保存在异常的 `details["error"]`，message 附带最多 2048 字符的插件说明。空正文、非 JSON、超限或读取失败通过 `details["body_state"]` 区分；超限时不保留正文。不自动重试或跟随重定向。写请求超时不代表未执行，调用者应先查询原生状态再决定下一步。接口拒绝外站 URL、内嵌 query/fragment、路径跳转和 Comani 管理/计算/文件保留路径。
 
 worker 在原生启动完成后，以 aiohttp 公共 `add_subapp` 将 `PromptServer.routes` 挂到同端口 `/native`；父应用认证和原生 Request.app、路径参数、query/body、响应状态及中间件保持。挂载发生在应用冻结前。没有第二个监听端口；停止 worker 后这些路由也不可用。
 
