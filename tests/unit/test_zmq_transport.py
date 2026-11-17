@@ -7,10 +7,10 @@ import weakref
 
 import pytest
 
-from comani import Client, ZMQTransport
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
-from comani.daemon.zmq import ZMQServer
-from comani.errors import Expired, RemoteError, SessionClosed
+from comfier import Client, ZMQTransport
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier.daemon.zmq import ZMQServer
+from comfier.errors import Expired, RemoteError, SessionClosed
 
 zmq = pytest.importorskip("zmq")
 
@@ -235,7 +235,7 @@ async def test_one_request_deadline_does_not_cancel_another_sender(tmp_path):
 
 
 async def test_internal_send_reset_resumes_the_original_session_and_preserves_its_terminal_error(tmp_path):
-    from comani.client import _ConnectionRecovery
+    from comfier.client import _ConnectionRecovery
 
     class ClosedRuntime(Runtime):
         def __init__(self):

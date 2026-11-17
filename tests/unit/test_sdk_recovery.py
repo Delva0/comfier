@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-from comani import Client, Expired, InProcessTransport, SessionClosed
+from comfier import Client, Expired, InProcessTransport, SessionClosed
 
 from ._helpers import eventually
 from .conftest import FakeRuntime

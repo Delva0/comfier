@@ -9,8 +9,8 @@ import weakref
 import pytest
 from aiohttp import ClientSession
 
-from comani import Client, Expired, PackageConflict, RemoteError, RemoteRef, SessionClosed
-from comani.code import prepare_code
+from comfier import Client, Expired, PackageConflict, RemoteError, RemoteRef, SessionClosed
+from comfier.code import prepare_code
 
 pytestmark = pytest.mark.native
 
@@ -238,14 +238,14 @@ async def test_package_normal_imports_globals_and_conflicts(native_http, tmp_pat
     import stat
 
     _, url = native_http
-    package = tmp_path / "comani_package_a_fixture"
+    package = tmp_path / "comfier_package_a_fixture"
     package.mkdir()
     (package / "__init__.py").write_text("from .ops import apply\n")
     (package / "state.py").write_text("count = 0\n")
     (package / "helpers.py").write_text("OFFSET = 2\n")
     (package / "ops.py").write_text(
         "import asyncio\n"
-        "from comani_package_a_fixture import state\n"  # normal absolute import
+        "from comfier_package_a_fixture import state\n"  # normal absolute import
         "from .helpers import OFFSET\n"              # normal relative import
         "async def apply(value):\n"
         "    state.count += 1\n"
@@ -260,7 +260,7 @@ async def test_package_normal_imports_globals_and_conflicts(native_http, tmp_pat
             os.utime(path, (1_700_000_000, 1_700_000_000))
             path.chmod(path.stat().st_mode ^ stat.S_IXUSR)
         assert prepare_code(source=package, entry="ops:apply").artifact_id == original_hash
-        second = remote.python(source=package, entry="comani_package_a_fixture.ops:apply",
+        second = remote.python(source=package, entry="comfier_package_a_fixture.ops:apply",
                                inputs={"value": 4}, return_call=True)
         assert await (await second.output()).fetch() == {"value": 6, "count": 2}
     async with Client(url) as remote:
@@ -298,7 +298,7 @@ async def test_native_prompt_history_ui_events_and_hidden_prompt(native_http, tm
             "width": 64, "height": 64, "batch_size": 1, "color": 0x123456,
         }},
         "save": {"class_type": "SaveImage", "inputs": {
-            "images": ["image", 0], "filename_prefix": "comani-integration",
+            "images": ["image", 0], "filename_prefix": "comfier-integration",
         }},
     }
     try:

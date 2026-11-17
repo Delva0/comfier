@@ -7,10 +7,10 @@ import cloudpickle
 import pytest
 from aiohttp import ClientPayloadError, ClientSession, web
 
-from comani import Client, RemoteError
-from comani._codec import LZ4_MIN_BYTES, decompress_pickle
-from comani.daemon.http import create_app
-from comani.protocol import (
+from comfier import Client, RemoteError
+from comfier._codec import LZ4_MIN_BYTES, decompress_pickle
+from comfier.daemon.http import create_app
+from comfier.protocol import (
     LZ4_ACCEPT_HEADER,
     LZ4_CODEC,
     LZ4_PICKLE_CONTENT_TYPE,
@@ -30,7 +30,7 @@ def lz4_frame():
 
 
 async def test_missing_optional_server_codec_keeps_handshake_and_fetch_working(monkeypatch):
-    monkeypatch.setattr("comani._codec._lz4", None)
+    monkeypatch.setattr("comfier._codec._lz4", None)
     runtime = FetchRuntime()
     async with serve(create_app(runtime)) as url:
         async with Client(url) as client:
@@ -58,7 +58,7 @@ async def test_unknown_codec_or_missing_binary_capability_uses_identity(capabili
         requests.append(request.headers.get(LZ4_ACCEPT_HEADER))
         if request.headers.get("Accept") == PICKLE_CONTENT_TYPE:
             return web.Response(body=cloudpickle.dumps(123), content_type=PICKLE_CONTENT_TYPE)
-        from comani.protocol import pack_pickle
+        from comfier.protocol import pack_pickle
 
         return web.json_response({"result": pack_pickle(123)})
 
@@ -68,7 +68,7 @@ async def test_unknown_codec_or_missing_binary_capability_uses_identity(capabili
 
 
 async def test_missing_optional_client_codec_does_not_request_lz4(monkeypatch):
-    monkeypatch.setattr("comani._codec._lz4", None)
+    monkeypatch.setattr("comfier._codec._lz4", None)
     requests = []
 
     async def fetch(request):
@@ -237,6 +237,6 @@ async def test_truncated_http_entity_stays_a_payload_error_before_lz4_decode(lz4
 
 
 def test_missing_decoder_is_an_explicit_error(monkeypatch):
-    monkeypatch.setattr("comani._codec._lz4", None)
+    monkeypatch.setattr("comfier._codec._lz4", None)
     with pytest.raises(RemoteError, match="local decoder"):
         decompress_pickle(b"not decoded", "10")

@@ -18,7 +18,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 MODEL = "moss_image_sft_int8_convrot.safetensors"
 CLIP = "qwen3.5_9b_int8_convrot.safetensors"
@@ -57,9 +57,9 @@ async def main(args):
               "phases": []}
     stages = report["phases"]
     try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             started = time.perf_counter()
-            info = await comani.comfyui.start()
+            info = await cf.comfyui.start()
             required = {"CreateBoundingBoxes", "MOSSImageLayoutPrompt", "SkipLayerGuidanceDiTSimple",
                         "EmptyFlux2LatentImage"}
             if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
@@ -68,36 +68,36 @@ async def main(args):
             if args.download_models:
                 for category, repository, path, filename in WEIGHTS if args.hires else WEIGHTS[:3]:
                     started = time.perf_counter()
-                    source = await comani.models.resolve({"repo_id": repository, "path": path})
+                    source = await cf.models.resolve({"repo_id": repository, "path": path})
                     artifact, = source.files
-                    await comani.models.download(artifact, category=category, path=filename, reuse=True)
+                    await cf.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": filename, "sha256": artifact.sha256,
                                    "revision": source.revision, "seconds": time.perf_counter() - started})
             started = time.perf_counter()
-            clip = comani.node("CLIPLoader", clip_name=CLIP, type="moss_image", device="default")
-            vae = comani.node("VAELoader", vae_name=VAE)
-            base_model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-            model = comani.node("SkipLayerGuidanceDiTSimple", model=base_model, double_layers="",
+            clip = cf.node("CLIPLoader", clip_name=CLIP, type="moss_image", device="default")
+            vae = cf.node("VAELoader", vae_name=VAE)
+            base_model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+            model = cf.node("SkipLayerGuidanceDiTSimple", model=base_model, double_layers="",
                                 single_layers="22", start_percent=0.0, end_percent=0.5)
-            preview, _bounds, elements = comani.node("CreateBoundingBoxes", width=args.width,
+            preview, _bounds, elements = cf.node("CreateBoundingBoxes", width=args.width,
                                                     height=args.height, editor_state=[], bboxes=json.dumps(boxes))
-            layout = comani.node("MOSSImageLayoutPrompt", prompt=args.prompt, element=elements,
+            layout = cf.node("MOSSImageLayoutPrompt", prompt=args.prompt, element=elements,
                                  width=args.width, height=args.height, character_boxes=args.character_boxes)
-            positive = comani.node("CLIPTextEncode", clip=clip, text=layout)
-            negative = comani.node("CLIPTextEncode", clip=clip, text=args.negative)
-            latent = comani.node("EmptyFlux2LatentImage", width=args.width, height=args.height, batch_size=1)
+            positive = cf.node("CLIPTextEncode", clip=clip, text=layout)
+            negative = cf.node("CLIPTextEncode", clip=clip, text=args.negative)
+            latent = cf.node("EmptyFlux2LatentImage", width=args.width, height=args.height, batch_size=1)
             if args.hires:
-                hires_model = comani.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=0.9)
+                hires_model = cf.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=0.9)
             await asyncio.gather(model, positive, negative, latent)
             stages.append({"phase": "load_layout_encode", "seconds": time.perf_counter() - started})
             (args.output_dir / "layout-prompt.json").write_text(await (await layout).fetch(), encoding="utf-8")
             for index in range(args.count):
                 seed = args.seed + index
                 started = time.perf_counter()
-                samples = comani.node("KSampler", model=model, positive=positive, negative=negative,
+                samples = cf.node("KSampler", model=model, positive=positive, negative=negative,
                                       latent_image=latent, seed=seed, steps=args.steps, cfg=3.0,
                                       sampler_name="er_sde", scheduler="simple", denoise=1.0)
-                image = comani.node("VAEDecode", samples=samples, vae=vae)
+                image = cf.node("VAEDecode", samples=samples, vae=vae)
                 await image
                 stages.append({"phase": "sample_decode", "seed": seed, "seconds": time.perf_counter() - started})
                 outputs = {"base": image}
@@ -105,22 +105,22 @@ async def main(args):
                     outputs["boxes"] = preview
                 if args.hires:
                     started = time.perf_counter()
-                    enlarged = comani.node("ImageScaleBy", image=image, upscale_method="lanczos", scale_by=1.5)
-                    encoded = comani.node("VAEEncode", pixels=enlarged, vae=vae)
-                    refined = comani.node("KSampler", model=hires_model, positive=positive, negative=negative,
+                    enlarged = cf.node("ImageScaleBy", image=image, upscale_method="lanczos", scale_by=1.5)
+                    encoded = cf.node("VAEEncode", pixels=enlarged, vae=vae)
+                    refined = cf.node("KSampler", model=hires_model, positive=positive, negative=negative,
                                           latent_image=encoded, seed=args.hires_seed + index, steps=8, cfg=1.8,
                                           sampler_name="er_sde", scheduler="simple", denoise=0.4)
-                    finished = comani.node("VAEDecode", samples=refined, vae=vae)
+                    finished = cf.node("VAEDecode", samples=refined, vae=vae)
                     await finished
                     outputs["hires"] = finished
                     stages.append({"phase": "hires", "seed": seed, "seconds": time.perf_counter() - started})
                 for name, output in outputs.items():
-                    saved = comani.node("SaveImage", images=output,
-                                        filename_prefix=f"comani/moss/{name}", return_call=True)
+                    saved = cf.node("SaveImage", images=output,
+                                        filename_prefix=f"comfier/moss/{name}", return_call=True)
                     file = await saved.file()
                     started = time.perf_counter()
                     target = args.output_dir / f"seed{seed}-{name}.png"
-                    await comani.files.download(file, target)
+                    await cf.files.download(file, target)
                     stages.append({"phase": "download", "name": name, "bytes": file.size,
                                    "seconds": time.perf_counter() - started})
                     print(target, flush=True)
@@ -133,7 +133,7 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--prompt", default=PROMPT)
     parser.add_argument("--negative", default="")
     parser.add_argument("--boxes", type=Path, help="pixel-box list accepted by core CreateBoundingBoxes")

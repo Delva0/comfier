@@ -4,17 +4,17 @@ from pathlib import Path
 import pytest
 from aiohttp import web
 
-from comani.daemon import NativeRuntime
-from comani.daemon.http import create_app
+from comfier.daemon import NativeRuntime
+from comfier.daemon.http import create_app
 
 PROJECT = Path(__file__).resolve().parents[2]
-COMFY_ROOT = Path(os.environ.get("COMANI_COMFY_ROOT", PROJECT.parent / "ComfyUI"))
+COMFY_ROOT = Path(os.environ.get("COMFIER_COMFY_ROOT", PROJECT.parent / "ComfyUI"))
 
 
 @pytest.fixture
 async def native_http(request):
     if not (COMFY_ROOT / "execution.py").is_file():
-        pytest.skip("Set COMANI_COMFY_ROOT to the supported ComfyUI checkout")
+        pytest.skip("Set COMFIER_COMFY_ROOT to the supported ComfyUI checkout")
     options = getattr(request, "param", None)
     options = options if isinstance(options, dict) else {"token": options}
     runtime = NativeRuntime(COMFY_ROOT, cpu=True, custom_nodes=False,

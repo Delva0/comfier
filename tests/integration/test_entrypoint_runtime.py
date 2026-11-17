@@ -11,15 +11,15 @@ from pathlib import Path
 import pytest
 from aiohttp import ClientSession
 
-from comani import Client
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor, SupervisorError
+from comfier import Client
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor, SupervisorError
 
 PROJECT = Path(__file__).resolve().parents[2]
-COMFY = Path(os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI"))
+COMFY = Path(os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI"))
 SDK_PYTHON = PROJECT / ".venv-sdk/bin/python"
-CONSOLE = next((path for path in (PROJECT / ".venv-sdk/bin/comani",
-                                     PROJECT / ".venv-wheel/bin/comani") if path.is_file()),
-               PROJECT / ".venv-sdk/bin/comani")
+CONSOLE = next((path for path in (PROJECT / ".venv-sdk/bin/comfier",
+                                     PROJECT / ".venv-wheel/bin/comfier") if path.is_file()),
+               PROJECT / ".venv-sdk/bin/comfier")
 TARGET = PROJECT / ".local/management-implementation/runtime-linked-env/bin/python"
 
 
@@ -30,7 +30,7 @@ def runtime_python():
 @pytest.mark.skipif(not SDK_PYTHON.is_file() or not CONSOLE.is_file(), reason="Torch-free SDK environment required")
 def test_module_and_console_help_and_effective_config_match(tmp_path):
     env = dict(os.environ, PYTHONPATH=str(PROJECT / "src"))
-    commands = [[str(SDK_PYTHON), "-m", "comani"], [str(CONSOLE)]]
+    commands = [[str(SDK_PYTHON), "-m", "comfier"], [str(CONSOLE)]]
     outputs = []
     for command in commands:
         result = subprocess.run([*command, "--help"], cwd=tmp_path, env=env,
@@ -53,7 +53,7 @@ async def test_torch_free_management_entry_serves_bash_and_files_without_startin
     with socket.socket() as reserve:
         reserve.bind(("127.0.0.1", 0))
         port = reserve.getsockname()[1]
-    command = ([str(SDK_PYTHON), "-m", "comani"] if entry == "module" else [str(CONSOLE)])
+    command = ([str(SDK_PYTHON), "-m", "comfier"] if entry == "module" else [str(CONSOLE)])
     env = dict(os.environ, PYTHONPATH=str(PROJECT / "src"))
     child = await asyncio.create_subprocess_exec(
         *command, "daemon", "--no-start", "--comfy-root", str(tmp_path / "absent"),
@@ -112,7 +112,7 @@ async def test_private_worker_cleanup_and_cold_hot_custom_node_roots(tmp_path):
     try:
         cold = list((await supervisor.get_file_store()).folder_paths.get_folder_paths("custom_nodes"))
         assert set(map(str, roots)).issubset(cold)
-        await supervisor.configure(comfy_args=[*arguments, "--invalid-comani-native-flag"])
+        await supervisor.configure(comfy_args=[*arguments, "--invalid-comfier-native-flag"])
         with pytest.raises(SupervisorError, match="exited"):
             await supervisor.start()
         assert supervisor.process.returncode is not None and supervisor.endpoint is None

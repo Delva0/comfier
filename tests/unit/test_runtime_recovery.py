@@ -2,7 +2,7 @@
 
 import math
 
-from comani.daemon.service import NativeRuntime
+from comfier.daemon.service import NativeRuntime
 
 
 def test_call_metadata_projects_only_safe_native_ui_without_prompt_or_repr():

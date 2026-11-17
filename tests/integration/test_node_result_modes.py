@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from comani import Client, Expired, InProcessTransport, InvalidReference, RemoteError
+from comfier import Client, Expired, InProcessTransport, InvalidReference, RemoteError
 
 pytestmark = pytest.mark.native
 

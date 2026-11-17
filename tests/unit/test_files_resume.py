@@ -9,9 +9,9 @@ from contextlib import asynccontextmanager
 import pytest
 from aiohttp import ClientSession, web
 
-from comani import Client, FileTransferExpired, RemoteError
-from comani.daemon.http import create_app
-from comani.files import _FileTransfer
+from comfier import Client, FileTransferExpired, RemoteError
+from comfier.daemon.http import create_app
+from comfier.files import _FileTransfer
 
 from .test_binary_fetch import serve
 from .test_files_api import FileRuntime
@@ -399,7 +399,7 @@ async def test_partial_tampering_is_rejected_instead_of_publishing_stale_digest(
     source = source_file(tmp_path)
     async with resumable(tmp_path) as (runtime, _, url):
         async with Client(url, token="file-token") as client:
-            from comani.daemon.files import FileChangedError
+            from comfier.daemon.files import FileChangedError
 
             root, = runtime._files.roots(directory="input")
             upload = runtime._files.begin_upload(root, "tampered.bin", size=4)
@@ -557,7 +557,7 @@ async def test_cancel_interrupts_half_open_append_and_queued_commit_cannot_reviv
 async def test_cancel_drains_blocked_write_without_blocking_other_transfers(tmp_path, monkeypatch):
     import threading
 
-    from comani.daemon.files import Upload
+    from comfier.daemon.files import Upload
 
     entered, release = threading.Event(), threading.Event()
     original = Upload.write
@@ -594,7 +594,7 @@ async def test_cancel_drains_blocked_write_without_blocking_other_transfers(tmp_
 async def test_commit_admitted_before_cancel_retains_publication_and_receipt(tmp_path, monkeypatch):
     import threading
 
-    from comani.daemon.files import Upload
+    from comfier.daemon.files import Upload
 
     entered, release = threading.Event(), threading.Event()
     original = Upload.commit

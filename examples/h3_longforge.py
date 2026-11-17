@@ -33,7 +33,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 NODE_ARCHIVE = {
     "url": "https://civitai.com/api/download/models/3467080?fileId=3370455",
@@ -60,29 +60,29 @@ WEIGHTS = (
 
 async def prepare_runtime(args, *, prepare=False, download=True):
     if prepare and args.install_plugin:
-        installed = await comani.plugins.list()
+        installed = await cf.plugins.list()
         missing = {name: path for name, path in NODE_ARCHIVE["packages"].items() if not any(
             Path(plugin.path).name.casefold() == name.casefold() for plugin in installed)}
-        info = await comani.comfyui.info()
-        dependencies = await comani.bash.run(shlex.join([info.runtime_python, "-c",
+        info = await cf.comfyui.info()
+        dependencies = await cf.bash.run(shlex.join([info.runtime_python, "-c",
             "import importlib.metadata,importlib.util,shutil; "
             "assert int(importlib.metadata.version('filelock').split('.')[0]) >= 3; "
             "assert shutil.which('ffmpeg') or importlib.util.find_spec('imageio_ffmpeg')"]), check=False)
         if missing or dependencies.exit_code:
-            await comani.comfyui.stop()
+            await cf.comfyui.stop()
         if missing:
-            await comani.plugins.install_archive({**NODE_ARCHIVE, "packages": missing})
+            await cf.plugins.install_archive({**NODE_ARCHIVE, "packages": missing})
         if dependencies.exit_code:
-            await comani.bash.run(shlex.join([
+            await cf.bash.run(shlex.join([
                 info.runtime_python, "-m", "pip", "install", "filelock>=3", "imageio-ffmpeg"]))
-    info = await comani.comfyui.start()
+    info = await cf.comfyui.start()
     required = {"LongForgeProject", "LongForgeVideoSettings", "LongForgeSampling", "LongForgeRender"}
     if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
         raise ValueError(f"Install original LongForge NodePack first; missing: {sorted(missing)}")
     if prepare and download and args.download_models:
-        sources = await asyncio.gather(*(comani.models.resolve({"repo_id": repo, "path": path})
+        sources = await asyncio.gather(*(cf.models.resolve({"repo_id": repo, "path": path})
                                          for _, repo, path in WEIGHTS))
-        downloads = await asyncio.gather(*(comani.models.download(
+        downloads = await asyncio.gather(*(cf.models.download(
             source.files[0], category=category, path=Path(path).name, reuse=True)
             for (category, _, path), source in zip(WEIGHTS, sources)), return_exceptions=True)
         for result in downloads:
@@ -108,18 +108,18 @@ async def edit_project(args, project):
     def save(name, value):
         (args.output_dir / f"{name}.json").write_text(json.dumps(value, indent=2), encoding="utf-8")
 
-    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+    async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
         # Inspection and edit preflight need no weights. Acquisition follows
         # successful revision/trim checks, before the one replacement render.
         await prepare_runtime(args, prepare=True, download=False)
-        status = await comani.comfyui.request("GET", "/longforge_unified/project", params={"name": project})
+        status = await cf.comfyui.request("GET", "/longforge_unified/project", params={"name": project})
         save("before-project", status)
         if status.get("broken") or not status.get("head"):
             raise ValueError("Choose an intact saved project before inspecting or editing")
         revision = status["head"]["revision"]
         if args.inspect:
             for scene in range(1, status["head"]["cursor"] + 1):
-                value = await comani.comfyui.request("GET", "/longforge_unified/scene", params={
+                value = await cf.comfyui.request("GET", "/longforge_unified/scene", params={
                     "name": project, "index": scene, "revision": revision})
                 save(f"scene-{scene}", value)
             print(f"Inspect before-project.json and scene-*.json in {args.output_dir}", flush=True)
@@ -127,7 +127,7 @@ async def edit_project(args, project):
         if edit["revision"] != revision:
             raise ValueError("Project revision changed; inspect again before replacing a scene")
         selected = edit["scene"]
-        before = await comani.comfyui.request("GET", "/longforge_unified/scene", params={
+        before = await cf.comfyui.request("GET", "/longforge_unified/scene", params={
             "name": project, "index": selected, "revision": revision})
         save("before-scene", before)
         if before.get("missing") or before.get("damaged") or not before.get("export_trim"):
@@ -156,19 +156,19 @@ async def edit_project(args, project):
                 or settings.get("refmods", {}).get("enabled", False)):
             raise ValueError("This small example requires saved base settings, HQ OFF and RefMods disabled")
         await prepare_runtime(args, prepare=True)
-        video = comani.node("LongForgeVideoSettings", **settings["video"])
-        sampling = comani.node("LongForgeSampling", **settings["sampling"])
-        model = comani.node("UNETLoader", unet_name=args.model, weight_dtype="default")
-        clip = comani.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
-        video_vae = comani.node("VAELoader", vae_name=args.video_vae)
-        audio_vae = comani.node("VAELoader", vae_name=args.audio_vae)
+        video = cf.node("LongForgeVideoSettings", **settings["video"])
+        sampling = cf.node("LongForgeSampling", **settings["sampling"])
+        model = cf.node("UNETLoader", unet_name=args.model, weight_dtype="default")
+        clip = cf.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
+        video_vae = cf.node("VAELoader", vae_name=args.video_vae)
+        audio_vae = cf.node("VAELoader", vae_name=args.audio_vae)
         for stamp, action in enumerate(("REPLACE SELECTED", "EXPORT FILM"), 1):
-            job = comani.node("LongForgeProject", project_name=project, action=action,
+            job = cf.node("LongForgeProject", project_name=project, action=action,
                               run_mode="ONE SCENE", scene_data=json.dumps(story), selected_scene=selected,
                               run_stamp=stamp, export_when_done=False)
             if action == "REPLACE SELECTED" and (await (await job).fetch())["head"]["revision"] != revision:
                 raise ValueError("Project changed during edit preparation; no replacement submitted")
-            rendered = comani.node(
+            rendered = cf.node(
                 "LongForgeRender", job=job, video_settings=video, sampling=sampling,
                 model=model, clip=clip, video_vae=video_vae, audio_vae=audio_vae,
                 preview_new_scene=True, export_crf=18, repair_audio_seams=True, repair_video_seams=False,
@@ -177,24 +177,24 @@ async def edit_project(args, project):
             report = json.loads(await (await rendered.output(1)).fetch())
             save("replace" if stamp == 1 else "export", report)
             if stamp == 1:
-                after = await comani.comfyui.request("GET", "/longforge_unified/project", params={"name": project})
-                current = await comani.comfyui.request("GET", "/longforge_unified/scene", params={
+                after = await cf.comfyui.request("GET", "/longforge_unified/project", params={"name": project})
+                current = await cf.comfyui.request("GET", "/longforge_unified/scene", params={
                     "name": project, "index": selected, "revision": after["head"]["revision"]})
                 save("after-replace-scene", current)
-                result = await comani.comfyui.request("POST", "/longforge_unified/export_trim", json={
+                result = await cf.comfyui.request("POST", "/longforge_unified/export_trim", json={
                     "name": project, "revision": current["revision"], "scene": selected,
                     "take": current["take"], "trim_revision": current["export_trim"]["revision"], **trim})
                 save("approved-trim", result)
             else:
                 target = args.output_dir / "film.mp4"
-                await comani.files.download(await rendered.file(), target)
+                await cf.files.download(await rendered.file(), target)
                 print(f"{target}\nReview the replaced performance and its video/audio joins.", flush=True)
 
 
 async def main(args):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=args.output_dir)).resolve()
-    project = args.project or "comani-" + uuid.uuid4().hex[:12]
+    project = args.project or "comfier-" + uuid.uuid4().hex[:12]
     print(f"Output directory: {args.output_dir}\nRemote project: {project}", flush=True)
     if args.edit or args.inspect:
         await edit_project(args, project)
@@ -205,30 +205,30 @@ async def main(args):
 
     # Each Client owns its objects; only the native project/takes survive reconnecting.
     for scene_number in (1, 2):
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             await prepare_runtime(args, prepare=scene_number == 1)
 
-            model = comani.node("UNETLoader", unet_name=args.model, weight_dtype="default")
-            clip = comani.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
-            video_vae = comani.node("VAELoader", vae_name=args.video_vae)
-            audio_vae = comani.node("VAELoader", vae_name=args.audio_vae)
+            model = cf.node("UNETLoader", unet_name=args.model, weight_dtype="default")
+            clip = cf.node("CLIPLoader", clip_name=args.clip, type="minimax", device="default")
+            video_vae = cf.node("VAELoader", vae_name=args.video_vae)
+            audio_vae = cf.node("VAELoader", vae_name=args.audio_vae)
             await asyncio.gather(model, clip, video_vae, audio_vae)
-            video = comani.node(
+            video = cf.node(
                 "LongForgeVideoSettings", pipeline="REF2VA", width=args.width, height=args.height,
                 frames=107, overlap_frames=args.overlap, continuity_mode="MANUAL",
                 audio_continuity="HARD", audio_history_frames=0, reference_policy="EVERY SCENE",
                 ref_image_size="max", last_frame_usage="LAST SCENE", audio_soft_steps=4,
                 duration_mode="NEW SECONDS", new_seconds=args.new_seconds, continuation_method="PROTECTED")
-            sampling = comani.node("LongForgeSampling", steps=args.steps, sampler="euler", scheduler="simple",
+            sampling = cf.node("LongForgeSampling", steps=args.steps, sampler="euler", scheduler="simple",
                                   denoise=1.0, cfg=1.0, seed=args.seed, increment_seed=True,
                                   shift_video=12.0, shift_audio=3.0)
             actions = ("GENERATE NEXT",) if scene_number == 1 else ("GENERATE NEXT", "EXPORT FILM")
             for action in actions:
                 exporting = action == "EXPORT FILM"
-                job = comani.node("LongForgeProject", project_name=project, action=action,
+                job = cf.node("LongForgeProject", project_name=project, action=action,
                                   run_mode="ONE SCENE", scene_data=json.dumps(story), selected_scene=1,
                                   run_stamp=3 if exporting else scene_number, export_when_done=False)
-                rendered = comani.node(
+                rendered = cf.node(
                     "LongForgeRender", job=job, video_settings=video, sampling=sampling,
                     model=model, clip=clip, video_vae=video_vae, audio_vae=audio_vae,
                     preview_new_scene=True, export_crf=18, repair_audio_seams=True, repair_video_seams=False,
@@ -240,14 +240,14 @@ async def main(args):
                 print(f"{name}: {report.get('summary', 'completed')}", flush=True)
                 if exporting:
                     target = args.output_dir / "film.mp4"
-                    await comani.files.download(await rendered.file(), target)
+                    await cf.files.download(await rendered.file(), target)
                     print(target, flush=True)
         print(f"Client {scene_number} closed; project takes remain on the daemon disk.", flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--project", help="existing project name to continue; default creates a new unique project")
     parser.add_argument("--story", type=Path, help="JSON list of exactly two scene cards with name/prompt")
     mode = parser.add_mutually_exclusive_group()

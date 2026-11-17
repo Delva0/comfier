@@ -7,7 +7,7 @@ import aiohttp
 import pytest
 from aiohttp import web
 
-from comani import (
+from comfier import (
     Client,
     CodeCompatibilityError,
     CommandError,
@@ -17,8 +17,8 @@ from comani import (
     ManagementOperation,
     OperationCancelled,
 )
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
 
 from .conftest import FakeRuntime
 from .test_binary_fetch import serve

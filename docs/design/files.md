@@ -1,11 +1,13 @@
 # 原生文件与模型 I/O
 
-实现：[客户端文件代理](../../src/comani/files.py)、[文件存储](../../src/comani/daemon/files.py)、[HTTP 流](../../src/comani/daemon/file_http.py)。管理 daemon 独立持有文件存储，计算未启动或重启时仍可用。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。模块 `comani.files` 使用当前显式 Client 上下文；`remote.files` 始终使用指定 Client。
+实现：[客户端文件代理](../../src/comfier/files.py)、[文件存储](../../src/comfier/daemon/files.py)、[HTTP 流](../../src/comfier/daemon/file_http.py)。管理 daemon 独立持有文件存储，计算未启动或重启时仍可用。文件操作是显式 async I/O，不经过 native 计算队列，也不改变 Call/Output 的语义。模块 `cf.files` 使用当前显式 Client 上下文；`remote.files` 始终使用指定 Client。
 
 ## 上传后交给原生节点
 
 ```python
-async with Client(url, token=token) as remote:
+import comfier as cf
+
+async with cf.Client(url, token=token) as remote:
     staged = await remote.files.upload("local.png")
     image = mask = None
     try:
@@ -23,20 +25,20 @@ async with Client(url, token=token) as remote:
 ## 从原生文件结果下载
 
 ```python
-saved = comani.node("SaveImage", images=image, filename_prefix="comani/result", return_call=True)
+saved = cf.node("SaveImage", images=image, filename_prefix="comfier/result", return_call=True)
 file = await saved.file()
-await comani.files.download(file, "result.png")
+await cf.files.download(file, "result.png")
 
 # 捕获图的标准输出节点：需要文件/UI 时显式保留 Call
-run = comani.submit(workflow, return_call=True)
+run = cf.submit(workflow, return_call=True)
 files = await run.files(node_id=saved_in_graph.id, key="images")
 for index, file in enumerate(files):
-    await comani.files.download(file, f"result-{index}.png")
+    await cf.files.download(file, f"result-{index}.png")
 ```
 
 `Call.files(*, node_id=None, key=None)` 等待调用完成，使用该 Call 原本的 Client 将标准 UI filename/subfolder/type descriptor 定位为 RemoteFile tuple；不依赖新的当前 Client。所有执行 Call（包括 workflow run）都有此方法，但只有标准 UI 文件描述符会产生文件；没有文件时 files() 返回空 tuple，file() 在零个或多个时均报 ValueError 并提示使用 files()。不会从 Tensor、模型对象、普通字符串返回值推断文件。尚未提交的 capture Call 调用此方法会报 NotSubmitted。
 
-无需手解 SaveImage 的 UI 字典、拼 subfolder/filename 或额外 stat。该桥接支持 input/temp/output 根，仍保留原始 metadata；只解析与查询文件元数据，不取 Tensor、不自动下载、不转换图像。自定义非标准 UI 字段仍由应用解释；已有 UI Mapping 可用 `await comani.files.from_ui(ui, node_id=..., key=...)` 走相同桥接。
+无需手解 SaveImage 的 UI 字典、拼 subfolder/filename 或额外 stat。该桥接支持 input/temp/output 根，仍保留原始 metadata；只解析与查询文件元数据，不取 Tensor、不自动下载、不转换图像。自定义非标准 UI 字段仍由应用解释；已有 UI Mapping 可用 `await cf.files.from_ui(ui, node_id=..., key=...)` 走相同桥接。
 
 ## 公共方法与本地值
 
@@ -55,7 +57,7 @@ for index, file in enumerate(files):
 
 `FileRoot` 包含不透明 `id`、远端 `path`、`directory`、`category` 和原生查找顺序 `priority`。这些是当前 daemon 文件配置的定位信息，不能作为跨 daemon 的持久 ID。`DownloadedFile` 包含本地绝对 `local_path`、`size`、`sha256` 和更新后的 `remote` 元数据。这些不可变本地值不保留 Client，没有 `fetch()` 或 `release()`。
 
-Comani 的默认 temp 根为原生 `base_path/.comani/temp`，冷态文件 API 与运行中的节点使用同一路径，避免另一个官方 ComfyUI 服务启动时清空 `base_path/temp` 影响当前计算。升级前默认使用的 `base_path/temp` 不会迁移或删除；指向旧根的 `FileDescriptor` 不会自动解析到新根。要保留旧路径，可显式传入原生参数 `--temp-directory <base_path>`（实际根仍为 `<参数>/temp`）。同一 base 的多个 Comani 进程仍共享默认 temp；需要分别保留临时文件的实例应各自设置不同的 `--temp-directory`。这不隔离 GPU 或其他共享目录。
+Comfier 的默认 temp 根为原生 `base_path/.comani/temp`，冷态文件 API 与运行中的节点使用同一路径，避免另一个官方 ComfyUI 服务启动时清空 `base_path/temp` 影响当前计算。可显式传入原生参数 `--temp-directory <目录>`，实际 temp 根为 `<目录>/temp`。`FileDescriptor` 绑定其记录的根，不会随配置变化自动指向其他目录。同一 base 的多个 Comfier 进程仍共享默认 temp；需要分别保留临时文件的实例应各自设置不同的 `--temp-directory`。这不隔离 GPU 或其他共享目录。
 
 ## 模型多根与命名
 
@@ -102,7 +104,7 @@ recovery_timeout 默认使用服务器 transfer_idle_timeout=3600 秒，从观�
 
 ## 持久性与会话
 
-已完成文件由原生文件系统持有，可供其他授权会话使用，不属于 session 的 owned refs。GC、`RemoteRef.release()`、Client close 和 daemon 正常关闭都不删除已完成文件；temp 根的后续清理由原生环境或部署者策略决定，Comani 不提供永久保留保证。删除通过 `files.remove()` 明确进行；传入 `RemoteFile` 时会拒绝删除 revision 已改变的文件。
+已完成文件由原生文件系统持有，可供其他授权会话使用，不属于 session 的 owned refs。GC、`RemoteRef.release()`、Client close 和 daemon 正常关闭都不删除已完成文件；temp 根的后续清理由原生环境或部署者策略决定，Comfier 不提供永久保留保证。删除通过 `files.remove()` 明确进行；传入 `RemoteFile` 时会拒绝删除 revision 已改变的文件。
 
 保存 `files = remote.files` 会强持有所属 Client；Client 每次访问都返回新代理，不缓存它，因此没有反向所有权环。只保存 `RemoteFile`/`FileRoot`/`DownloadedFile` 不保活会话。显式 Client close 优先取消活动文件 I/O，关闭后需新建 Client 才能再次操作文件。
 
@@ -114,21 +116,21 @@ recovery_timeout 默认使用服务器 transfer_idle_timeout=3600 秒，从观�
 import json
 from dataclasses import asdict
 from pathlib import Path
-from comani import Client
+import comfier as cf
 
 # 在成功保存文件后，记录已核验内容。普通 stat/from_ui 的 SHA256 可能为空。
-async with Client(url, token=token) as remote:
+async with cf.Client(url, token=token) as remote:
     file = await remote.files.stat("shots/front.png", directory="output", checksum=True)
     Path("front-file.json").write_text(json.dumps(asdict(file.describe())), encoding="utf-8")
 
 # 可以在另一个 Python 进程、计算重启或管理 daemon 重建后执行。
-async with Client(url, token=token) as remote:
+async with cf.Client(url, token=token) as remote:
     saved = json.loads(Path("front-file.json").read_text(encoding="utf-8"))
     file = await remote.files.resolve(saved)
     await remote.files.download(file, "verified-front.png")
 ```
 
-`file.describe()` 是本地元数据转换，不执行 I/O；SHA256 为空时明确报 `ValueError`，要求先执行 `stat(file, checksum=True)`。上传或完整下载得到的 `RemoteFile` 已有 SHA256，可以直接 describe。`FileDescriptor` 是无 Client 的不可变 dataclass，字段为 `version=1`、`directory` 或 `category`、服务端已规范化的 `root_path`、`relative_path`、`size` 和必需的 `sha256`；用 `dataclasses.asdict` 和 JSON 保存，也可通过 `FileDescriptor(**saved)` 重建。它不保存 session、root ID 或 inode/revision。
+`file.describe()` 是本地元数据转换，不执行 I/O；SHA256 为空时明确报 `ValueError`，要求先执行 `stat(file, checksum=True)`。上传或完整下载得到的 `RemoteFile` 已有 SHA256，可以直接 describe。`FileDescriptor` 是无 Client 的不可变 dataclass，字段为 `version=1`、`directory` 或 `category`、服务端已规范化的 `root_path`、`relative_path`、`size` 和必需的 `sha256`；用 `dataclasses.asdict` 和 JSON 保存，也可通过 `cf.FileDescriptor(**saved)` 重建。它不保存 session、root ID 或 inode/revision。
 
 `files.resolve` 是真实文件 RPC，复用 daemon 的 stat 实现，始终完整读取文件计算 SHA256。daemon 仅在当前原生配置允许的目录或模型类别中匹配精确 `root_path`，然后检查相对路径、常规文件、大小和 SHA256。保存的路径是定位约束，不授予任意服务端目录权限；客户端不使用本地操作系统解释远端路径。根已更换、目录不再允许、文件缺失、路径越界、内容变化或未知描述版本均明确失败，不搜索全盘，也不改绑到其他根的同名文件。旧 daemon 不支持描述参数时会拒绝解析，不降低为仅按名称查找。
 

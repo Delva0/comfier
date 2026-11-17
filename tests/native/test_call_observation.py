@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from comani import CallExpired, Client, Expired, InProcessTransport, RemoteError, SessionClosed
-from comani.daemon import NativeRuntime
+from comfier import CallExpired, Client, Expired, InProcessTransport, RemoteError, SessionClosed
+from comfier.daemon import NativeRuntime
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(not Path(COMFY, "execution.py").is_file(), reason="real ComfyUI required")
 
 

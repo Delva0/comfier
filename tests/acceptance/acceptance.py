@@ -2,7 +2,7 @@
 
 This never starts a local daemon or substitutes local model weights. Results
 are written only after real operations finish. Use a private SSH tunnel URL or
-provide COMANI_TOKEN for an authenticated HTTPS endpoint. Run only against a
+provide COMFIER_TOKEN for an authenticated HTTPS endpoint. Run only against a
 disposable test daemon: one case deliberately evicts its native cache. The client
 requires its normal tensor/serializer dependencies; this script installs nothing.
 """
@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from comani import Client, Expired, PackageConflict, Released, RemoteError, SessionClosed
+from comfier import Client, Expired, PackageConflict, Released, RemoteError, SessionClosed
 
 
 def delayed(value, seconds):
@@ -41,9 +41,9 @@ def metadata():
     import torch
     from comfy.cli_args import args
 
-    import comani
+    import comfier
 
-    package = Path(comani.__file__).parent
+    package = Path(comfier.__file__).parent
     comfy_root = Path(mm.__file__).resolve().parents[1]
     try:
         commit = subprocess.check_output(['git', '-C', str(comfy_root), 'rev-parse', 'HEAD'], text=True, stderr=subprocess.DEVNULL).strip()
@@ -54,7 +54,7 @@ def metadata():
     return {'host': socket.gethostname(), 'python': platform.python_version(),
             'cloudpickle': importlib.metadata.version('cloudpickle'),
             'device': device_name, 'torch': torch.__version__,
-            'comani_file': comani.__file__, 'comani_version': importlib.metadata.version('comani'),
+            'comfier_file': comfier.__file__, 'comfier_version': importlib.metadata.version('comfier'),
             'installed_source_sha256': {str(path.relative_to(package.parent)): hashlib.sha256(path.read_bytes()).hexdigest()
                                         for path in package.rglob('*.py')},
             'native_reserve_vram_gib': args.reserve_vram,
@@ -102,7 +102,7 @@ async def main(args):
         (args.output / 'acceptance.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report['cases'][-1]), flush=True)
 
-    token = os.environ.get('COMANI_TOKEN')
+    token = os.environ.get('COMFIER_TOKEN')
     remote = Client(args.url, token=token)
     try:
         await remote.start()
@@ -115,7 +115,7 @@ async def main(args):
             assert wheel_sha256 == args.wheel_sha256
         with zipfile.ZipFile(args.wheel) as wheel:
             expected_sources = {name: hashlib.sha256(wheel.read(name)).hexdigest()
-                                for name in wheel.namelist() if name.startswith('comani/') and name.endswith('.py')}
+                                for name in wheel.namelist() if name.startswith('comfier/') and name.endswith('.py')}
         assert info['installed_source_sha256'] == expected_sources
         if args.expected_device:
             assert args.expected_device in info['device']
@@ -202,7 +202,7 @@ async def main(args):
         assert await (await remote.python(lambda: 42, return_call=True).output()).fetch() == 42
         record('producer_error_dependency_error_and_worker_recovery')
 
-        with tempfile.TemporaryDirectory(prefix='comani-remote-acceptance-') as temporary:
+        with tempfile.TemporaryDirectory(prefix='comfier-remote-acceptance-') as temporary:
             directory = Path(temporary)
             source = directory / 'operation.py'
             source.write_text('def apply(value):\n    return value * 3\n')

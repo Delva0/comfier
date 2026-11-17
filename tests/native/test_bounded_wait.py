@@ -4,10 +4,10 @@ import threading
 
 import pytest
 
-from comani.daemon import NativeRuntime
-from comani.errors import Expired, RemoteError, SessionClosed, Skipped
+from comfier.daemon import NativeRuntime
+from comfier.errors import Expired, RemoteError, SessionClosed, Skipped
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(not os.path.isfile(COMFY + "/execution.py"), reason="real ComfyUI checkout required")
 
 

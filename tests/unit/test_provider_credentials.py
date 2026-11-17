@@ -7,12 +7,12 @@ import shutil
 import pytest
 from aiohttp import web
 
-import comani
-from comani import _model_providers
-from comani._model_providers import ProviderQueries, provider_headers
-from comani.daemon.management import models, transports
-from comani.daemon.management.processes import child_env
-from comani.daemon.management.service import ManagementService
+import comfier
+from comfier import _model_providers
+from comfier._model_providers import ProviderQueries, provider_headers
+from comfier.daemon.management import models, transports
+from comfier.daemon.management.processes import child_env
+from comfier.daemon.management.service import ManagementService
 
 from .test_binary_fetch import serve
 from .test_management_service import Supervisor, finish, submit
@@ -29,9 +29,9 @@ async def test_civitai_api_token_alias_and_explicit_local_query_are_private(monk
             {"id": 12, "name": "toy.bin", "sizeKB": 1, "hashes": {"SHA256": "a" * 64}}]}
 
     monkeypatch.setattr(ProviderQueries, "json", metadata)
-    source = await comani.models.resolve({"version_id": 123, "file_id": 12})
+    source = await comfier.models.resolve({"version_id": 123, "file_id": 12})
     assert seen[-1] == {"Authorization": "Bearer alias-private"}
-    await comani.models.resolve({"version_id": 123}, token="explicit-private")
+    await comfier.models.resolve({"version_id": 123}, token="explicit-private")
     assert seen[-1] == {"Authorization": "Bearer explicit-private"}
     monkeypatch.setenv("CIVITAI_TOKEN", "legacy-private")
     assert provider_headers("https://www.civitai.com/api/v1/models/4") == {

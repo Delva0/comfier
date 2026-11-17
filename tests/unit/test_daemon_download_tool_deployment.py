@@ -8,10 +8,10 @@ import aiohttp
 import pytest
 from aiohttp import web
 
-from comani.cli import daemon as launcher
-from comani.daemon.management.operations import ManagementError
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier.cli import daemon as launcher
+from comfier.daemon.management.operations import ManagementError
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
 
 
 @asynccontextmanager
@@ -50,7 +50,7 @@ async def deployment_settles(request):
 
 
 async def test_constructor_and_bare_app_do_not_prepare_tools(tmp_path, monkeypatch):
-    from comani.daemon.management import download_tools
+    from comfier.daemon.management import download_tools
 
     calls = []
 
@@ -72,7 +72,7 @@ async def test_constructor_and_bare_app_do_not_prepare_tools(tmp_path, monkeypat
 
 
 async def test_deployment_preparation_does_not_delay_auto_start(tmp_path, monkeypatch):
-    from comani.daemon.management import download_tools
+    from comfier.daemon.management import download_tools
 
     entered, release = asyncio.Event(), asyncio.Event()
     calls, starts = [], []
@@ -102,7 +102,7 @@ async def test_deployment_preparation_does_not_delay_auto_start(tmp_path, monkey
 
 
 async def test_failed_preinstallation_keeps_repair_channel_and_failure_receipt(tmp_path, monkeypatch, caplog):
-    from comani.daemon.management import download_tools
+    from comfier.daemon.management import download_tools
 
     supervisor = supervisor_at(tmp_path)
     starts = []
@@ -134,7 +134,7 @@ async def test_failed_preinstallation_keeps_repair_channel_and_failure_receipt(t
 @pytest.mark.parametrize("no_start", [False, True])
 def test_real_cli_enables_deployment_preparation(monkeypatch, tmp_path, no_start):
     calls = []
-    monkeypatch.delenv("COMANI_TOKEN", raising=False)
+    monkeypatch.delenv("COMFIER_TOKEN", raising=False)
     monkeypatch.setattr(launcher, "create_management_app",
                         lambda supervisor, **options: calls.append(options) or object())
     monkeypatch.setattr(launcher.web, "run_app", lambda app, **options: None)

@@ -20,7 +20,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 MODEL = "qwen_image_2.1_int8_convrot.safetensors"
 CLIP = "qwen3vl_8b_int8_convrot.safetensors"
@@ -75,10 +75,10 @@ async def main(args):
     stages = profile["phases"]
     total_started = time.perf_counter()
     try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             started = time.perf_counter()
             if args.install_plugin:
-                installed = await comani.plugins.list()
+                installed = await cf.plugins.list()
                 if not any(
                     plugin.id.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
                     or Path(plugin.path).name.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
@@ -86,9 +86,9 @@ async def main(args):
                     == "https://github.com/ausboss/comfyui-ausboss"
                     for plugin in installed
                 ):
-                    await comani.comfyui.stop()
-                    await comani.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
-            info = await comani.comfyui.start()
+                    await cf.comfyui.stop()
+                    await cf.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
+            info = await cf.comfyui.start()
             required = {"TextEncodeQwenImage21", "QwenImage21Cache", "AUSBOSS_NODES_ImageResize"}
             if args.description is None:
                 required.add("TextGenerate")
@@ -98,42 +98,42 @@ async def main(args):
             if args.download_models:
                 for category, repository, path in WEIGHTS:
                     started = time.perf_counter()
-                    source = await comani.models.resolve({"repo_id": repository, "path": path})
+                    source = await cf.models.resolve({"repo_id": repository, "path": path})
                     artifact, = source.files
                     filename = Path(path).name
-                    file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
+                    file = await cf.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": path,
                                    "sha256": artifact.sha256, "revision": source.revision,
                                    "root": file.root.path, "priority": file.root.priority,
                                    "seconds": time.perf_counter() - started})
             started = time.perf_counter()
-            uploads = await asyncio.gather(comani.files.upload(args.person), comani.files.upload(args.garment))
+            uploads = await asyncio.gather(cf.files.upload(args.person), cf.files.upload(args.garment))
             stages.append({"phase": "upload", "seconds": time.perf_counter() - started})
             try:
                 started = time.perf_counter()
-                person, _ = comani.node("LoadImage", image=uploads[0].native_name)
-                garment, _ = comani.node("LoadImage", image=uploads[1].native_name)
-                clip = comani.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
-                vae = comani.node("VAELoader", vae_name=VAE)
-                model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-                model = comani.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=1.0)
-                model = comani.node("QwenImage21Cache", model=model, device="auto", dtype="default")
+                person, _ = cf.node("LoadImage", image=uploads[0].native_name)
+                garment, _ = cf.node("LoadImage", image=uploads[1].native_name)
+                clip = cf.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
+                vae = cf.node("VAELoader", vae_name=VAE)
+                model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+                model = cf.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=1.0)
+                model = cf.node("QwenImage21Cache", model=model, device="auto", dtype="default")
                 await asyncio.gather(person, garment, clip, vae, model)
                 stages.append({"phase": "load_objects", "seconds": time.perf_counter() - started})
                 description = args.description
                 if description is None:
                     started = time.perf_counter()
-                    person_small, _, _, _ = comani.node(
+                    person_small, _, _, _ = cf.node(
                         "AUSBOSS_NODES_ImageResize", image=person, target_mode="megapixels",
                         width=0, height=0, edge_length=1024, megapixels=0.6, scale_factor=0.5,
                         keep_proportion="fit", fill_color="#000000", divisible_by=32, interpolation="lanczos",
                     )
-                    garment_small, _, _, _ = comani.node(
+                    garment_small, _, _, _ = cf.node(
                         "AUSBOSS_NODES_ImageResize", image=garment, target_mode="megapixels",
                         width=0, height=0, edge_length=1024, megapixels=0.6, scale_factor=0.5,
                         keep_proportion="fit", fill_color="#000000", divisible_by=32, interpolation="lanczos",
                     )
-                    legs, _ = comani.node(
+                    legs, _ = cf.node(
                         "TextGenerate", clip=clip, image=person_small,
                         prompt="Are the person's legs in this picture? Answer yes or no.",
                         max_length=16, sampling_mode="off", thinking=True, use_default_template=True, mtp="auto",
@@ -143,7 +143,7 @@ async def main(args):
                     feet_text = None
                     branch = "upper_body"
                     if has_legs:
-                        feet, _ = comani.node(
+                        feet, _ = cf.node(
                             "TextGenerate", clip=clip, image=person_small,
                             prompt="Are the person's feet or shoes in this picture? Answer yes or no.",
                             max_length=16, sampling_mode="off", thinking=True,
@@ -152,7 +152,7 @@ async def main(args):
                         feet_text = await (await feet).fetch()
                         has_feet = bool(re.match(r"^\s*yes\b", feet_text, re.IGNORECASE))
                         branch = "full_body" if has_feet else "no_feet"
-                    text, _ = comani.node(
+                    text, _ = cf.node(
                         "TextGenerate", clip=clip, image=garment_small, prompt=DESCRIPTION_PROMPTS[branch],
                         max_length=200, sampling_mode="off", thinking=True, use_default_template=True, mtp="auto",
                     )
@@ -164,17 +164,17 @@ async def main(args):
                 profile.update(description=description, edit_prompt=prompt)
                 print(prompt, flush=True)
                 started = time.perf_counter()
-                person, _, _, _ = comani.node(
+                person, _, _, _ = cf.node(
                     "AUSBOSS_NODES_ImageResize", image=person, target_mode="megapixels",
                     width=0, height=0, edge_length=1024, megapixels=2.0, scale_factor=0.5,
                     keep_proportion="fit", fill_color="#000000", divisible_by=32, interpolation="lanczos",
                 )
-                garment, _, _, _ = comani.node(
+                garment, _, _, _ = cf.node(
                     "AUSBOSS_NODES_ImageResize", image=garment, target_mode="megapixels",
                     width=0, height=0, edge_length=1024, megapixels=1.0, scale_factor=0.5,
                     keep_proportion="fit", fill_color="#000000", divisible_by=32, interpolation="lanczos",
                 )
-                positive, negative, latent = comani.node(
+                positive, negative, latent = cf.node(
                     "TextEncodeQwenImage21", clip=clip, vae=vae, prompt=prompt,
                     negative_prompt="", resolution=0, **{"images.image_1": person, "images.image_2": garment},
                 )
@@ -183,27 +183,27 @@ async def main(args):
                 for index in range(args.count):
                     seed = args.seed + index
                     started = time.perf_counter()
-                    samples = comani.node("KSampler", model=model, positive=positive, negative=negative,
+                    samples = cf.node("KSampler", model=model, positive=positive, negative=negative,
                                           latent_image=latent, seed=seed, steps=args.steps, cfg=1.0,
                                           sampler_name="euler", scheduler="simple", denoise=1.0)
                     await samples
                     stages.append({"phase": "sample", "seed": seed, "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
-                    dressed = comani.node("VAEDecode", samples=samples, vae=vae)
-                    dressed, _ = comani.node("SplitImageWithAlpha", image=dressed)
+                    dressed = cf.node("VAEDecode", samples=samples, vae=vae)
+                    dressed, _ = cf.node("SplitImageWithAlpha", image=dressed)
                     await dressed
                     stages.append({"phase": "decode", "seed": seed, "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
-                    saved = comani.node("SaveImage", images=dressed, filename_prefix="comani/outfit", return_call=True)
+                    saved = cf.node("SaveImage", images=dressed, filename_prefix="comfier/outfit", return_call=True)
                     file = await saved.file()
                     stages.append({"phase": "save", "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
                     target = args.output_dir / f"seed{seed}-outfit.png"
-                    await comani.files.download(file, target)
+                    await cf.files.download(file, target)
                     stages.append({"phase": "download", "bytes": file.size, "seconds": time.perf_counter() - started})
                     print(target, flush=True)
             finally:
-                await asyncio.gather(*(comani.files.remove(file) for file in uploads))
+                await asyncio.gather(*(cf.files.remove(file) for file in uploads))
     except Exception as error:
         profile["error"] = f"{type(error).__name__}: {error}"
         raise
@@ -214,7 +214,7 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--person", type=Path, required=True)
     parser.add_argument("--garment", type=Path, required=True)
     parser.add_argument("--description", help="manual alternative to vision-generated garment description")

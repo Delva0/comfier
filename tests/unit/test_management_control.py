@@ -9,22 +9,22 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani.daemon.files import FileStore
-from comani.daemon.management import plugins
-from comani.daemon.management.models import ModelService
-from comani.daemon.management.operations import ManagementError
-from comani.daemon.management.processes import run_process
-from comani.daemon.management.service import ManagementService
-from comani.daemon.management.tools import python_metadata
-from comani.daemon.service import NativeRuntime
-from comani.daemon.supervisor import (
+from comfier.daemon.files import FileStore
+from comfier.daemon.management import plugins
+from comfier.daemon.management.models import ModelService
+from comfier.daemon.management.operations import ManagementError
+from comfier.daemon.management.processes import run_process
+from comfier.daemon.management.service import ManagementService
+from comfier.daemon.management.tools import python_metadata
+from comfier.daemon.service import NativeRuntime
+from comfier.daemon.supervisor import (
     ObservedPaths,
     RuntimeConfig,
     RuntimeSupervisor,
     SupervisorError,
 )
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 
 
 async def test_emergency_stop_skips_compute_rpc_and_default_stop_waits_for_maintenance(tmp_path):
@@ -155,7 +155,7 @@ async def marker(path):
 
 
 def slow_maintenance(monkeypatch, *, cancelled=None, finish_cancel=None):
-    from comani.daemon.management import comfyui
+    from comfier.daemon.management import comfyui
 
     async def prepare(supervisor, context, *, package):
         async with supervisor.maintenance_lock:

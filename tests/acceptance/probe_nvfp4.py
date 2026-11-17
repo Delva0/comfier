@@ -10,7 +10,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--comfy-root', type=Path, required=True)
 a = p.parse_args()
 sys.path.insert(0, str(a.comfy_root.resolve()))
-sys.argv = ['comani-nvfp4-probe']
+sys.argv = ['comfier-nvfp4-probe']
 import comfy.model_management as mm
 import comfy.ops as ops
 import torch

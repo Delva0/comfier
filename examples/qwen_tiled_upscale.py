@@ -18,7 +18,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 MODEL = "qwen_image_2.1_int8_convrot.safetensors"
 CLIP = "qwen3vl_8b_int8_convrot.safetensors"
@@ -47,10 +47,10 @@ async def main(args):
     stages = profile["phases"]
     total_started = time.perf_counter()
     try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             started = time.perf_counter()
             if args.install_plugin:
-                installed = await comani.plugins.list()
+                installed = await cf.plugins.list()
                 if not any(
                     plugin.id.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
                     or Path(plugin.path).name.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
@@ -58,9 +58,9 @@ async def main(args):
                     == "https://github.com/ausboss/comfyui-ausboss"
                     for plugin in installed
                 ):
-                    await comani.comfyui.stop()
-                    await comani.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
-            info = await comani.comfyui.start()
+                    await cf.comfyui.stop()
+                    await cf.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
+            info = await cf.comfyui.start()
             required = {"AUSBOSS_NODES_TiledUpscale", "AUSBOSS_NODES_TiledUpscaleStitch",
                         "TextEncodeQwenImage21", "QwenImage21Cache"}
             if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
@@ -69,37 +69,37 @@ async def main(args):
             if args.download_models:
                 for category, repository, path in WEIGHTS[:4] if args.no_turbo else WEIGHTS:
                     started = time.perf_counter()
-                    source = await comani.models.resolve({"repo_id": repository, "path": path})
+                    source = await cf.models.resolve({"repo_id": repository, "path": path})
                     artifact, = source.files
                     filename = Path(path).name
-                    file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
+                    file = await cf.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": path,
                                    "sha256": artifact.sha256, "revision": source.revision,
                                    "root": file.root.path, "priority": file.root.priority,
                                    "seconds": time.perf_counter() - started})
             started = time.perf_counter()
-            uploaded = await comani.files.upload(args.input)
+            uploaded = await cf.files.upload(args.input)
             stages.append({"phase": "upload", "seconds": time.perf_counter() - started})
             try:
                 started = time.perf_counter()
-                image, _ = comani.node("LoadImage", image=uploaded.native_name)
-                clip = comani.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
-                vae = comani.node("VAELoader", vae_name=VAE)
-                model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-                model = comani.node("LoraLoaderModelOnly", model=model, lora_name=RESTORE, strength_model=1.0)
+                image, _ = cf.node("LoadImage", image=uploaded.native_name)
+                clip = cf.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
+                vae = cf.node("VAELoader", vae_name=VAE)
+                model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+                model = cf.node("LoraLoaderModelOnly", model=model, lora_name=RESTORE, strength_model=1.0)
                 if not args.no_turbo:
-                    model = comani.node("LoraLoaderModelOnly", model=model, lora_name=TURBO, strength_model=1.0)
-                model = comani.node("QwenImage21Cache", model=model, device="auto", dtype="default")
+                    model = cf.node("LoraLoaderModelOnly", model=model, lora_name=TURBO, strength_model=1.0)
+                model = cf.node("QwenImage21Cache", model=model, device="auto", dtype="default")
                 await asyncio.gather(image, clip, vae, model)
                 stages.append({"phase": "load_objects", "seconds": time.perf_counter() - started})
                 started = time.perf_counter()
-                tiles, stitcher, before, _width, _height, plan = comani.node(
+                tiles, stitcher, before, _width, _height, plan = cf.node(
                     "AUSBOSS_NODES_TiledUpscale", image=image, megapixels=args.megapixels,
                     tile_megapixels=args.tile_megapixels, overlap=128, multiple=32, max_growth=8.0,
                 )
                 profile["tile_plan"] = await (await plan).fetch()
                 # Native OUTPUT_IS_LIST maps each tile through these nodes in the original order.
-                positive, negative, latent = comani.node(
+                positive, negative, latent = cf.node(
                     "TextEncodeQwenImage21", clip=clip, vae=vae, prompt=args.prompt,
                     negative_prompt="", resolution=0, **{"images.image_1": tiles},
                 )
@@ -108,17 +108,17 @@ async def main(args):
                 for index in range(args.count):
                     seed = args.seed + index
                     started = time.perf_counter()
-                    samples = comani.node("KSampler", model=model, positive=positive, negative=negative,
+                    samples = cf.node("KSampler", model=model, positive=positive, negative=negative,
                                           latent_image=latent, seed=seed, steps=args.steps, cfg=1.0,
                                           sampler_name="euler", scheduler="simple", denoise=1.0)
                     await samples
                     stages.append({"phase": "sample_tiles", "seed": seed, "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
-                    redrawn = comani.node("VAEDecode", samples=samples, vae=vae)
+                    redrawn = cf.node("VAEDecode", samples=samples, vae=vae)
                     await redrawn
                     stages.append({"phase": "decode_tiles", "seed": seed, "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
-                    restored = comani.node("AUSBOSS_NODES_TiledUpscaleStitch", tiles=redrawn,
+                    restored = cf.node("AUSBOSS_NODES_TiledUpscaleStitch", tiles=redrawn,
                                            stitcher=stitcher, keep_colors=1.0)
                     await restored
                     stages.append({"phase": "stitch", "seed": seed, "seconds": time.perf_counter() - started})
@@ -127,19 +127,19 @@ async def main(args):
                         outputs["plain-upscale"] = before
                     for name, output in outputs.items():
                         started = time.perf_counter()
-                        saved = comani.node("SaveImage", images=output,
-                                            filename_prefix=f"comani/tiled/{name}", return_call=True)
+                        saved = cf.node("SaveImage", images=output,
+                                            filename_prefix=f"comfier/tiled/{name}", return_call=True)
                         file = await saved.file()
                         stages.append({"phase": "save", "name": name,
                                        "seconds": time.perf_counter() - started})
                         started = time.perf_counter()
                         target = args.output_dir / f"seed{seed}-{name}.png"
-                        await comani.files.download(file, target)
+                        await cf.files.download(file, target)
                         stages.append({"phase": "download", "name": name, "bytes": file.size,
                                        "seconds": time.perf_counter() - started})
                         print(target, flush=True)
             finally:
-                await comani.files.remove(uploaded)
+                await cf.files.remove(uploaded)
     except Exception as error:
         profile["error"] = f"{type(error).__name__}: {error}"
         raise
@@ -150,7 +150,7 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, default=Path("artifacts/qwen-tiled-upscale"))
     parser.add_argument("--prompt", default=PROMPT)

@@ -6,8 +6,8 @@ from contextlib import asynccontextmanager
 import pytest
 from aiohttp import web
 
-from comani.daemon.management.operations import ManagementError
-from comani.daemon.management.providers import ProviderResolver
+from comfier.daemon.management.operations import ManagementError
+from comfier.daemon.management.providers import ProviderResolver
 
 LIMIT = 8 * 1024 * 1024
 

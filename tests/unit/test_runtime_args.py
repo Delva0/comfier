@@ -6,11 +6,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani.cli import daemon as launcher
-from comani.daemon import NativeRuntime
-from comani.daemon.adapter import NativeAdapter
-from comani.daemon.service import RecoveryPolicy
-from comani.daemon.startup import initialize
+from comfier.cli import daemon as launcher
+from comfier.daemon import NativeRuntime
+from comfier.daemon.adapter import NativeAdapter
+from comfier.daemon.service import RecoveryPolicy
+from comfier.daemon.startup import initialize
 
 
 @pytest.mark.parametrize("native_args", [[], ["--reserve-vram", "4", "--disable-smart-memory"]])
@@ -19,7 +19,7 @@ def test_private_worker_receives_native_arguments_without_a_second_cli(monkeypat
 
     from aiohttp import web
 
-    from comani.daemon import _worker, http, service
+    from comfier.daemon import _worker, http, service
 
     captured = {}
     runtime, app = object(), object()
@@ -110,7 +110,7 @@ def startup_parser(monkeypatch, tmp_path):
         assert name == "main"
         return native
 
-    monkeypatch.setattr("comani.daemon.startup.importlib.import_module", import_native)
+    monkeypatch.setattr("comfier.daemon.startup.importlib.import_module", import_native)
     args.temp_directory = None
     return parser, args, imports, tmp_path
 
@@ -138,7 +138,7 @@ def test_startup_rejects_explicit_headless_options_before_import(startup_parser,
     with pytest.raises(SystemExit) as error:
         initialize(root, arguments, custom_nodes=False)
     assert error.value.code == 2
-    assert "Comani does not host" in capsys.readouterr().err
+    assert "Comfier does not host" in capsys.readouterr().err
     assert imports == []
 
 

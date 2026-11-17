@@ -8,7 +8,7 @@ from pathlib import Path
 
 import aiohttp
 
-from comani import Client
+from comfier import Client
 
 
 async def main(args):

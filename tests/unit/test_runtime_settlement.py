@@ -12,7 +12,7 @@ import pytest
 
 @pytest.mark.skipif(
     importlib.util.find_spec("torch") is None
-    or not (Path(os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")) / "execution.py").is_file(),
+    or not (Path(os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")) / "execution.py").is_file(),
     reason="Requires the optional native CPU test environment",
 )
 def test_cache_loss_settles_and_empty_queue_does_not_mean_worker_finished():

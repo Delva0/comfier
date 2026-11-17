@@ -12,12 +12,12 @@ from contextlib import asynccontextmanager
 import pytest
 from aiohttp import web
 
-import comani
-from comani import Client, OperationError, PluginChanges
-from comani.daemon.files import FileStore
-from comani.daemon.management import models
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import ObservedPaths, RuntimeConfig, RuntimeSupervisor
+import comfier
+from comfier import Client, OperationError, PluginChanges
+from comfier.daemon.files import FileStore
+from comfier.daemon.management import models
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import ObservedPaths, RuntimeConfig, RuntimeSupervisor
 
 from .test_binary_fetch import serve
 
@@ -61,12 +61,12 @@ async def test_public_archive_installs_selected_packages_once_without_importing(
     async with installed_server(tmp_path, payload, {"one": "release/first/", "two": "release/second"}) as data:
         url, manifest, _, roots, requests = data
         async with Client(url):
-            result = await comani.plugins.install_archive(manifest)
+            result = await comfier.plugins.install_archive(manifest)
             assert isinstance(result, PluginChanges)
             assert result.restart_required and result.partial_changes
             assert {item.package for item in result.items} == {"one", "two"}
             assert all(item.status == "applied" for item in result.items)
-            installed = await comani.plugins.list()
+            installed = await comfier.plugins.list()
             assert {item.source for item in installed} == {"archive"}
             assert all(item.archive["sha256"] == manifest["sha256"] for item in installed)
             receipt_path = roots[0] / "one/.comani-archive.json"
@@ -74,7 +74,7 @@ async def test_public_archive_installs_selected_packages_once_without_importing(
             edited.update(url="https://user:private-password@example.invalid/release.zip?token=private-query",
                           headers={"Authorization": "private-header"})
             receipt_path.write_text(json.dumps(edited))
-            public = repr(await comani.plugins.list())
+            public = repr(await comfier.plugins.list())
             assert all(secret not in public for secret in ("private-password", "private-query", "private-header"))
         assert len(requests) == 1
         assert (roots[0] / "one/LICENSE").read_text() == "fixture license\n"
@@ -138,7 +138,7 @@ async def test_existing_name_is_not_overwritten_or_downloaded(tmp_path):
 async def test_no_deps_still_executes_installer_and_reports_partial_failure(tmp_path):
     payload = bundle([("release/node/__init__.py", "NODE_CLASS_MAPPINGS = {}"),
                       ("release/node/install.py", "from pathlib import Path\nPath('attempted').write_text('yes')\nraise SystemExit(7)\n"),
-                      ("release/node/requirements.txt", "comani-nonexistent-fixture-must-not-fetch==999999\n")])
+                      ("release/node/requirements.txt", "comfier-nonexistent-fixture-must-not-fetch==999999\n")])
     async with installed_server(tmp_path, payload) as (url, manifest, _, roots, requests):
         async with Client(url) as remote:
             operation = await remote.plugins.begin_install_archive(manifest, no_deps=True)

@@ -15,13 +15,13 @@ from pathlib import Path
 import pytest
 from aiohttp import web
 
-import comani
+import comfier
 
 pytestmark = pytest.mark.native
 PROJECT = Path(__file__).resolve().parents[2]
-COMFY = Path(os.environ.get("COMANI_COMFY_ROOT", PROJECT.parent / "ComfyUI"))
-RUNTIME_PYTHON = os.environ.get("COMANI_NATIVE_PYTHON", sys.executable)
-NAME = "comani-persistence-probe.safetensors"
+COMFY = Path(os.environ.get("COMFIER_COMFY_ROOT", PROJECT.parent / "ComfyUI"))
+RUNTIME_PYTHON = os.environ.get("COMFIER_NATIVE_PYTHON", sys.executable)
+NAME = "comfier-persistence-probe.safetensors"
 HEADER = json.dumps({"probe": {"dtype": "F32", "shape": [1],
                               "data_offsets": [0, 4]}}, separators=(",", ":")).encode()
 HEADER += b" " * (-len(HEADER) % 8)
@@ -51,11 +51,11 @@ async def daemon(config_path, log_path):
         listener.bind(("127.0.0.1", 0))
         port = listener.getsockname()[1]
     environment = dict(os.environ)
-    environment.pop("COMANI_TOKEN", None)
-    environment.pop("COMANI_RUNTIME_TOKEN", None)
+    environment.pop("COMFIER_TOKEN", None)
+    environment.pop("COMFIER_RUNTIME_TOKEN", None)
     with log_path.open("wb") as log:
         process = subprocess.Popen(
-            [sys.executable, "-m", "comani", "daemon", "--config", str(config_path),
+            [sys.executable, "-m", "comfier", "daemon", "--config", str(config_path),
              "--host", "127.0.0.1", "--port", str(port), "--no-start"],
             cwd=PROJECT, env=environment, stdout=log, stderr=subprocess.STDOUT)
         try:
@@ -166,7 +166,7 @@ async def test_model_bytes_survive_restart_and_code_redeployment(tmp_path):
 
     try:
         async with daemon(config_path, tmp_path / "daemon-first.log") as (url, first_pid):
-            async with comani.Client(url) as remote:
+            async with comfier.Client(url) as remote:
                 await reuse(remote, "first_download_while_runtime_stopped")
                 assert len(source_gets) == 1
                 first = await remote.comfyui.start()
@@ -182,7 +182,7 @@ async def test_model_bytes_survive_restart_and_code_redeployment(tmp_path):
             assert second_pid != first_pid
             report["fresh_daemon_process"] = True
             report["daemon_pids"] = [first_pid, second_pid]
-            async with comani.Client(url) as remote:
+            async with comfier.Client(url) as remote:
                 assert (await remote.comfyui.info()).state == "stopped"
                 await reuse(remote, "daemon_restart_before_runtime_start")
                 second = await remote.comfyui.start()
@@ -208,6 +208,6 @@ async def test_model_bytes_survive_restart_and_code_redeployment(tmp_path):
         report["passed"] = True
     finally:
         await source.cleanup()
-        directory = Path(os.environ.get("COMANI_MODEL_PERSISTENCE_REPORT_DIR", tmp_path))
+        directory = Path(os.environ.get("COMFIER_MODEL_PERSISTENCE_REPORT_DIR", tmp_path))
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "report.json").write_text(json.dumps(report, indent=2) + "\n")

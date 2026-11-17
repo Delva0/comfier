@@ -3,9 +3,9 @@
 import pytest
 from aiohttp import web
 
-from comani import Client, HTTPTransport, InProcessTransport
-from comani.daemon.http import create_app
-from comani.protocol import LZ4_ACCEPT_HEADER, LZ4_CODEC
+from comfier import Client, HTTPTransport, InProcessTransport
+from comfier.daemon.http import create_app
+from comfier.protocol import LZ4_ACCEPT_HEADER, LZ4_CODEC
 
 from .test_binary_fetch import FetchRuntime, serve
 

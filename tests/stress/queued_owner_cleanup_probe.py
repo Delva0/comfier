@@ -16,7 +16,7 @@ import traceback
 import weakref
 from pathlib import Path
 
-from comani import Client
+from comfier import Client
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parents[1]

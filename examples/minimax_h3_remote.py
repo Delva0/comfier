@@ -1,6 +1,6 @@
 """Reuse or explicitly prepare a GPU instance, acquire H3 weights and save one PNG.
 
-COMANI_URL / COMANI_TOKEN select the daemon. Environment/model-root paths are
+COMFIER_URL / COMFIER_TOKEN select the daemon. Environment/model-root paths are
 on the server; --output is local. Ordinary runs reuse installed software.
 --prepare permits environment/plugin changes; --update or an explicit core
 version/commit also selects an update. Torch/CUDA packages are your choice.
@@ -13,7 +13,7 @@ import shlex
 from dataclasses import replace
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 HF_COMMIT = "0bb149f51e3156ed4b90dd45d5620346bfe1df8f"
 MODEL = "minimax_H3_image_pruned_INT8.safetensors"
@@ -58,7 +58,7 @@ def git_plugin_spec(value):
 
 def add_arguments(parser, *, benchmark=False):
     parser.add_argument("--url", type=str,
-                        default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+                        default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--output", type=Path,
                         default=Path("artifacts/h3-benchmark" if benchmark else "artifacts/h3.png"),
                         help="local benchmark directory" if benchmark else "new local PNG")
@@ -99,7 +99,7 @@ def add_arguments(parser, *, benchmark=False):
 
 
 async def choose_root(category, selected_path):
-    roots = await comani.files.roots(category=category)
+    roots = await cf.files.roots(category=category)
     selected = [root for root in roots if root.path == selected_path] if selected_path else roots
     if len(selected) != 1:
         raise ValueError(f"Choose an explicit {category} root from {[root.path for root in roots]}")
@@ -108,7 +108,7 @@ async def choose_root(category, selected_path):
 
 async def prepare(args):
     """Explicit changes first; three verified model downloads form the ready barrier."""
-    info = await comani.comfyui.info()
+    info = await cf.comfyui.info()
     changes = (args.new_environment, args.runtime_python, args.comfy_root, args.runtime_package,
                args.update, args.comfy_version, args.comfy_commit, args.cli_version, args.cli_revision,
                args.manager_version, args.hub_version, args.torch_requirement, args.torch_index_url,
@@ -124,40 +124,40 @@ async def prepare(args):
         if args.new_environment:
             if not (args.runtime_package and args.torch_requirement and args.torch_index_url):
                 raise ValueError("New GPU environment needs --runtime-package, --torch-requirement and --torch-index-url")
-            runtime_python = (await comani.comfyui.create_environment(args.new_environment)).python
+            runtime_python = (await cf.comfyui.create_environment(args.new_environment)).python
         fields = {"runtime_python": runtime_python, "cpu": False, "custom_nodes": True}
         if args.comfy_root:
             fields["comfy_root"] = args.comfy_root
-        await comani.comfyui.configure(**fields)
-        await comani.comfyui.prepare_tools(cli_version=args.cli_version, cli_revision=args.cli_revision,
+        await cf.comfyui.configure(**fields)
+        await cf.comfyui.prepare_tools(cli_version=args.cli_version, cli_revision=args.cli_revision,
                                             skip_manager=True)
         if args.torch_requirement:
             if not args.torch_index_url:
                 raise ValueError("GPU package installation needs --torch-index-url")
             command = [runtime_python, "-m", "pip", "install", *args.torch_requirement,
                        "--index-url", args.torch_index_url]
-            await comani.bash.run(shlex.join(command))
-        configured = await comani.comfyui.info()
+            await cf.bash.run(shlex.join(command))
+        configured = await cf.comfyui.info()
         target = {"version": args.comfy_version, "commit": args.comfy_commit,
                   "skip_torch": True, "skip_manager": True}
         if not configured.installed:
-            await comani.comfyui.install(**target)
+            await cf.comfyui.install(**target)
         elif args.update or args.comfy_version or args.comfy_commit:
-            await comani.comfyui.update(**target)
+            await cf.comfyui.update(**target)
         if args.runtime_package:
-            await comani.comfyui.prepare_runtime(args.runtime_package)
-        await comani.comfyui.prepare_tools(skip_cli=True, manager_version=args.manager_version,
+            await cf.comfyui.prepare_runtime(args.runtime_package)
+        await cf.comfyui.prepare_tools(skip_cli=True, manager_version=args.manager_version,
                                             hub_version=args.hub_version)
         for package, version in args.plugin:
-            await comani.plugins.install([package], version=version)
+            await cf.plugins.install([package], version=version)
         for repository, commit in args.git_plugin:
-            await comani.plugins.install_git(repository, commit=commit)
+            await cf.plugins.install_git(repository, commit=commit)
 
-    info = await comani.comfyui.info()
+    info = await cf.comfyui.info()
     if not info.installed or info.config.get("cpu"):
         raise ValueError("H3 needs an installed GPU-configured runtime; select --prepare to change it")
     # Check actual node availability, rather than requiring a particular software commit.
-    info = await comani.comfyui.start()
+    info = await cf.comfyui.start()
     nodes = (info.extra.get("node_metadata") or {}).get("nodes", {})
     required = {"CLIPLoader", "MiniMaxH3ImageConditioning", "ConditioningZeroOut",
                 "UNETLoader", "KSampler", "VAELoader", "VAEDecode", "SaveImage"}
@@ -168,7 +168,7 @@ async def prepare(args):
     async def acquire(weight, selected_path):
         category, name, source, expected_hash = weight
         root = await choose_root(category, selected_path)
-        resolved = await comani.models.resolve(source)  # Local provider query; no remote disk access.
+        resolved = await cf.models.resolve(source)  # Local provider query; no remote disk access.
         candidates = [artifact for artifact in resolved.files if artifact.filename == name]
         if len(candidates) != 1:
             raise ValueError(f"Expected exactly one provider file named {name}")
@@ -176,7 +176,7 @@ async def prepare(args):
         if artifact.sha256 and artifact.sha256.lower() != expected_hash:
             raise ValueError(f"Provider digest changed for {name}")
         artifact = replace(artifact, sha256=expected_hash)
-        return await comani.models.download(artifact, root=root, path=name, reuse=True,
+        return await cf.models.download(artifact, root=root, path=name, reuse=True,
                                              transport=args.transport, connections=args.connections)
 
     # Different roots/providers are not one filesystem transaction.
@@ -186,28 +186,28 @@ async def prepare(args):
 
 
 async def run(args, *, transform=None):
-    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+    async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
         await prepare(args)
-        with comani.graph() as graph:
-            clip = comani.node("CLIPLoader", clip_name=ENCODER, type="minimax", device="default")
-            positive, latent = comani.node("MiniMaxH3ImageConditioning", clip=clip,
+        with cf.graph() as graph:
+            clip = cf.node("CLIPLoader", clip_name=ENCODER, type="minimax", device="default")
+            positive, latent = cf.node("MiniMaxH3ImageConditioning", clip=clip,
                                            prompt=args.prompt, width=args.width, height=args.height)
-            negative = comani.node("ConditioningZeroOut", conditioning=positive)
-            model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-            sampled = comani.node(
+            negative = cf.node("ConditioningZeroOut", conditioning=positive)
+            model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+            sampled = cf.node(
                 "KSampler", model=model, positive=positive, negative=negative, latent_image=latent,
                 seed=args.seed, steps=args.steps, cfg=1.0, sampler_name="euler",
                 scheduler="simple", denoise=1.0,
             )
-            vae = comani.node("VAELoader", vae_name=VAE)
-            image = comani.node("VAEDecode", samples=sampled, vae=vae)
+            vae = cf.node("VAELoader", vae_name=VAE)
+            image = cf.node("VAEDecode", samples=sampled, vae=vae)
             if transform is not None:
                 image = transform(image)
-            saved = comani.node("SaveImage", images=image, filename_prefix="comani/h3", return_call=True)
-        run = comani.submit(graph, return_call=True)
+            saved = cf.node("SaveImage", images=image, filename_prefix="comfier/h3", return_call=True)
+        run = cf.submit(graph, return_call=True)
         output = await run.file(node_id=saved.id)
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        print((await comani.files.download(output, args.output)).local_path)
+        print((await cf.files.download(output, args.output)).local_path)
 
 
 if __name__ == "__main__":

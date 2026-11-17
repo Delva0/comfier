@@ -30,13 +30,13 @@ def main():
         "--wheel-dir", str(directories["dist"]), str(project),
     ], cwd=project, env=env, check=True)
     version = tomllib.loads((project / "pyproject.toml").read_text())["project"]["version"]
-    wheel = directories["dist"] / f"comani-{version}-py3-none-any.whl"
-    source = project / "src/comani"
+    wheel = directories["dist"] / f"comfier-{version}-py3-none-any.whl"
+    source = project / "src/comfier"
     source_hashes = {path.relative_to(source).as_posix(): sha256(path.read_bytes())
                      for path in sorted(source.rglob("*.py"))}
     with zipfile.ZipFile(wheel) as archive:
-        wheel_hashes = {name.removeprefix("comani/"): sha256(archive.read(name))
-                        for name in archive.namelist() if name.startswith("comani/") and name.endswith(".py")}
+        wheel_hashes = {name.removeprefix("comfier/"): sha256(archive.read(name))
+                        for name in archive.namelist() if name.startswith("comfier/") and name.endswith(".py")}
     if source_hashes != wheel_hashes:
         raise RuntimeError("Built wheel Python files differ from the current source tree")
     wheel_python = project / ".venv-wheel/bin/python"
@@ -48,9 +48,9 @@ def main():
     ], cwd=local, env=env, check=True)
     inspect = """
 import hashlib, importlib.util, json, pathlib
-import comani
+import comfier
 assert importlib.util.find_spec('torch') is None
-package = pathlib.Path(comani.__file__).parent
+package = pathlib.Path(comfier.__file__).parent
 print(json.dumps({'package': str(package), 'files': {
     path.relative_to(package).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
     for path in sorted(package.rglob('*.py'))

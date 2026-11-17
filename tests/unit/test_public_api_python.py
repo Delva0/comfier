@@ -2,23 +2,23 @@
 
 import pytest
 
-import comani
-from comani import Call, GraphRef, OutputFuture
-from comani.code import prepare_code
+import comfier
+from comfier import Call, GraphRef, OutputFuture
+from comfier.code import prepare_code
 
 
 @pytest.mark.parametrize('value', [(1, 2), {'items': [1, 2]}, None])
 async def test_default_python_single_output_and_explicit_call(peer, value):
     remote, _ = peer
-    future = comani.python(lambda item: item, inputs={'item': value})
+    future = comfier.python(lambda item: item, inputs={'item': value})
     assert isinstance(future, OutputFuture) and not isinstance(future, Call)
     assert await (await future).fetch() == value
     call = remote.python(lambda item: item, inputs={'item': value}, return_call=True)
     assert isinstance(call, Call)
     ref, = await call
     assert await ref.fetch() == value
-    with comani.graph() as graph:
-        symbolic = comani.python(lambda item: item, inputs={'item': value})
+    with comfier.graph() as graph:
+        symbolic = comfier.python(lambda item: item, inputs={'item': value})
         assert isinstance(symbolic, GraphRef)
         graph.output('one', symbolic)
     assert len(graph.outputs) == 1

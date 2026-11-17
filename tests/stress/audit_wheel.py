@@ -13,14 +13,14 @@ def hashes(root):
 
 
 project = Path(__file__).resolve().parents[2]
-wheel = project / ".local/dist/comani-0.2.0-py3-none-any.whl"
-source = hashes(project / "src/comani")
+wheel = project / ".local/dist/comfier-0.2.0-py3-none-any.whl"
+source = hashes(project / "src/comfier")
 with zipfile.ZipFile(wheel) as archive:
-    packaged = {name.removeprefix("comani/"): hashlib.sha256(archive.read(name)).hexdigest()
-                for name in archive.namelist() if name.startswith("comani/") and name.endswith(".py")}
+    packaged = {name.removeprefix("comfier/"): hashlib.sha256(archive.read(name)).hexdigest()
+                for name in archive.namelist() if name.startswith("comfier/") and name.endswith(".py")}
 with tempfile.TemporaryDirectory() as temporary:
     checked = subprocess.run([str(project / ".venv-wheel/bin/python"), "-B", "-c",
-                              "import comani,importlib.util; assert importlib.util.find_spec('torch') is None; print(comani.__file__)"],
+                              "import comfier,importlib.util; assert importlib.util.find_spec('torch') is None; print(comfier.__file__)"],
                              cwd=temporary, text=True, capture_output=True, check=True)
 installed_root = Path(checked.stdout.strip()).parent
 assert installed_root.is_relative_to(project / ".venv-wheel")

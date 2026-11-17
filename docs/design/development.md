@@ -1,36 +1,36 @@
 # 运行、示例与开发
 
-客户端和管理 daemon 需要 Python 3.11+ 与轻量 Comani 包。ComfyUI、Torch、节点和模型属于明确选定的计算环境。以下命令用于 Linux/WSL；服务器路径和客户端路径分别标明。
+客户端和管理 daemon 需要 Python 3.11+ 与轻量 Comfier 包。ComfyUI、Torch、节点和模型属于明确选定的计算环境。以下命令用于 Linux/WSL；服务器路径和客户端路径分别标明。
 
 ## 启动管理 daemon
 
 在服务器管理环境安装当前 wheel，然后选择实际 root、计算解释器和 workspace：
 
 ```sh
-python -m pip install /server/packages/comani-0.5.0-py3-none-any.whl
-comani daemon --comfy-root /server/ComfyUI \
+python -m pip install /server/packages/comfier-0.5.0-py3-none-any.whl
+comfier daemon --comfy-root /server/ComfyUI \
   --runtime-python /server/comfy-env/bin/python --workspace /server --no-start
 ```
 
-ComfyUI 和计算环境路径可以尚不存在；此时先执行下面的显式准备。`python -m comani daemon` 与 console 入口相同。默认前台监听 127.0.0.1:8190，由 Ctrl-C/SIGTERM 或部署者进程管理器停止。`--no-start` 只启动管理，不加时 CLI 尝试启动计算；Client 连接始终只做管理握手。
+ComfyUI 和计算环境路径可以尚不存在；此时先执行下面的显式准备。`python -m comfier daemon` 与 console 入口相同。默认前台监听 127.0.0.1:8190，由 Ctrl-C/SIGTERM 或部署者进程管理器停止。`--no-start` 只启动管理，不加时 CLI 尝试启动计算；Client 连接始终只做管理握手。
 
-daemon 命令展开时会先检查可用的 `aria2c`，缺失时通过目标系统包管理器自动安装；下载选择 aria2 时也会独立检查并补装，复用同一安装锁。`--no-start` 只禁止计算启动，仍准备下载工具；`--print-config` 只打印配置，不安装。直接构造管理服务或导入 Comani 不会安装系统包。
+daemon 命令展开时会先检查可用的 `aria2c`，缺失时通过目标系统包管理器自动安装；下载选择 aria2 时也会独立检查并补装，复用同一安装锁。`--no-start` 只禁止计算启动，仍准备下载工具；`--print-config` 只打印配置，不安装。直接构造管理服务或导入 Comfier 不会安装系统包。
 
-工具准备在后台运行，管理入口保持可连接，与 CLI 原有的自动计算启动相互独立。工具准备缓慢或失败不会阻止已有模型运行；失败会输出明确错误，并通过 `comfyui.info().extra["download_tools"]` 暴露工具状态、部署失败与 Operation 回执，保留 bash/管理接口用于修复。修复权限或包源后可以重新展开 daemon；后续 aria2 下载也会重新检查实际可执行文件并重试准备。安装不要求用户额外手动预装或确认；无可用包管理器、无权限或安装失败会返回具体错误，不会静默切换下载器。
+工具准备在后台运行，管理入口保持可连接，与 CLI 的自动计算启动相互独立。工具准备缓慢或失败不会阻止已有模型运行；失败会输出明确错误，并通过 `comfyui.info().extra["download_tools"]` 暴露工具状态、部署失败与 Operation 回执，保留 bash/管理接口用于修复。修复权限或包源后可以重新展开 daemon；后续 aria2 下载也会重新检查实际可执行文件并重试准备。安装不要求用户额外手动预装或确认；无可用包管理器、无权限或安装失败会返回具体错误，不会静默切换下载器。
 
-通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMANI_TOKEN 或 --token，非 loopback 绑定必须有 token。
+通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMFIER_TOKEN 或 --token，非 loopback 绑定必须有 token。
 
 计算通道默认 HTTP。显式配置 `compute_transport="zmq"` 或 `--compute-transport zmq` 可让 daemon 到 worker 使用私有 IPC，`--zmq-bind` 可重复开放 IPC/TCP gateway；管理、文件与原生 JSON 控制继续通过 HTTP。可选依赖、同一个 Client 的 HTTP companion 和远端 CURVE 部署见 [ZMQ 计算通道](compute-transport.md)。
 
 ## 模型目录与代码更新分开
 
-同一实例保留磁盘时，重启计算、重启 daemon、替换 Comani wheel 都不要求重新下载模型。ComfyUI 的原地 Git 更新也不删除已有模型；把 ComfyUI 改装到另一个目录时，默认 `models/` 会随代码目录改变，旧文件可能仍在磁盘却不在新搜索路径里。
+同一实例保留磁盘时，重启计算、重启 daemon、替换 Comfier wheel 都不要求重新下载模型。ComfyUI 的原地 Git 更新也不删除已有模型；把 ComfyUI 改装到另一个目录时，默认 `models/` 会随代码目录改变，旧文件可能仍在磁盘却不在新搜索路径里。
 
-部署时把模型和配置放在代码目录之外，使用 ComfyUI 原生的 `extra_model_paths`。例如先创建 `/server/comani-data/models/` 下需要的类别目录，再保存 `/server/comani-data/extra_model_paths.yaml`：
+部署时把模型和配置放在代码目录之外，使用 ComfyUI 原生的 `extra_model_paths`。例如先创建 `/server/comfier-data/models/` 下需要的类别目录，再保存 `/server/comfier-data/extra_model_paths.yaml`：
 
 ```yaml
 persistent_models:
-  base_path: /server/comani-data
+  base_path: /server/comfier-data
   is_default: true
   checkpoints: models/checkpoints
   diffusion_models: models/diffusion_models
@@ -39,21 +39,21 @@ persistent_models:
   loras: models/loras
 ```
 
-`is_default: true` 把这些目录放在原生优先级前面。只声明实际需要的类别；插件自注册的类别仍遵循插件自己的准备流程。把下面保存为 `/server/comani-data/runtime.json`，然后运行 `comani daemon --config /server/comani-data/runtime.json --no-start`：
+`is_default: true` 把这些目录放在原生优先级前面。只声明实际需要的类别；插件自注册的类别仍遵循插件自己的准备流程。把下面保存为 `/server/comfier-data/runtime.json`，然后运行 `comfier daemon --config /server/comfier-data/runtime.json --no-start`：
 
 ```json
 {
   "comfy_root": "/server/ComfyUI",
   "runtime_python": "/server/comfy-env/bin/python",
-  "workspace": "/server/comani-data",
+  "workspace": "/server/comfier-data",
   "comfy_args": [
     "--extra-model-paths-config",
-    "/server/comani-data/extra_model_paths.yaml"
+    "/server/comfier-data/extra_model_paths.yaml"
   ]
 }
 ```
 
-之后停止计算并更新 core/wheel，或将 `comfy_root` 显式切换到已准备好的新代码目录，保留这份配置和模型目录。`configure(comfy_args=[...])` 会替换整个参数列表，增改设备参数时要保留上述配置参数。已有模型不会自动搬家；迁移旧部署时先停止计算，再由部署者移动或挂载原模型目录并核对文件，避免把含模型的旧目录一并删除。
+之后停止计算并更新 core/wheel，或将 `comfy_root` 显式切换到已准备好的新代码目录，保留这份配置和模型目录。`configure(comfy_args=[...])` 会替换整个参数列表，增改设备参数时要保留上述配置参数。调整模型位置时先停止计算，显式配置挂载或搜索路径并核对文件。
 
 普通准备调用继续使用同一模型文件名与内容 SHA，并传 `reuse=True`。相同可见路径和 SHA 的文件会在源 GET 前复用；本地 SHA 检查仍有磁盘读取成本。新代码目录中出现同名但不同内容的高优先级文件会报冲突，不会用另一个根中的文件掩盖它。
 
@@ -67,22 +67,22 @@ persistent_models:
 import asyncio
 import os
 
-import comani
+import comfier as cf
 
 
 async def main():
-    async with comani.Client(
-        os.environ.get("COMANI_URL", "http://127.0.0.1:8190"),
-        token=os.environ.get("COMANI_TOKEN"),
+    async with cf.Client(
+        os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"),
+        token=os.environ.get("COMFIER_TOKEN"),
     ):
-        env = await comani.comfyui.create_environment("/server/comfy-env")
-        await comani.comfyui.configure(
+        env = await cf.comfyui.create_environment("/server/comfy-env")
+        await cf.comfyui.configure(
             runtime_python=env.python, comfy_root="/server/ComfyUI",
             cpu=True, custom_nodes=False,
         )
-        await comani.comfyui.prepare_tools(skip_manager=True)
-        await comani.comfyui.install(skip_torch=False, skip_manager=True)
-        await comani.comfyui.prepare_runtime("/server/packages/comani-0.5.0-py3-none-any.whl")
+        await cf.comfyui.prepare_tools(skip_manager=True)
+        await cf.comfyui.install(skip_torch=False, skip_manager=True)
+        await cf.comfyui.prepare_runtime("/server/packages/comfier-0.5.0-py3-none-any.whl")
 
 
 asyncio.run(main())
@@ -102,7 +102,7 @@ python examples/basic.py --input photo.png --output artifacts/basic.png
 python examples/graph_to_eager.py --output artifacts/graph-to-eager.png
 ```
 
-[graph_to_eager.py](../../examples/graph_to_eager.py) 不需要模型或本地 Torch。它把 eager EmptyImage 绑定到 graph 输入，图内 ImageInvert 声明一个导出；`processed = comani.submit(workflow, inputs=...)` 默认直接给 Output，再交给图外 ImageInvert，最后保存下载。两次反转近似恢复原始 RGB(18,52,86)，浮点计算后保存为 8-bit PNG 可能每通道相差一级。
+[graph_to_eager.py](../../examples/graph_to_eager.py) 不需要模型或本地 Torch。它把 eager EmptyImage 绑定到 graph 输入，图内 ImageInvert 声明一个导出；`processed = cf.submit(workflow, inputs=...)` 默认直接给 Output，再交给图外 ImageInvert，最后保存下载。两次反转近似恢复原始 RGB(18,52,86)，浮点计算后保存为 8-bit PNG 可能每通道相差一级。
 
 此处没有 Call 包装或 .output() 胶水。需要 UI/文件句柄的 checkpoint/H3 图则显式 `submit(..., return_call=True)`。零导出的默认 submit 返回 None 仍已提交；需要等待整图时也选 True。计算、逐节点观察与返回形状见 [SDK](sdk.md#graph-导出直接接-eager-下游)。
 
@@ -115,7 +115,7 @@ python examples/local_checkpoint.py --checkpoint my-model.safetensors \
 
 `--checkpoint` 是 ComfyUI 原生模型名。要上传本地 checkpoint，增加 `--upload-checkpoint /local/model.safetensors`；多个 checkpoint 根时还需 `--model-root /actual/server/checkpoints`，只有一个根可直接使用它。上传是 create-only，模型保留供以后使用。选择的权重须适合可见的 CheckpointLoaderSimple/CLIP/KSampler/VAE 节点链和目标硬件；示例不替你选择模型体系。
 
-这个脚本使用显式 `async with Client(...) as remote`，与 basic/H3 的模块上下文风格相互对应。graph 仅捕获计算，SaveImage 默认是原生执行根，通过 submit(graph, return_call=True) 保留 Call，下载用 run.file(node_id=saved.id) 获取实际结果。
+这个脚本使用显式 `async with cf.Client(...) as remote`，与 basic/H3 的模块上下文风格相互对应。graph 仅捕获计算，SaveImage 默认是原生执行根，通过 submit(graph, return_call=True) 保留 Call，下载用 run.file(node_id=saved.id) 获取实际结果。
 
 ## H3 完整脚本
 
@@ -132,7 +132,7 @@ python examples/minimax_h3_remote.py --output artifacts/h3.png
 ```sh
 python examples/minimax_h3_remote.py --prepare \
   --runtime-python "$RUNTIME_PYTHON" --comfy-root "$COMFY_ROOT" \
-  --runtime-package "$SERVER_COMANI_WHEEL" --output artifacts/h3.png
+  --runtime-package "$SERVER_COMFIER_WHEEL" --output artifacts/h3.png
 ```
 
 `--prepare` 复用已装 core/工具，缺 core 才 install；不会默认更新已装 core。增加 `--update` 才沿当前 upstream 更新；`--comfy-version nightly|latest|tag` 或 `--comfy-commit 完整SHA` 明确选择目标，并在已安装时更新到该目标。detached HEAD 没有当前 upstream，更新时必须指定目标。
@@ -175,7 +175,7 @@ python -m ruff check src tests scripts examples benchmarks
 python -m pip wheel --no-deps --wheel-dir dist .
 ```
 
-unit 验证 SDK/故障/打包，native 验证 cache/lazy/loop/expand/list，integration 验证 HTTP/隔离环境/管理与计算。GPU 测试通过 COMANI_TEST_URL 和显式 COMANI_TEST_CHECKPOINT 选择已有权重，不自动下载或租机。
+unit 验证 SDK/故障/打包，native 验证 cache/lazy/loop/expand/list，integration 验证 HTTP/隔离环境/管理与计算。GPU 测试通过 COMFIER_TEST_URL 和显式 COMFIER_TEST_CHECKPOINT 选择已有权重，不自动下载或租机。
 
 最终 wheel 在源码/README 冻结后构建，并核对 source/archive/独立安装身份。历史 [wheel_manifest.json](../wheel_manifest.json) 是 0.2.0 快照；旧报告不得借给新构建。[verify_wheel.py](../../tests/acceptance/verify_wheel.py) 必须使用本次真实 SHA。scripts/ 保留必要 [环境诊断](../../scripts/check_environment.py) 与 [wheel 刷新](../../scripts/refresh_wheel.py)。
 

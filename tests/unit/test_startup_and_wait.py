@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from comani import Client, HTTPTransport, InProcessTransport, RemoteError
+from comfier import Client, HTTPTransport, InProcessTransport, RemoteError
 
 from ._helpers import eventually
 

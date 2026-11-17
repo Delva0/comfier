@@ -17,10 +17,10 @@ if __name__ == "__main__":
 
     import minimax_h3_remote as h3
 
-    import comani
+    import comfier as cf
 
     def transform(image):
-        return comani.python(source=Path(__file__), entry="soften", inputs={"image": image})
+        return cf.python(source=Path(__file__), entry="soften", inputs={"image": image})
 
     parser = argparse.ArgumentParser(description=__doc__)
     h3.add_arguments(parser)

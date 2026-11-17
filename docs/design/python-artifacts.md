@@ -1,27 +1,29 @@
 # Python 代码与目录包
 
-实现：[code.py](../../src/comani/code.py)、[参数 layout](../../src/comani/protocol.py)、[原生 Python 节点](../../src/comani/daemon/python_node.py)。
+实现：[code.py](../../src/comfier/code.py)、[参数 layout](../../src/comfier/protocol.py)、[原生 Python 节点](../../src/comfier/daemon/python_node.py)。
 
-`comani.python()` / `remote.python()` 准备代码 artifact 和参数端口，再调用 driver 注册的 ComaniPython 原生节点。默认返回一个 Output，与单输出原生节点相同；需要 Call 时显式 `return_call=True`。它仍复用调用、输出和所有权规则，不是本地执行。
+`cf.python()` / `remote.python()` 准备代码 artifact 和参数端口，再调用 driver 注册的内部 `ComaniPython` 原生节点。默认返回一个 Output，与单输出原生节点相同；需要 Call 时显式 `return_call=True`。它仍复用调用、输出和所有权规则，不是本地执行。
 
 ## 四种显式来源
 
 ```python
+import comfier as cf
+
 # 一小段自包含 UTF-8 源码：code 是源码内容，不是路径，entry 必填
-result = comani.python(
+result = cf.python(
     code="def adjust(image):\n    return image * 0.5\n",
     entry="adjust", inputs={"image": image},
 )
 
 # 一个 UTF-8 文件：entry 是文件内的 callable
-result = comani.python(source="adjust.py", entry="main", inputs={"image": image})
+result = cf.python(source="adjust.py", entry="main", inputs={"image": image})
 
 # 一个普通目录包：完整入口和相对包根的短入口均可
-result = comani.python(source="my_ops", entry="my_ops.pipeline:main", inputs={"image": image})
-result = comani.python(source="my_ops", entry="pipeline:main", inputs={"image": image})
+result = cf.python(source="my_ops", entry="my_ops.pipeline:main", inputs={"image": image})
+result = cf.python(source="my_ops", entry="pipeline:main", inputs={"image": image})
 
 # callable：本地与对端必须匹配 Python patch 版本和 cloudpickle 版本
-result = comani.python(lambda value: value + 1, inputs={"value": ref})
+result = cf.python(lambda value: value + 1, inputs={"value": ref})
 ```
 
 function、code、source 三种参数互斥。inline/file/package 都是用户显式选择的源码，由目标解释器重新编译；不强制与客户端 Python 相同，也不改写语法、安装依赖或抓取本机 globals/闭包。目标 Python 必须支持所用语法与库 API；目录包才提供正常包内导入上下文。
@@ -39,16 +41,16 @@ if __name__ == "__main__":
     import asyncio
     from pathlib import Path
 
-    import comani
+    import comfier as cf
 
     async def main():
-        async with comani.Client("http://127.0.0.1:8190"):
-            await comani.comfyui.start()
-            image = comani.node("EmptyImage", width=64, height=64, batch_size=1, color=0)
-            adjusted = comani.python(source=Path(__file__), entry="adjust", inputs={"image": image})
-            saved = comani.node("SaveImage", images=adjusted,
-                                filename_prefix="comani/source", return_call=True)
-            await comani.files.download(await saved.file(), "adjusted.png")
+        async with cf.Client("http://127.0.0.1:8190"):
+            await cf.comfyui.start()
+            image = cf.node("EmptyImage", width=64, height=64, batch_size=1, color=0)
+            adjusted = cf.python(source=Path(__file__), entry="adjust", inputs={"image": image})
+            saved = cf.node("SaveImage", images=adjusted,
+                                filename_prefix="comfier/source", return_call=True)
+            await cf.files.download(await saved.file(), "adjusted.png")
 
     asyncio.run(main())
 ```
@@ -83,10 +85,10 @@ daemon 进程记录 top-level package name → content hash：
 Python 节点可在 eager 与 graph 中使用；函数返回 awaitable 时由节点等待。所有返回值都放在一个输出槽：
 
 ```python
-result = await comani.python(code="def main():\n    return (1, False, None)\n", entry="main")
+result = await cf.python(code="def main():\n    return (1, False, None)\n", entry="main")
 assert await result.fetch() == (1, False, None)
 
-call = comani.python(code="def main():\n    return 42\n", entry="main", return_call=True)
+call = cf.python(code="def main():\n    return 42\n", entry="main", return_call=True)
 result, = await call
 ```
 

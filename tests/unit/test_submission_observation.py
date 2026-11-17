@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from comani import Client, SessionClosed
+from comfier import Client, SessionClosed
 
 from .test_submit_batch import BatchRuntime, TraceTransport
 

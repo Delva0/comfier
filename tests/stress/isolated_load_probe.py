@@ -27,8 +27,8 @@ from types import SimpleNamespace
 
 from aiohttp import ClientSession, web
 
-from comani.daemon import NativeRuntime
-from comani.daemon.http import create_app
+from comfier.daemon import NativeRuntime
+from comfier.daemon.http import create_app
 
 PROJECT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT / 'tests/stress'))
@@ -36,22 +36,22 @@ workload = importlib.import_module('independent_load')
 
 
 def provenance():
-    import comani
-    package = Path(comani.__file__).resolve().parent
+    import comfier
+    package = Path(comfier.__file__).resolve().parent
     manifest = json.loads(args.manifest.read_text())['files'] if args.manifest else {
         str(path.relative_to(PROJECT)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in (PROJECT / 'src/comani').rglob('*.py')}
-    expected = {name.removeprefix('src/comani/'): value for name, value in manifest.items() if name.startswith('src/comani/')}
+        for path in (PROJECT / 'src/comfier').rglob('*.py')}
+    expected = {name.removeprefix('src/comfier/'): value for name, value in manifest.items() if name.startswith('src/comfier/')}
     files = {str(p.relative_to(package)): hashlib.sha256(p.read_bytes()).hexdigest() for p in package.rglob('*.py')}
     loaded = {name: {'path': str(Path(module.__file__).resolve()), 'sha256': hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()}
-              for name, module in list(sys.modules.items()) if (name == 'comani' or name.startswith('comani.'))
+              for name, module in list(sys.modules.items()) if (name == 'comfier' or name.startswith('comfier.'))
               and getattr(module, '__file__', '').endswith('.py')}
     source = {name: hashlib.sha256((PROJECT / name).read_bytes()).hexdigest() for name in manifest}
     assert files == expected, 'installed runtime differs from the tested wheel manifest'
-    assert '/site-packages/comani' in str(package)
+    assert '/site-packages/comfier' in str(package)
     assert all(Path(value['path']).is_relative_to(package) for value in loaded.values())
     return {'pid': os.getpid(), 'python': sys.executable, 'package': str(package),
-            'version': importlib.metadata.version('comani'), 'installed_files': files,
+            'version': importlib.metadata.version('comfier'), 'installed_files': files,
             'loaded_modules': loaded, 'checkout_files': source,
             'checkout_manifest_differences': [key for key, value in source.items() if value != manifest[key]],
             'head': subprocess.check_output(['git', '-C', str(PROJECT), 'rev-parse', 'HEAD'], text=True).strip(),

@@ -7,8 +7,8 @@ import time
 import uuid
 from pathlib import Path
 
-from comani import Client
-from comani.transport import HTTPTransport
+from comfier import Client
+from comfier.transport import HTTPTransport
 
 
 def once(marker, seconds, directory=None):
@@ -19,7 +19,7 @@ def once(marker, seconds, directory=None):
     from pathlib import Path
     directory = Path(directory) if directory else Path(tempfile.gettempdir())
     directory.mkdir(parents=True, exist_ok=True)
-    path = directory / ('comani-longwait-' + marker + '.jsonl')
+    path = directory / ('comfier-longwait-' + marker + '.jsonl')
     with path.open('a') as stream:
         stream.write(json.dumps({'started': time.time()}) + '\n')
     time.sleep(seconds)
@@ -43,7 +43,7 @@ class AuditedTransport(HTTPTransport):
 
 
 async def main(args):
-    transport = AuditedTransport(args.url, os.environ.get('COMANI_TOKEN'))
+    transport = AuditedTransport(args.url, os.environ.get('COMFIER_TOKEN'))
     async with Client(transport=transport) as remote:
         assert remote.handshake.get('capabilities', {}).get('bounded_wait') is True
         started = time.monotonic()

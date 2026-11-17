@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(
     not os.path.isfile(COMFY + "/execution.py"), reason="real ComfyUI checkout required",
 )
@@ -16,7 +16,7 @@ def test_native_arguments_set_import_time_memory_policy_in_fresh_process(reserve
         [sys.executable, "-c", """
 import asyncio
 import sys
-from comani.daemon import NativeRuntime
+from comfier.daemon import NativeRuntime
 
 async def main():
     original_argv = sys.argv
@@ -44,7 +44,7 @@ asyncio.run(main())
 
 
 @pytest.mark.parametrize(("native_args", "message"), [
-    (["--unknown-comani-native-option"], "unrecognized arguments"),
+    (["--unknown-comfier-native-option"], "unrecognized arguments"),
     (["--cuda"], "ambiguous option"),
     (["--lowvram", "--highvram"], "not allowed with argument"),
 ])
@@ -52,7 +52,7 @@ def test_native_parser_rejects_invalid_arguments_before_nodes_import(native_args
     result = subprocess.run(
         [sys.executable, "-c", """
 import sys
-from comani.daemon.adapter import NativeAdapter
+from comfier.daemon.adapter import NativeAdapter
 
 original_argv = sys.argv
 try:

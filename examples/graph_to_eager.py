@@ -10,31 +10,31 @@ import asyncio
 import os
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 
 async def main(args):
-    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
-        await comani.comfyui.start()
-        source = comani.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
-        with comani.graph() as workflow:
+    async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
+        await cf.comfyui.start()
+        source = cf.node("EmptyImage", width=64, height=64, batch_size=1, color=0x123456)
+        with cf.graph() as workflow:
             image = workflow.input("image", type="IMAGE")
-            inverted = comani.node("ImageInvert", image=image)
+            inverted = cf.node("ImageInvert", image=image)
             workflow.output("image", inverted)
 
-        processed = comani.submit(workflow, inputs={"image": source})
-        restored = comani.node("ImageInvert", image=processed)
-        saved = comani.node("SaveImage", images=restored,
-                            filename_prefix="comani/graph-to-eager", return_call=True)
+        processed = cf.submit(workflow, inputs={"image": source})
+        restored = cf.node("ImageInvert", image=processed)
+        saved = cf.node("SaveImage", images=restored,
+                            filename_prefix="comfier/graph-to-eager", return_call=True)
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        downloaded = await comani.files.download(await saved.file(), args.output)
+        downloaded = await cf.files.download(await saved.file(), args.output)
         print(downloaded.local_path)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", type=str,
-                        default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+                        default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--output", type=Path, default=Path("artifacts/graph-to-eager.png"),
                         help="new local PNG; existing files are not overwritten")
     asyncio.run(main(parser.parse_args()))

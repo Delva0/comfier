@@ -4,11 +4,11 @@
 
 ## 连接已配置的 daemon
 
-客户端安装 Comani，daemon 的计算环境安装所需 ComfyUI、Torch、节点包和模型。客户端无需安装 Torch；性能基准另有说明。启动和首次环境准备见[运行指南](../docs/design/development.md)，GPU 的 Python、Torch/CUDA 与硬件由调用者选择。
+客户端安装 Comfier，daemon 的计算环境安装所需 ComfyUI、Torch、节点包和模型。客户端无需安装 Torch；性能基准另有说明。启动和首次环境准备见[运行指南](../docs/design/development.md)，GPU 的 Python、Torch/CUDA 与硬件由调用者选择。
 
 ```sh
-export COMANI_URL='http://127.0.0.1:8190'
-# 入口需要鉴权时，通过 COMANI_TOKEN 提供凭证。
+export COMFIER_URL='http://127.0.0.1:8190'
+# 入口需要鉴权时，通过 COMFIER_TOKEN 提供凭证。
 ```
 
 `Client` 连接只握手；脚本会显式启动计算。输入路径和输出路径属于客户端，计算与模型留在 daemon。模型准备由 daemon 直接下载，无需先下载到客户端再上传。
@@ -26,9 +26,11 @@ export COMANI_URL='http://127.0.0.1:8190'
 普通 Python 变量保存远端输出，后续节点可以直接使用它。只有需要本地值时才 `fetch()`；最终图片或视频通常在远端保存，再用文件 API 下载：
 
 ```python
-saved = comani.node("SaveImage", images=image,
-                    filename_prefix="comani/example", return_call=True)
-await comani.files.download(await saved.file(), "result.png")
+import comfier as cf
+
+saved = cf.node("SaveImage", images=image,
+                    filename_prefix="comfier/example", return_call=True)
+await cf.files.download(await saved.file(), "result.png")
 ```
 
 `graph()` 用于需要整体提交或原生 lazy/dynamic 行为的部分；导出可接回 eager 下游。`submit(..., return_call=True)` 可保留整图的文件和节点观察入口，示例见 checkpoint。调用、引用生命周期和 graph 细节见 [SDK](../docs/design/sdk.md)。

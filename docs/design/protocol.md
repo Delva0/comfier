@@ -1,6 +1,6 @@
 # RPC、值与事件协议
 
-实现：[protocol.py](../../src/comani/protocol.py)、[transport.py](../../src/comani/transport.py)、[管理 HTTP](../../src/comani/daemon/management_http.py)、[计算 HTTP](../../src/comani/daemon/http.py)、[errors.py](../../src/comani/errors.py)。基础协议版本常量为 `1`，新增能力以精确 capability 版本协商。
+实现：[protocol.py](../../src/comfier/protocol.py)、[transport.py](../../src/comfier/transport.py)、[管理 HTTP](../../src/comfier/daemon/management_http.py)、[计算 HTTP](../../src/comfier/daemon/http.py)、[errors.py](../../src/comfier/errors.py)。基础协议版本常量为 `1`，新增能力以精确 capability 版本协商。
 
 ## 管理与计算通道
 
@@ -49,7 +49,7 @@ SDK 使用 `POST /rpc`，请求为 `{"method": "...", "params": {...}}`；成功
 
 `fetch` 仍使用同一 `POST /rpc`，返回同一份 cloudpickle 对象字节。握手精确声明整数 `capabilities.binary_fetch=1` 时，新 HTTP 客户端发送 `Accept: application/vnd.comani.pickle`，服务端以该 media type 返回 pickle body。没有能力时使用原有 `{"codec":"pickle","data":"<base64>"}` JSON envelope；新服务端对旧客户端仍返回 JSON，新客户端也能读取 JSON fallback。能力版本不匹配或布尔 `true` 不算支持。
 
-可选 `comani[lz4]` 在双方都有 LZ4 且服务端声明整数 `binary_fetch_lz4=1` 时，允许默认 `fetch_compression="auto"` 发送 `X-Comani-Accept-Codec: lz4-frame-v1`。`"identity"` 禁用该协商；缺 extra 或对端能力时保留 binary identity。`auto` 只选择可用 codec，不测网络带宽，也不保证更快。
+可选 `comfier[lz4]` 在双方都有 LZ4 且服务端声明整数 `binary_fetch_lz4=1` 时，允许默认 `fetch_compression="auto"` 发送 `X-Comani-Accept-Codec: lz4-frame-v1`。`"identity"` 禁用该协商；缺 extra 或对端能力时保留 binary identity。`auto` 只选择可用 codec，不测网络带宽，也不保证更快。
 
 服务端仅对至少 1 MiB 的完整 pickle body 尝试 fast LZ4 frame，实际节省至少 1% 才返回 `application/vnd.comani.pickle+lz4`，并以 `X-Comani-Uncompressed-Length` 声明原长度。LZ4 是独立 vendor media type，不使用 HTTP `Content-Encoding`。客户端要求一个完整、带 content checksum 的 frame，验证 frame 长度、声明长度和无尾随数据；未协商、截断、校验或长度错误直接失败，不重新请求或重做计算。
 
@@ -103,6 +103,6 @@ driver 还提供 `/prompt`、`/history`、`/queue`、`/ws` 的小型辅助接口
 
 ## 网络入口
 
-HTTP 是默认传输。显式安装 `comani[zmq]` 后可选择同协议 IPC/TCP 计算通道；管理、文件与 Range 保留 HTTP。端点、逐请求 token、CURVE、credit 和截止时间的部署约定见 [可选 ZMQ 计算通道](compute-transport.md)。
+HTTP 是默认传输。显式安装 `comfier[zmq]` 后可选择同协议 IPC/TCP 计算通道；管理、文件与 Range 保留 HTTP。端点、逐请求 token、CURVE、credit 和截止时间的部署约定见 [可选 ZMQ 计算通道](compute-transport.md)。
 
 配置 token 时使用 Bearer 鉴权；无 token 时仅接受 loopback peer、local Host 与同源浏览器请求。代码执行属于授权能力，实际远端网络、转发和鉴权部署应以独立远端报告为准。

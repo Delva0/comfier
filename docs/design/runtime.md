@@ -1,12 +1,12 @@
 # Driver 与原生 runtime 边界
 
-实现：[CLI](../../src/comani/cli/)、[supervisor](../../src/comani/daemon/supervisor.py)、[service.py](../../src/comani/daemon/service.py)、[adapter.py](../../src/comani/daemon/adapter.py)。
+实现：[CLI](../../src/comfier/cli/)、[supervisor](../../src/comfier/daemon/supervisor.py)、[service.py](../../src/comfier/daemon/service.py)、[adapter.py](../../src/comfier/daemon/adapter.py)。
 
 ## 启动边界
 
-`comani daemon` 与 `python -m comani daemon` 启动独立管理进程，配置一个 ComfyUI 子进程。`--no-start` 只启动管理，ComfyUI 目录可以不存在；CLI 不加该参数时为旧启动脚本兼容而尝试自动启动计算。Client 连接本身只握手管理，不安装、不启动。环境创建、工具准备、安装与生命周期通过显式 [管理 API](remote-management-plan.md) 执行。公开入口统一经过 `cli/` 调用 `daemon/`；原生子进程使用 daemon 内部 bootstrap，不另提供启动命令。
+`comfier daemon` 与 `python -m comfier daemon` 启动独立管理进程，配置一个 ComfyUI 子进程。`--no-start` 只启动管理，ComfyUI 目录可以不存在；CLI 不加该参数时会尝试启动计算。Client 连接本身只握手管理，不安装、不启动。环境创建、工具准备、安装与生命周期通过显式 [管理 API](remote-management-plan.md) 执行。公开入口统一经过 `cli/` 调用 `daemon/`；原生子进程使用 daemon 内部 bootstrap，不另提供启动命令。
 
-管理解释器与 `runtime_python` 可分离。daemon 仅复制当前 comani 包作为隔离桥接，不把管理 site-packages/PYTHONPATH 注入目标；目标依赖通过显式 prepare_runtime 准备。start 检查依赖并报错，不执行 pip。计算启动失败不会杀死管理；info/config/logs、bash 和文件 I/O 仍可用。
+管理解释器与 `runtime_python` 可分离。daemon 仅复制当前 comfier 包作为隔离桥接，不把管理 site-packages/PYTHONPATH 注入目标；目标依赖通过显式 prepare_runtime 准备。start 检查依赖并报错，不执行 pip。计算启动失败不会杀死管理；info/config/logs、bash 和文件 I/O 仍可用。
 
 原生计算参数通过 `--` 传入，在原生模块初始化前应用。这个入口运行 headless backend，没有再启动第二个 ComfyUI HTTP/WebUI 服务；原生 parser 的语法覆盖范围不等于 driver 的实现范围。不支持的服务或 cache 模式必须明确拒绝，不能静默接受后忽略。
 
@@ -16,7 +16,7 @@
 
 API/partner 后端节点不会被 driver 永久禁用；`--offline`、`--disable-api-nodes` 沿用所选 backend 的节点治理。节点依赖和所需执行 metadata 仍由调用方提供，见 [SDK metadata](sdk.md#可选执行-metadata)。这不增加 WebUI、前端 JS 或第三方 HTTP route 的兼容承诺。
 
-当前保留 `NoAssets` headless 边界。下列 **`--` 后的原生选项** 被明确拒绝，作为参数错误在 Torch 初始化前结束；Comani 自己的 `--host/--port` 仍可用：
+当前保留 `NoAssets` headless 边界。下列 **`--` 后的原生选项** 被明确拒绝，作为参数错误在 Torch 初始化前结束；Comfier 自己的 `--host/--port` 仍可用：
 
 | 不提供的服务/行为 | 拒绝的原生选项 |
 |---|---|

@@ -8,11 +8,11 @@ import time
 
 
 async def probe():
-    from comani import Client, InProcessTransport
-    from comani.daemon import NativeRuntime
+    from comfier import Client, InProcessTransport
+    from comfier.daemon import NativeRuntime
 
     runtime = await NativeRuntime(
-        os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI"),
+        os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI"),
         cpu=True, custom_nodes=False,
     ).start()
     started, finish, ended = threading.Event(), threading.Event(), threading.Event()

@@ -1,1 +1,1 @@
-"""Comani's repository tests; never included in the SDK wheel."""
+"""Comfier's repository tests; never included in the SDK wheel."""

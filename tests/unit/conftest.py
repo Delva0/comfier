@@ -5,8 +5,8 @@ import sys
 import cloudpickle
 import pytest
 
-from comani import Client, InProcessTransport
-from comani.protocol import decode_tree, pack_pickle, restore_arguments
+from comfier import Client, InProcessTransport
+from comfier.protocol import decode_tree, pack_pickle, restore_arguments
 
 
 class FakeRuntime:

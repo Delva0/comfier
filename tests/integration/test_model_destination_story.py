@@ -16,16 +16,16 @@ from pathlib import Path
 import pytest
 from aiohttp import web
 
-import comani
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+import comfier
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
 
 pytestmark = pytest.mark.native
 
 PROJECT = Path(__file__).resolve().parents[2]
-COMFY = Path(os.environ.get("COMANI_COMFY_ROOT", PROJECT.parent / "ComfyUI"))
+COMFY = Path(os.environ.get("COMFIER_COMFY_ROOT", PROJECT.parent / "ComfyUI"))
 RUNTIME_PYTHON = os.environ.get(
-    "COMANI_NATIVE_PYTHON", sys.executable
+    "COMFIER_NATIVE_PYTHON", sys.executable
 )
 CATEGORY = "acceptance_plugin_models"
 PAYLOAD = bytes(range(256)) * 4097
@@ -41,12 +41,12 @@ REGISTER = """def main(category, paths):
 
 
 def write_report(name, report, tmp_path):
-    directory = Path(os.environ.get("COMANI_MODEL_DESTINATION_REPORT_DIR", tmp_path))
+    directory = Path(os.environ.get("COMFIER_MODEL_DESTINATION_REPORT_DIR", tmp_path))
     directory.mkdir(parents=True, exist_ok=True)
     report["source_sha256"] = {
         relative: hashlib.sha256((PROJECT / relative).read_bytes()).hexdigest()
-        for relative in ("src/comani/models.py", "src/comani/management.py",
-                         "src/comani/daemon/management/models.py", "docs/design/models.md")}
+        for relative in ("src/comfier/models.py", "src/comfier/management.py",
+                         "src/comfier/daemon/management/models.py", "docs/design/models.md")}
     report["runtime_python"] = RUNTIME_PYTHON
     report["comfy_root"] = str(COMFY)
     (directory / (name + ".json")).write_text(json.dumps(report, indent=2) + "\n")
@@ -155,11 +155,11 @@ async def native_story(tmp_path, *, start=True):
         site = web.TCPSite(server, "127.0.0.1", 0)
         await site.start()
         source_url = "http://127.0.0.1:" + str(site._server.sockets[0].getsockname()[1])
-        async with comani.Client(url) as remote:
+        async with comfier.Client(url) as remote:
             if start:
                 try:
                     await remote.comfyui.start()
-                except comani.OperationError as error:
+                except comfier.OperationError as error:
                     raise AssertionError({"startup": error.details,
                                           "logs": await remote.comfyui.logs()}) from error
                 roots = await remote.files.roots(category=CATEGORY)
@@ -199,7 +199,7 @@ async def test_native_model_root_baseline(tmp_path):
     try:
         async with native_story(tmp_path) as story:
             before = story.snapshot()
-            source = await comani.models.resolve(story.base + "/builtin.bin")
+            source = await comfier.models.resolve(story.base + "/builtin.bin")
             assert len(source.files) == 1
             assert story.snapshot() == before  # URL resolve is local metadata, not a daemon RPC.
             file = await legacy_example_prepare(story, "checkpoints", "builtin.bin")
@@ -251,7 +251,7 @@ async def test_native_model_category_destination_story(tmp_path):
             (story.first / "shadow.bin").write_bytes(b"different visible model")
             (story.second / "shadow.bin").write_bytes(PAYLOAD)
             before = story.snapshot()
-            with pytest.raises(comani.OperationError) as failure:
+            with pytest.raises(comfier.OperationError) as failure:
                 await story.remote.models.download(
                     story.artifact("shadow.bin"), category=CATEGORY, path="shadow.bin",
                     reuse=True, transport="http")
@@ -297,7 +297,7 @@ async def test_native_model_category_destination_story(tmp_path):
             await asyncio.wait_for(started.wait(), 10)
             await story.register([story.second])
             release.set()
-            with pytest.raises(comani.OperationError) as failure:
+            with pytest.raises(comfier.OperationError) as failure:
                 await asyncio.wait_for(operation.result(), 15)
             assert failure.value.details["error"]["code"] == "RootsChanged"
             assert not (story.first / "removed.bin").exists()
@@ -309,7 +309,7 @@ async def test_native_model_category_destination_story(tmp_path):
             for selection in ({}, {"root": second, "category": CATEGORY},
                               {"category": "not_registered_for_acceptance"}):
                 before_gets = len(story.transfers)
-                with pytest.raises((ValueError, TypeError, comani.OperationError)):
+                with pytest.raises((ValueError, TypeError, comfier.OperationError)):
                     await story.remote.models.download(
                         story.artifact("invalid.bin"), path="invalid.bin", **selection)
                 assert len(story.transfers) == before_gets
@@ -340,7 +340,7 @@ async def test_cold_model_category_does_not_start_or_import_plugins(tmp_path):
                 story.artifact("cold.bin"), category="checkpoints", transport="http")
             story.verify(file, story.builtin, "cold.bin")
             before_gets = len(story.transfers)
-            with pytest.raises(comani.OperationError) as failure:
+            with pytest.raises(comfier.OperationError) as failure:
                 await story.remote.models.download(
                     story.artifact("unregistered.bin"), category=CATEGORY, transport="http")
             assert failure.value.details["error"]["code"] == "InvalidArgument"

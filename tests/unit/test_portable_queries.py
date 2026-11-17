@@ -5,11 +5,11 @@ import json
 import pytest
 from aiohttp import web
 
-import comani
-from comani import Client, InProcessTransport, ModelArtifact
-from comani._model_providers import ProviderQueries, provider_headers
-from comani.daemon.management.service import ManagementService
-from comani.management import _plain
+import comfier
+from comfier import Client, InProcessTransport, ModelArtifact
+from comfier._model_providers import ProviderQueries, provider_headers
+from comfier.daemon.management.service import ManagementService
+from comfier.management import _plain
 
 from .conftest import FakeRuntime
 from .test_binary_fetch import serve
@@ -44,11 +44,11 @@ def provider_facts(monkeypatch):
 
 async def test_hf_civitai_manifest_versions_registry_are_local_inside_and_outside_client(provider_facts):
     async def query_all():
-        hf = await comani.models.resolve({'repo_id': 'owner/repo'})
-        cv = await comani.models.resolve({'version_id': 123})
-        manifest = await comani.models.manifest({'repo_id': 'owner/repo'}, allow=['unet/*'])
-        versions = await comani.models.versions({'repo_id': 'owner/repo'})
-        registry = await comani.plugins.versions('example-package')
+        hf = await comfier.models.resolve({'repo_id': 'owner/repo'})
+        cv = await comfier.models.resolve({'version_id': 123})
+        manifest = await comfier.models.manifest({'repo_id': 'owner/repo'}, allow=['unet/*'])
+        versions = await comfier.models.versions({'repo_id': 'owner/repo'})
+        registry = await comfier.plugins.versions('example-package')
         assert hf.revision == 'a' * 40 and hf.files[0].size == 16
         assert cv.files[0].source['version_id'] == 123
         assert cv.files[0].sha256 == 'd' * 64
@@ -74,7 +74,7 @@ async def test_hf_civitai_manifest_versions_registry_are_local_inside_and_outsid
 
 
 async def test_explicit_query_token_is_local_and_never_in_descriptor(provider_facts):
-    source = await comani.models.resolve({'repo_id': 'owner/repo'}, token='explicit-private')
+    source = await comfier.models.resolve({'repo_id': 'owner/repo'}, token='explicit-private')
     assert provider_facts[-1][1] == {'Authorization': 'Bearer explicit-private'}
     assert 'explicit-private' not in repr(source)
     assert 'explicit-private' not in json.dumps(_plain(source))
@@ -93,7 +93,7 @@ async def test_generic_signed_url_portable_public_redaction_and_real_daemon_down
     monkeypatch.setenv('HF_TOKEN', 'local-hf-do-not-send')
     monkeypatch.setenv('CIVITAI_TOKEN', 'local-cv-do-not-send')
     async with serve(app) as url:
-        source = await comani.models.resolve(url + '/toy.bin?signature=caller-explicit-secret')
+        source = await comfier.models.resolve(url + '/toy.bin?signature=caller-explicit-secret')
         artifact, = source.files
         assert isinstance(artifact, ModelArtifact)
         assert 'caller-explicit-secret' not in repr(source)
@@ -122,5 +122,5 @@ async def test_generic_signed_url_portable_public_redaction_and_real_daemon_down
                                    'not-a-url?secret=value'])
 async def test_bad_generic_source_errors_do_not_echo_secret(source):
     with pytest.raises(Exception) as failure:
-        await comani.models.resolve(source)
+        await comfier.models.resolve(source)
     assert 'secret' not in str(failure.value)

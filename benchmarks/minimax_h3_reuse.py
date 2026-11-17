@@ -18,8 +18,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-import comani
-from comani import Client, RemoteRef
+import comfier as cf
 
 # Direct execution also finds the shared, editable H3 preparation example.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "examples"))
@@ -28,11 +27,11 @@ import minimax_h3_remote as h3  # noqa: E402
 
 @dataclass
 class Setup:
-    model: RemoteRef
-    positive: RemoteRef
-    latent: RemoteRef
-    negative: RemoteRef
-    vae: RemoteRef
+    model: cf.RemoteRef
+    positive: cf.RemoteRef
+    latent: cf.RemoteRef
+    negative: cf.RemoteRef
+    vae: cf.RemoteRef
 
     def release(self):
         for ref in (self.model, self.positive, self.latent, self.negative, self.vae):
@@ -195,11 +194,11 @@ async def run_images(remote, reused, seeds, directory, record, *, steps, serial=
 async def main(args):
     client_started = time.monotonic()
     args.output.mkdir(parents=True, exist_ok=True)
-    package = Path(comani.__file__).parent
+    package = Path(cf.__file__).parent
     record = {'status': 'running', 'started_at_utc': datetime.now(timezone.utc).isoformat(),
               'script_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               'h3_script_sha256': hashlib.sha256(Path(h3.__file__).read_bytes()).hexdigest(),
-              'client_version': importlib.metadata.version('comani'),
+              'client_version': importlib.metadata.version('comfier'),
               'client_source_sha256': {
                   str(path.relative_to(package.parent)): hashlib.sha256(path.read_bytes()).hexdigest()
                   for path in package.rglob('*.py')},
@@ -210,7 +209,7 @@ async def main(args):
               'width': args.width, 'height': args.height, 'steps': args.steps,
               'cfg': 1.0, 'sampler': 'euler', 'scheduler': 'simple', 'images': []}
     try:
-        async with Client(args.url, token=os.environ.get('COMANI_TOKEN')) as remote:
+        async with cf.Client(args.url, token=os.environ.get('COMFIER_TOKEN')) as remote:
             started = time.monotonic()
             acquired = await h3.prepare(args)
             record['remote'] = {'info': asdict(await remote.comfyui.info()),

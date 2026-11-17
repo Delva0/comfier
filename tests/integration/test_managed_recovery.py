@@ -12,12 +12,12 @@ import aiohttp
 import pytest
 from aiohttp import web
 
-from comani import Client, Expired
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier import Client, Expired
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
 
 pytestmark = pytest.mark.native
-COMFY = Path(os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI"))
+COMFY = Path(os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI"))
 
 
 @pytest.mark.skipif(not (COMFY / "execution.py").is_file(), reason="Requires a native ComfyUI checkout")
@@ -67,7 +67,7 @@ async def test_managed_http_start_lost_replies_and_owned_references(tmp_path):
             assert len({item["epoch"] for item in resumes}) == 1
             image = remote.node("EmptyImage", return_call=True, width=64, height=64, batch_size=1, color=0x123456)
             save = remote.node("SaveImage", {"images": image.output(),
-                "filename_prefix": "comani-metadata-" + uuid.uuid4().hex}, return_call=True,
+                "filename_prefix": "comfier-metadata-" + uuid.uuid4().hex}, return_call=True,
                 extra_data={"api_key_comfy_org": "private-metadata-sentinel"})
             metadata = await save.metadata()
             assert isinstance(await save, tuple)

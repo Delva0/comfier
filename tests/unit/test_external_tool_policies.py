@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani.daemon.management import comfyui, plugins, tools
-from comani.daemon.management.operations import ManagementError
+from comfier.daemon.management import comfyui, plugins, tools
+from comfier.daemon.management.operations import ManagementError
 
 
 def setup_tools(tmp_path, packages):

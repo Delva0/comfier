@@ -20,7 +20,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 MODEL = "ideogram4_fp8_scaled.safetensors"
 CLIP = "qwen3vl_8b_fp8_scaled.safetensors"
@@ -51,20 +51,20 @@ async def main(args):
     stages = profile["phases"]
     total_started = time.perf_counter()
     try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             started = time.perf_counter()
             if args.install_plugins:
-                installed = await comani.plugins.list()
+                installed = await cf.plugins.list()
                 missing_plugins = [repository for name, repository in PLUGINS if not any(
                     plugin.id.casefold() == name or Path(plugin.path).name.casefold() == name
                     or (plugin.repository or "").rstrip("/").removesuffix(".git").casefold()
                     == repository.casefold() for plugin in installed
                 )]
                 if missing_plugins:
-                    await comani.comfyui.stop()
+                    await cf.comfyui.stop()
                     for repository in missing_plugins:
-                        await comani.plugins.install_git(repository)
-            info = await comani.comfyui.start()
+                        await cf.plugins.install_git(repository)
+            info = await cf.comfyui.start()
             required = {"Epsilon Scaling", "ModelSamplingAuraFlow", "CFGOverride", "ScheduledCFGGuidance",
                         "ExtendIntermediateSigmas", "LyingSigmaSampler", "EmptyFlux2LatentImage",
                         "BetaSamplingScheduler"}
@@ -74,50 +74,50 @@ async def main(args):
             if args.download_models:
                 for category, filename in WEIGHTS:
                     started = time.perf_counter()
-                    source = await comani.models.resolve({"repo_id": "Comfy-Org/Ideogram-4",
+                    source = await cf.models.resolve({"repo_id": "Comfy-Org/Ideogram-4",
                                                           "path": f"{category}/{filename}"})
                     artifact, = source.files
-                    file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
+                    file = await cf.models.download(artifact, category=category, path=filename, reuse=True)
                     stages.append({"phase": "model_download", "file": filename, "sha256": artifact.sha256,
                                    "revision": source.revision, "root": file.root.path,
                                    "seconds": time.perf_counter() - started})
             started = time.perf_counter()
-            model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-            model = comani.node("Epsilon Scaling", model=model, scaling_factor=1.024)
-            schedule_model = comani.node("ModelSamplingAuraFlow", model=model, shift=3.0, sampling="flow")
-            guided_model = comani.node("CFGOverride", model=schedule_model, cfg=1.0,
+            model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+            model = cf.node("Epsilon Scaling", model=model, scaling_factor=1.024)
+            schedule_model = cf.node("ModelSamplingAuraFlow", model=model, shift=3.0, sampling="flow")
+            guided_model = cf.node("CFGOverride", model=schedule_model, cfg=1.0,
                                       start_percent=0.9, end_percent=1.0)
-            clip = comani.node("CLIPLoader", clip_name=CLIP, type="ideogram4", device="default")
-            vae = comani.node("VAELoader", vae_name=VAE)
-            positive = comani.node("CLIPTextEncode", clip=clip, text=args.prompt)
-            negative = comani.node("CLIPTextEncode", clip=clip, text=args.negative)
-            guider = comani.node("ScheduledCFGGuidance", model=guided_model, positive=positive, negative=negative,
+            clip = cf.node("CLIPLoader", clip_name=CLIP, type="ideogram4", device="default")
+            vae = cf.node("VAELoader", vae_name=VAE)
+            positive = cf.node("CLIPTextEncode", clip=clip, text=args.prompt)
+            negative = cf.node("CLIPTextEncode", clip=clip, text=args.negative)
+            guider = cf.node("ScheduledCFGGuidance", model=guided_model, positive=positive, negative=negative,
                                 cfg=4.0, start_percent=0.0, end_percent=1.0)
-            sigmas = comani.node("BetaSamplingScheduler", model=schedule_model, steps=args.steps,
+            sigmas = cf.node("BetaSamplingScheduler", model=schedule_model, steps=args.steps,
                                 alpha=0.5, beta=0.7)
-            sigmas = comani.node("ExtendIntermediateSigmas", sigmas=sigmas, steps=2,
+            sigmas = cf.node("ExtendIntermediateSigmas", sigmas=sigmas, steps=2,
                                 start_at_sigma=1.0, end_at_sigma=0.98, spacing="linear")
-            sampler = comani.node("KSamplerSelect", sampler_name="euler")
-            sampler = comani.node("LyingSigmaSampler", sampler=sampler, dishonesty_factor=-0.02,
+            sampler = cf.node("KSamplerSelect", sampler_name="euler")
+            sampler = cf.node("LyingSigmaSampler", sampler=sampler, dishonesty_factor=-0.02,
                                  start_percent=0.28, end_percent=0.95)
-            latent = comani.node("EmptyFlux2LatentImage", width=args.width // 16 * 16,
+            latent = cf.node("EmptyFlux2LatentImage", width=args.width // 16 * 16,
                                 height=args.height // 16 * 16, batch_size=1)
             await asyncio.gather(guider, sigmas, sampler, latent, vae)
             stages.append({"phase": "load_encode_schedule", "seconds": time.perf_counter() - started})
             for index in range(args.count):
                 seed = args.seed + index
                 started = time.perf_counter()
-                noise = comani.node("RandomNoise", noise_seed=seed)
-                samples, _denoised = comani.node("SamplerCustomAdvanced", noise=noise, guider=guider,
+                noise = cf.node("RandomNoise", noise_seed=seed)
+                samples, _denoised = cf.node("SamplerCustomAdvanced", noise=noise, guider=guider,
                                                 sampler=sampler, sigmas=sigmas, latent_image=latent)
-                image = comani.node("VAEDecode", samples=samples, vae=vae)
+                image = cf.node("VAEDecode", samples=samples, vae=vae)
                 await image
                 stages.append({"phase": "sample_decode", "seed": seed, "seconds": time.perf_counter() - started})
-                saved = comani.node("SaveImage", images=image, filename_prefix="comani/ideogram4", return_call=True)
+                saved = cf.node("SaveImage", images=image, filename_prefix="comfier/ideogram4", return_call=True)
                 file = await saved.file()
                 started = time.perf_counter()
                 target = args.output_dir / f"seed{seed}.png"
-                await comani.files.download(file, target)
+                await cf.files.download(file, target)
                 stages.append({"phase": "download", "seed": seed, "bytes": file.size,
                                "seconds": time.perf_counter() - started})
                 print(target, flush=True)
@@ -131,7 +131,7 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--prompt", default=PROMPT)
     parser.add_argument("--negative", default="watermark")
     parser.add_argument("--width", type=int, default=1504)

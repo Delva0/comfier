@@ -10,8 +10,8 @@ import weakref
 import pytest
 from aiohttp import web
 
-from comani import Client, HTTPTransport, Released, RemoteError, SessionClosed
-from comani._graph import _receiver
+from comfier import Client, HTTPTransport, Released, RemoteError, SessionClosed
+from comfier._graph import _receiver
 
 from .test_heartbeat import LeaseServer, until
 
@@ -327,7 +327,7 @@ async def test_keeper_thread_construction_and_start_use_fresh_context(owner_serv
     transport = HTTPTransport(owner_server.url)
     await transport.open()
     session = (await transport.request("handshake"))["session_id"]
-    monkeypatch.setattr("comani.transport.threading.Thread", ObservedThread)
+    monkeypatch.setattr("comfier.transport.threading.Thread", ObservedThread)
     token = marker.set("caller-value")
     try:
         lease = transport._start_heartbeat(session, 0.1, asyncio.get_running_loop(), lambda *args: None)

@@ -9,16 +9,16 @@ from pathlib import Path
 
 import pytest
 
-from comani import Client
+from comfier import Client
 
 pytestmark = pytest.mark.gpu
 
 
 @pytest.fixture
 def gpu_url():
-    url = os.environ.get("COMANI_TEST_URL")
+    url = os.environ.get("COMFIER_TEST_URL")
     if not url:
-        pytest.skip("Start the recorded GPU daemon and set COMANI_TEST_URL")
+        pytest.skip("Start the recorded GPU daemon and set COMFIER_TEST_URL")
     return url
 
 
@@ -45,10 +45,10 @@ async def test_gpu_node_python_node_matches_native_function(gpu_url):
 async def test_existing_checkpoint_eager_matches_native_workflow(gpu_url):
     import torch
 
-    checkpoint = os.environ.get("COMANI_TEST_CHECKPOINT")
+    checkpoint = os.environ.get("COMFIER_TEST_CHECKPOINT")
     if not checkpoint:
-        pytest.skip("Set COMANI_TEST_CHECKPOINT to an existing local checkpoint filename")
-    comfy = Path(os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI"))
+        pytest.skip("Set COMFIER_TEST_CHECKPOINT to an existing local checkpoint filename")
+    comfy = Path(os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI"))
     assert (comfy / "models/checkpoints" / checkpoint).is_file()
     record = Path(__file__).resolve().parents[2] / ".local/model-validation.json"
     record.parent.mkdir(exist_ok=True)

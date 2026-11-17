@@ -2,8 +2,8 @@
 
 import pytest
 
-import comani
-from comani import Client, FileRoot, Files, InProcessTransport, RemoteFile
+import comfier
+from comfier import Client, FileRoot, Files, InProcessTransport, RemoteFile
 
 from .conftest import FakeRuntime
 from .test_files_api import running
@@ -31,7 +31,7 @@ def stat_calls(monkeypatch):
 
 async def test_from_ui_all_nodes_order_duplicates_filters_and_directories(peer, stat_calls):
     remote, _ = peer
-    values = await comani.files.from_ui(UI)
+    values = await comfier.files.from_ui(UI)
     assert isinstance(values, tuple) and len(values) == 3
     assert [(value.relative_path, value.root.directory) for value in values] == [
         ('nested/same.png', 'output'), ('same.png', 'temp'), ('in.png', 'input')]
@@ -101,16 +101,16 @@ async def test_real_ui_paths_validate_and_independent_download_keeps_explicit_ow
             async with Client(url_a, token='file-token') as original:
                 for directory in ('input', 'temp', 'output'):
                     await original.files.upload(source, directory=directory, path='nested/same.bin')
-                values = await comani.files.from_ui({'node': {'files': [
+                values = await comfier.files.from_ui({'node': {'files': [
                     {'filename': 'same.bin', 'subfolder': 'nested', 'type': directory}
                     for directory in ('input', 'temp', 'output')]}})
                 assert [value.root.directory for value in values] == ['input', 'temp', 'output']
                 async with Client(url_b, token='file-token'):
                     downloaded = await original.files.download(values[-1], tmp_path / 'copied.bin')
                     assert downloaded.local_path.read_bytes() == source.read_bytes()
-                    with pytest.raises(comani.RemoteError):
-                        await comani.files.download(values[-1], tmp_path / 'must-not-exist.bin')
+                    with pytest.raises(comfier.RemoteError):
+                        await comfier.files.download(values[-1], tmp_path / 'must-not-exist.bin')
                 for path in ('../escape.bin', '/absolute.bin'):
-                    with pytest.raises((ValueError, comani.RemoteError)):
+                    with pytest.raises((ValueError, comfier.RemoteError)):
                         await original.files.from_ui({'node': {'images': [
                             {'filename': path, 'type': 'output'}]}})

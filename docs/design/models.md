@@ -1,13 +1,15 @@
 # 模型来源、获取与原生发布
 
-实现：[SDK](../../src/comani/management.py)、[本地查询](../../src/comani/_model_providers.py)、[下载来源](../../src/comani/daemon/management/providers.py)、[模型服务](../../src/comani/daemon/management/models.py)、[transport](../../src/comani/daemon/management/transports.py)。
+实现：[SDK](../../src/comfier/management.py)、[本地查询](../../src/comfier/_model_providers.py)、[下载来源](../../src/comfier/daemon/management/providers.py)、[模型服务](../../src/comfier/daemon/management/models.py)、[transport](../../src/comfier/daemon/management/transports.py)。
 
-models 管理原生磁盘文件，不创建模型对象或显存 cache。`comani.models.resolve/versions/manifest` 在客户端查询 HF/Civitai 并返回可交给所选 daemon 的来源值，无需 Client；`remote.models` 没有这些纯查询。categories/list、下载、snapshot 和删除依赖远端实际状态，使用模块当前 Client 或显式 remote.models。模型加载仍由原生 Loader 节点执行，删除文件不会自动卸载已加载对象。
+models 管理原生磁盘文件，不创建模型对象或显存 cache。`cf.models.resolve/versions/manifest` 在客户端查询 HF/Civitai 并返回可交给所选 daemon 的来源值，无需 Client；`remote.models` 没有这些纯查询。categories/list、下载、snapshot 和删除依赖远端实际状态，使用模块当前 Client 或显式 remote.models。模型加载仍由原生 Loader 节点执行，删除文件不会自动卸载已加载对象。
 
 ## 选择具体 artifact
 
 ```python
-source = await comani.models.resolve({
+import comfier as cf
+
+source = await cf.models.resolve({
     "repo_id": "owner/model-repo",
     "revision": REQUESTED_REVISION,
     "path": "weights/model.safetensors",
@@ -31,7 +33,7 @@ model = remote.node("UNETLoader", unet_name=file.native_name, weight_dtype="defa
 
 类别选择不会为发现目录而启动 worker，也不会遍历所有节点的 `INPUT_TYPES`。目录来自运行中 live、停止后 last-observed 的快照；冷实例仍由既有路径 helper 读取原生路径配置。只在插件运行时注册、尚未观测到的类别仍不可用，应先按该插件的正常准备步骤注册/观测后再下载。现有显式 root 的带外下载能力不依赖运行中的 worker。
 
-Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`comani.models.versions(source)` 是本地 provider 查询；categories() 和 list(category=..., root=..., prefix=...) 才查询远端。list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
+Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须用 file_id 或自己的明确选择条件，不自动取第一个。其 sizeKB 是近似值，不作为精确 byte 长度证明；发布校验使用可信摘要与响应长度。`cf.models.versions(source)` 是本地 provider 查询；categories() 和 list(category=..., root=..., prefix=...) 才查询远端。list 返回 files wire metadata 与 truncated 标记，普通 stat 默认不扫描大模型。
 
 本地 provider 查询使用客户端进程的 `HF_TOKEN`、`CIVITAI_TOKEN`（兼容别名 `CIVITAI_API_TOKEN`），也可显式传 `token=...`；显式参数优先，两个 Civitai 环境变量同时存在时 `CIVITAI_TOKEN` 优先。返回值不携带 provider token。真正下载使用 daemon 的网络及其独立配置的凭证，本地查询成功不保证远端可下载；授权失败分别报告。需要受限模型时，应明确将该 provider 凭据配置给目标 daemon；客户端全部凭据不会自动透传。aria2 不接收 provider Bearer header：先按原 origin 安全解析重定向，能取得匿名或签名下载 URL 时直接交给 aria2；仍需 Bearer 的源才使用本次 Operation 的临时 loopback Range relay，凭据只发给原 origin，跨 origin 重定向不携带。relay 流式转发且连接数有界，Operation 结束即关闭；匿名下载不经过 relay。
 
@@ -53,7 +55,7 @@ Operation 的 progress 返回请求与实际引擎（`requested_transport`、`tr
 
 POSIX `flock` 对每个缓存 entry 独占，aria2 继承同一个锁 FD；Python 父进程被 SIGKILL 后，仍在写入的 aria2 继续持锁，后来的同目标获取返回 `DestinationBusy`。源地址只经匿名 FD 交给 aria2，不落 argv 或可遗留的输入文件；manifest 不记录 URL 或凭据。完整 SHA 不符、长度/Range 身份不符或超限的 bytes 会废弃；其余传输失败保留可重试部分。恢复后仍核对完整 SHA 和既有 root/stage 身份，随后使用原 create-only 原子发布，不凭缓存名字、文件长度或 aria2 退出码直接安装。
 
-`await remote.models.clear_partial()`（或当前 Client 的 `comani.models.clear_partial()`）立即清除闲置下载缓存，返回 `{"removed": ..., "skipped_active": ...}`；活跃锁持有者即使过期也只跳过并计数，包括仍在运行的旧 aria2。清理只操作该私有 cache，不删除任何已发布模型；已下载但尚未发布的 snapshot artifact 也属于可清除缓存。成功发布后清除本次相关 cache。已完成原生模型的跨运行复用仍通过相同目标路径和 `reuse=True` 的完整 SHA 检查。
+`await remote.models.clear_partial()`（或当前 Client 的 `cf.models.clear_partial()`）立即清除闲置下载缓存，返回 `{"removed": ..., "skipped_active": ...}`；活跃锁持有者即使过期也只跳过并计数，包括仍在运行的旧 aria2。清理只操作该私有 cache，不删除任何已发布模型；已下载但尚未发布的 snapshot artifact 也属于可清除缓存。成功发布后清除本次相关 cache。已完成原生模型的跨运行复用仍通过相同目标路径和 `reuse=True` 的完整 SHA 检查。
 
 支持官方 hub/Xet 路由不等于 private/gated、账号权限和大 LFS 已做真实远端验收；新报告应分别说明覆盖范围，受控每连接限速测试的收益不代表互联网吞吐承诺。
 
@@ -66,7 +68,7 @@ Provider→daemon 断流与 SDK→daemon 断流不同：SDK 恢复观察同一�
 ## HF manifest 与 snapshot
 
 ```python
-manifest = await comani.models.manifest(
+manifest = await cf.models.manifest(
     {"repo_id": "owner/model-repo"}, revision=REQUESTED_REVISION,
     allow=["weights/*.safetensors", "*.json"], ignore=["weights/experimental/*"],
 )

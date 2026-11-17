@@ -6,8 +6,8 @@ import inspect
 
 import pytest
 
-import comani
-from comani import Call, Client, GraphRef, InProcessTransport, OutputFuture, RemoteError
+import comfier
+from comfier import Call, Client, GraphRef, InProcessTransport, OutputFuture, RemoteError
 
 from ._helpers import eventually
 from .conftest import FakeRuntime
@@ -72,7 +72,7 @@ async def test_declared_export_order_zero_one_many_and_awaited_shape(workflow_pe
     remote, runtime = workflow_peer
     graph = make_graph(remote, count)
     kwargs = {'return_call': True} if explicit_call else {}
-    result = comani.submit(graph, **kwargs)
+    result = comfier.submit(graph, **kwargs)
     if explicit_call:
         assert isinstance(result, Call)
         ready = await result
@@ -97,7 +97,7 @@ async def test_zero_export_raw_and_capture_execute_without_any_public_handle(wor
     runtime.workflow_gate.clear()
     raw = {'effect': {'class_type': 'Effect', 'inputs': {'value': 'raw side effect'}}}
     assert remote.submit(raw) is None
-    assert comani.submit(make_graph(remote, 0)) is None
+    assert comfier.submit(make_graph(remote, 0)) is None
     gc.collect()
     await eventually(lambda: len(runtime.started) == 2)
     assert not runtime.completed
@@ -129,7 +129,7 @@ async def test_default_exports_feed_eager_inputs_without_call_or_intermediate_fe
     remote, runtime = workflow_peer
     result = remote.submit(make_graph(remote, count))
     outputs = (result,) if count == 1 else result
-    consumer = comani.python(lambda values: tuple(values), inputs={'values': list(outputs)})
+    consumer = comfier.python(lambda values: tuple(values), inputs={'values': list(outputs)})
     assert await (await consumer).fetch() == tuple(NAMES[:count])
     assert [spec['kind'] for _, spec in runtime.submissions] == ['workflow', 'node']
 
@@ -138,8 +138,8 @@ async def test_default_exports_feed_eager_inputs_without_call_or_intermediate_fe
 async def test_capture_composes_default_symbolic_exports_without_compute_rpc(workflow_peer, count):
     remote, runtime = workflow_peer
     child = make_graph(remote, count)
-    with comani.graph() as outer:
-        projected = comani.submit(child)
+    with comfier.graph() as outer:
+        projected = comfier.submit(child)
         if count == 0:
             assert projected is None
         else:
@@ -159,7 +159,7 @@ async def test_capture_composes_default_symbolic_exports_without_compute_rpc(wor
 async def test_repeated_submissions_have_independent_binding_and_output_owners(workflow_peer):
     remote, runtime = workflow_peer
     graph = make_graph(remote, 1, input_name='tag')
-    first = comani.submit(graph, inputs={'tag': 'first'})
+    first = comfier.submit(graph, inputs={'tag': 'first'})
     second = remote.submit(graph, inputs={'tag': 'second'})
     first_ref, second_ref = await asyncio.gather(first, second)
     assert first_ref.id != second_ref.id
@@ -177,7 +177,7 @@ async def test_export_future_and_downstream_preserve_whole_workflow_tail_failure
     graph = make_graph(remote, 1)
     source = graph.outputs['zeta']
     projected = remote.submit(graph)
-    explicit = comani.submit(graph, return_call=True)
+    explicit = comfier.submit(graph, return_call=True)
     downstream = remote.node('Echo', value=projected)
     default_waiter = asyncio.ensure_future(projected)
     explicit_waiter = asyncio.ensure_future(explicit.output('zeta'))
@@ -198,7 +198,7 @@ async def test_submit_return_call_is_an_explicit_bool(workflow_peer, value):
     with pytest.raises(TypeError, match='bool'):
         remote.submit(graph, return_call=value)
     with pytest.raises(TypeError, match='bool'):
-        comani.submit(graph, return_call=value)
+        comfier.submit(graph, return_call=value)
     assert not runtime.submissions
     assert inspect.signature(Client.submit).parameters['return_call'].default is False
-    assert inspect.signature(comani.submit).parameters['return_call'].default is False
+    assert inspect.signature(comfier.submit).parameters['return_call'].default is False

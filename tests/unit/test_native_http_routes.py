@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pytest
 from aiohttp import ClientSession, web
 
-from comani.daemon.http import create_runtime_app
+from comfier.daemon.http import create_runtime_app
 
 
 class Runtime:

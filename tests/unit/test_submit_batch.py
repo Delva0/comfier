@@ -1,14 +1,13 @@
 """Ordered transport framing preserves per-call acceptance and recovery."""
 
 import asyncio
-import time
 
 import pytest
 
-from comani import Client, InProcessTransport, RemoteError, SessionClosed
-from comani.daemon.service import NativeRuntime, RecoveryPolicy
+from comfier import Client, RemoteError, SessionClosed
+from comfier.daemon.service import NativeRuntime, RecoveryPolicy
 
-from .test_sdk_recovery import RecoverableRuntime, DroppingTransport
+from .test_sdk_recovery import DroppingTransport, RecoverableRuntime
 
 
 class BatchRuntime(RecoverableRuntime):

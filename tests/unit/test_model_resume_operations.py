@@ -7,9 +7,9 @@ from types import SimpleNamespace
 import pytest
 from aiohttp import web
 
-from comani import Client, models
-from comani.daemon.management.model_resume import ModelResumeCache
-from comani.daemon.management.service import ManagementService
+from comfier import Client, models
+from comfier.daemon.management.model_resume import ModelResumeCache
+from comfier.daemon.management.service import ManagementService
 
 from .test_binary_fetch import serve
 from .test_management_sdk import managed_server

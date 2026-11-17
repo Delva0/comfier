@@ -14,9 +14,9 @@ from types import SimpleNamespace
 import pytest
 from aiohttp import web
 
-from comani.daemon.files import FileChangedError, FileStore, Upload, verify_staged
-from comani.daemon.management.models import ModelService
-from comani.daemon.management.service import ManagementService
+from comfier.daemon.files import FileChangedError, FileStore, Upload, verify_staged
+from comfier.daemon.management.models import ModelService
+from comfier.daemon.management.service import ManagementService
 
 from .test_binary_fetch import serve
 from .test_management_service import Supervisor, finish, submit
@@ -253,7 +253,7 @@ def test_real_cross_filesystem_copy_preserves_digest(tmp_path):
     shared = Path("/dev/shm")
     if not shared.is_dir() or shared.stat().st_dev == tmp_path.stat().st_dev:
         pytest.skip("Requires a distinct writable tmpfs filesystem")
-    owner = Path(tempfile.mkdtemp(prefix="comani-stage-test-", dir=shared))
+    owner = Path(tempfile.mkdtemp(prefix="comfier-stage-test-", dir=shared))
     try:
         stage = staged(owner, b"real cross-filesystem payload" * 10000)
         store, _ = store_at(tmp_path / "native")

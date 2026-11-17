@@ -12,7 +12,7 @@ import traceback
 import urllib.request
 from pathlib import Path
 
-from comani import Client, SessionClosed
+from comfier import Client, SessionClosed
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parents[1]
@@ -25,20 +25,20 @@ def snapshot(url):
 
 
 def provenance():
-    import comani
-    package = Path(comani.__file__).resolve().parent
+    import comfier
+    package = Path(comfier.__file__).resolve().parent
     files = {str(path.relative_to(package)): hashlib.sha256(path.read_bytes()).hexdigest()
              for path in package.rglob('*.py')}
     manifest = json.loads(args.manifest.read_text())['files'] if args.manifest else {
         str(path.relative_to(PROJECT)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in (PROJECT / 'src/comani').rglob('*.py')}
-    expected = {name.removeprefix('src/comani/'): value for name, value in manifest.items()
-                if name.startswith('src/comani/')}
-    assert files == expected and '/site-packages/comani' in str(package)
+        for path in (PROJECT / 'src/comfier').rglob('*.py')}
+    expected = {name.removeprefix('src/comfier/'): value for name, value in manifest.items()
+                if name.startswith('src/comfier/')}
+    assert files == expected and '/site-packages/comfier' in str(package)
     return {'package': str(package), 'python': sys.executable, 'installed_files': files,
             'loaded_files': {name: {'path': str(Path(module.__file__).resolve()),
                 'sha256': hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()}
-                for name, module in list(sys.modules.items()) if name.startswith('comani')
+                for name, module in list(sys.modules.items()) if name.startswith('comfier')
                 and getattr(module, '__file__', '').endswith('.py')}}
 
 

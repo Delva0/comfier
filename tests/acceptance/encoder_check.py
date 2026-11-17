@@ -7,7 +7,7 @@ import os
 import time
 from pathlib import Path
 
-from comani import Client
+from comfier import Client
 
 
 def describe(conditioning, latent):
@@ -22,7 +22,7 @@ async def main(args):
     example = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(example)
     started = time.monotonic()
-    async with Client(args.url, token=os.environ.get('COMANI_TOKEN')) as remote:
+    async with Client(args.url, token=os.environ.get('COMFIER_TOKEN')) as remote:
         clip = remote.node('CLIPLoader', return_call=True, clip_name=example.ENCODER, type='minimax', device='default')
         call = remote.node('MiniMaxH3ImageConditioning', return_call=True, clip=clip.output(), prompt=example.PROMPT,
                            width=example.WIDTH, height=example.HEIGHT)
@@ -39,8 +39,8 @@ async def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--report', type=Path, required=True)
-    parser.add_argument('--url', default=os.environ.get('COMANI_URL'))
+    parser.add_argument('--url', default=os.environ.get('COMFIER_URL'))
     args = parser.parse_args()
     if not args.url:
-        parser.error('Provide --url or COMANI_URL')
+        parser.error('Provide --url or COMFIER_URL')
     asyncio.run(main(args))

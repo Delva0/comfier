@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani.daemon.objects import ObjectStore
-from comani.daemon.service import NativeRuntime
+from comfier.daemon.objects import ObjectStore
+from comfier.daemon.service import NativeRuntime
 
 
 @pytest.mark.parametrize('spec,results,port,expected', [

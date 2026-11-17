@@ -14,17 +14,17 @@ def main():
     parser.add_argument("--cuda", action="store_true")
     args = parser.parse_args()
     project = Path(__file__).resolve().parents[1]
-    import comani
+    import comfier
 
-    package = Path(comani.__file__).resolve()
-    expected = {path.relative_to(project / 'src/comani').as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
-                for path in (project / 'src/comani').rglob('*.py')}
+    package = Path(comfier.__file__).resolve()
+    expected = {path.relative_to(project / 'src/comfier').as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in (project / 'src/comfier').rglob('*.py')}
     actual = {path.relative_to(package.parent).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
               for path in package.parent.rglob('*.py')}
     if actual != expected:
-        raise RuntimeError(f'Imported Comani files differ from this checkout: {package}')
+        raise RuntimeError(f'Imported Comfier files differ from this checkout: {package}')
     sys.path.insert(0, str(args.comfy_root.resolve()))
-    sys.argv = ['comani-environment-check'] + ([] if args.cuda else ['--cpu'])
+    sys.argv = ['comfier-environment-check'] + ([] if args.cuda else ['--cpu'])
     import comfy.options
     comfy.options.enable_args_parsing()
     import execution
@@ -33,7 +33,7 @@ def main():
 
     result = {
         "python": sys.version.split()[0],
-        "comani_file": str(package),
+        "comfier_file": str(package),
         "torch_file": torch.__file__,
         "torch": torch.__version__,
         "execution_file": execution.__file__,

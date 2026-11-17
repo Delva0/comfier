@@ -19,26 +19,26 @@ import urllib.request
 import weakref
 from pathlib import Path
 
-from comani import Client, SessionClosed
+from comfier import Client, SessionClosed
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parents[1]
 
 
 def provenance(args):
-    import comani
-    package = Path(comani.__file__).resolve().parent
+    import comfier
+    package = Path(comfier.__file__).resolve().parent
     installed = {str(p.relative_to(package)): hashlib.sha256(p.read_bytes()).hexdigest()
                  for p in package.rglob('*.py')}
     if args.manifest:
-        expected = {name.removeprefix('src/comani/'): digest for name, digest
-                    in json.loads(args.manifest.read_text())['files'].items() if name.startswith('src/comani/')}
+        expected = {name.removeprefix('src/comfier/'): digest for name, digest
+                    in json.loads(args.manifest.read_text())['files'].items() if name.startswith('src/comfier/')}
         assert installed == expected
-    assert '/site-packages/comani' in str(package)
+    assert '/site-packages/comfier' in str(package)
     return {'package': str(package), 'python': sys.executable, 'installed_files': installed,
             'loaded_modules': {name: {'path': str(Path(module.__file__).resolve()),
                 'sha256': hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()}
-                for name, module in list(sys.modules.items()) if name.startswith('comani')
+                for name, module in list(sys.modules.items()) if name.startswith('comfier')
                 and getattr(module, '__file__', '').endswith('.py')}}
 
 

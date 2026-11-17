@@ -11,10 +11,10 @@ from types import SimpleNamespace
 import pytest
 from aiohttp import web
 
-from comani.daemon.files import FileStore
-from comani.daemon.management.operations import ManagementError, OperationRegistry
-from comani.daemon.management.providers import ProviderResolver
-from comani.daemon.management.service import ManagementService
+from comfier.daemon.files import FileStore
+from comfier.daemon.management.operations import ManagementError, OperationRegistry
+from comfier.daemon.management.providers import ProviderResolver
+from comfier.daemon.management.service import ManagementService
 
 
 class Paths:
@@ -556,7 +556,7 @@ async def test_core_update_accepts_exact_commit_and_reads_back_source(tmp_path):
 
 
 async def test_registry_nightly_uses_explicit_git_source_without_packaged_manager(tmp_path, monkeypatch):
-    from comani.daemon.management import plugins
+    from comfier.daemon.management import plugins
     repository = tmp_path / "repository"
     repository.mkdir()
     git(repository, "init")

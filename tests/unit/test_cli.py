@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from comani import __main__ as cli
-from comani.cli import daemon as launcher
+from comfier import __main__ as cli
+from comfier.cli import daemon as launcher
 
 
 def test_public_cli_dispatches_in_current_process(monkeypatch):
@@ -30,3 +30,25 @@ def test_daemon_rejects_invalid_port_before_runtime(port, capsys):
         cli.main(["daemon", "--comfy-root", "/configured/ComfyUI", "--port", port])
     assert result.value.code == 2
     assert "--port must be between" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("current, expected", [(None, "legacy"), ("current", "current"), ("", "")])
+def test_daemon_environment_prefers_comfier_and_keeps_legacy_fallback(monkeypatch, current, expected):
+    captured = {}
+    for suffix in ("TOKEN", "ZMQ_CURVE_PUBLIC_KEY", "ZMQ_CURVE_SECRET_KEY"):
+        monkeypatch.setenv("COMANI_" + suffix, "legacy")
+        if current is None:
+            monkeypatch.delenv("COMFIER_" + suffix, raising=False)
+        else:
+            monkeypatch.setenv("COMFIER_" + suffix, current)
+
+    def create_app(supervisor, **kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(launcher, "create_management_app", create_app)
+    monkeypatch.setattr(launcher.web, "run_app", lambda *args, **kwargs: None)
+    launcher.main(["--comfy-root", "/configured/ComfyUI", "--no-start"])
+    assert captured["token"] == expected
+    assert captured["curve_public_key"] == expected
+    assert captured["curve_secret_key"] == expected

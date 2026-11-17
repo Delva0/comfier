@@ -12,7 +12,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani.daemon.files import (
+from comfier.daemon.files import (
     FileChangedError,
     FileStore,
     UnsupportedFileSystem,

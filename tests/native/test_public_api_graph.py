@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 
-import comani
-from comani import Client, Expired, InProcessTransport
-from comani.daemon import NativeRuntime
+import comfier
+from comfier import Client, Expired, InProcessTransport
+from comfier.daemon import NativeRuntime
 
-COMFY = os.environ.get('COMANI_COMFY_ROOT', '/home/delva/projects/ComfyUI')
+COMFY = os.environ.get('COMFIER_COMFY_ROOT', '/home/delva/projects/ComfyUI')
 pytestmark = pytest.mark.skipif(not Path(COMFY, 'execution.py').is_file(), reason='real ComfyUI required')
 
 
@@ -46,28 +46,28 @@ async def test_native_output_roots_exports_explicit_selection_composition_and_ob
             }
             # Simulate cold/old metadata: daemon still knows native OUTPUT_NODE.
             remote._nodes.pop('IndependentEffect')
-            imported = comani.graph(raw, outputs={'value': ['export', 0]})
-            first = comani.submit(imported, return_call=True)
+            imported = comfier.graph(raw, outputs={'value': ['export', 0]})
+            first = comfier.submit(imported, return_call=True)
             assert await (await first.output('value')).fetch() == 'exported'
             assert Effect.seen == ['native-root']
             # An explicit target selects roots; it does not pull native effects back in.
-            selected = comani.graph({
+            selected = comfier.graph({
                 'native': {'class_type': 'IndependentEffect', 'inputs': {'value': 'unselected'}},
                 'chosen': {'class_type': 'IndependentValue', 'inputs': {'value': 'chosen'}},
             }, outputs={'value': ['chosen', 0]}, targets=['chosen'])
-            with comani.graph() as composed:
-                call = comani.submit(selected, return_call=True)
+            with comfier.graph() as composed:
+                call = comfier.submit(selected, return_call=True)
                 composed.output('value', call.output('value'))
-            assert await (await comani.submit(composed, return_call=True).output('value')).fetch() == 'chosen'
+            assert await (await comfier.submit(composed, return_call=True).output('value')).fetch() == 'chosen'
             assert Effect.seen == ['native-root']
             # Merely observing an unexecuted reference does not add a new root.
-            with comani.graph() as capture:
-                unused = comani.node('IndependentValue', value='unobserved')
-                chosen = comani.node('IndependentValue', value='visible')
+            with comfier.graph() as capture:
+                unused = comfier.node('IndependentValue', value='unobserved')
+                chosen = comfier.node('IndependentValue', value='visible')
                 capture.target(chosen)
-            observed = comani.submit(capture, return_call=True)
+            observed = comfier.submit(capture, return_call=True)
             await observed
-            with pytest.raises(comani.Skipped):
+            with pytest.raises(comfier.Skipped):
                 await observed[unused]
             assert Effect.seen == ['native-root']
             # Exported results are borrowed native cache entries, not permanent pins.

@@ -22,7 +22,7 @@ import urllib.request
 import weakref
 from pathlib import Path
 
-from comani import Client, Expired, Released, SessionClosed
+from comfier import Client, Expired, Released, SessionClosed
 
 HERE = Path(__file__).resolve().parent
 PROJECT = HERE.parents[1]

@@ -6,7 +6,7 @@ import weakref
 
 import pytest
 
-from comani import (
+from comfier import (
     Call,
     Client,
     GraphRef,

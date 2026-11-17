@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani import Client, InProcessTransport, NotSubmitted, RemoteError, SessionClosed
-from comani.daemon.adapter import NativeAdapter
-from comani.daemon.objects import CallFailed
-from comani.daemon.service import CallState, NativeRuntime, RecoveryError
+from comfier import Client, InProcessTransport, NotSubmitted, RemoteError, SessionClosed
+from comfier.daemon.adapter import NativeAdapter
+from comfier.daemon.objects import CallFailed
+from comfier.daemon.service import CallState, NativeRuntime, RecoveryError
 
 from .conftest import FakeRuntime
 

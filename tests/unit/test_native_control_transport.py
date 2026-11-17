@@ -6,9 +6,9 @@ import json
 import pytest
 from aiohttp import ClientResponseError, web
 
-from comani import HTTPTransport, ZMQTransport
-from comani.errors import RemoteError
-from comani.transport import _native_path
+from comfier import HTTPTransport, ZMQTransport
+from comfier.errors import RemoteError
+from comfier.transport import _native_path
 
 
 @pytest.mark.parametrize("path", [

@@ -41,7 +41,7 @@ def main(args):
 if __name__ == '__main__':
     project = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--comfy-root', type=Path, default=Path(os.environ.get('COMANI_COMFY_ROOT', project.parent / 'ComfyUI')))
+    parser.add_argument('--comfy-root', type=Path, default=Path(os.environ.get('COMFIER_COMFY_ROOT', project.parent / 'ComfyUI')))
     parser.add_argument('--port', type=int, default=0)
     parser.add_argument('--startup-timeout', type=float, default=120)
     parser.add_argument('--output', type=Path, default=project / '.local/thin-cli-probes/readme-quickstart.json')

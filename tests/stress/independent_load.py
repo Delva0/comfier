@@ -25,11 +25,11 @@ from pathlib import Path
 import aiohttp
 from aiohttp import web
 
-from comani import Client, Expired, InvalidReference, PackageConflict, RemoteError, Skipped
-from comani.code import prepare_code
-from comani.daemon import NativeRuntime
-from comani.daemon.http import create_app
-from comani.transport import HTTPTransport
+from comfier import Client, Expired, InvalidReference, PackageConflict, RemoteError, Skipped
+from comfier.code import prepare_code
+from comfier.daemon import NativeRuntime
+from comfier.daemon.http import create_app
+from comfier.transport import HTTPTransport
 
 
 class Echo:
@@ -470,7 +470,7 @@ async def raw_ws_ttl_phase(url, runtime, meter):
 
 
 async def package_phase(url, runtime, meter):
-    with tempfile.TemporaryDirectory(prefix="comani-independent-load-") as scratch:
+    with tempfile.TemporaryDirectory(prefix="comfier-independent-load-") as scratch:
         root = Path(scratch)
         package = root / "a" / "independent_probe_package"
         package.mkdir(parents=True)

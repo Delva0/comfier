@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from comani import Client, FileDescriptor, RemoteError
-from comani.daemon.files import FileStore
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier import Client, FileDescriptor, RemoteError
+from comfier.daemon.files import FileStore
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
 
 from .test_binary_fetch import serve
 from .test_files_api import running

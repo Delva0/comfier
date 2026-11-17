@@ -7,8 +7,8 @@ import zipfile
 
 import pytest
 
-from comani.daemon.python_node import Artifacts
-from comani.errors import PackageConflict
+from comfier.daemon.python_node import Artifacts
+from comfier.errors import PackageConflict
 
 
 def package(artifacts, name, *, value=7, entry=None):
@@ -28,7 +28,7 @@ def package(artifacts, name, *, value=7, entry=None):
 
 
 async def test_packages_use_normal_absolute_and_relative_imports_across_sessions():
-    name = "comani_test_" + uuid.uuid4().hex
+    name = "comfier_test_" + uuid.uuid4().hex
     first = Artifacts()
     second = Artifacts()
     try:

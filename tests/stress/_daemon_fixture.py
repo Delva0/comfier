@@ -36,14 +36,14 @@ class DaemonProcess:
                 self.port = probe.getsockname()[1]
         self.log.parent.mkdir(parents=True, exist_ok=True)
         self.output = self.log.open('ab')
-        self.command = [sys.executable, '-B', '-m', 'comani', 'daemon', '--comfy-root', str(self.comfy_root),
+        self.command = [sys.executable, '-B', '-m', 'comfier', 'daemon', '--comfy-root', str(self.comfy_root),
                         '--host', '127.0.0.1', '--port', str(self.port), '--cpu', '--no-custom-nodes']
         try:
             self.child = subprocess.Popen(self.command, cwd=self.project, env=self.env, stdin=subprocess.DEVNULL,
                                           stdout=self.output, stderr=subprocess.STDOUT, start_new_session=True)
             headers = {}
-            if self.env.get('COMANI_TOKEN'):
-                headers['Authorization'] = 'Bearer ' + self.env['COMANI_TOKEN']
+            if self.env.get('COMFIER_TOKEN'):
+                headers['Authorization'] = 'Bearer ' + self.env['COMFIER_TOKEN']
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             deadline = time.monotonic() + timeout
             while time.monotonic() < deadline:

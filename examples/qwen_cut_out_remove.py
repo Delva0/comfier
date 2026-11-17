@@ -23,7 +23,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 MODEL = "qwen_image_2.1_int8_convrot.safetensors"
 CLIP = "qwen3vl_8b_int8_convrot.safetensors"
@@ -42,10 +42,10 @@ WEIGHTS = (
 async def acquire_models(report):
     for category, repository, path in WEIGHTS:
         started = time.perf_counter()
-        source = await comani.models.resolve({"repo_id": repository, "path": path})
+        source = await cf.models.resolve({"repo_id": repository, "path": path})
         artifact, = source.files
         filename = Path(path).name
-        file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
+        file = await cf.models.download(artifact, category=category, path=filename, reuse=True)
         report.append({"phase": "model_download", "file": path, "revision": source.revision,
                        "sha256": artifact.sha256, "root": file.root.path, "priority": file.root.priority,
                        "seconds": time.perf_counter() - started})
@@ -63,9 +63,9 @@ async def main(args):
     phases = report["phases"]
     started = time.perf_counter()
     try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             if args.install_plugin:
-                installed = await comani.plugins.list()
+                installed = await cf.plugins.list()
                 if not any(
                     plugin.id.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
                     or Path(plugin.path).name.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
@@ -73,9 +73,9 @@ async def main(args):
                     == "https://github.com/ausboss/comfyui-ausboss"
                     for plugin in installed
                 ):
-                    await comani.comfyui.stop()
-                    await comani.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
-            info = await comani.comfyui.start()
+                    await cf.comfyui.stop()
+                    await cf.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
+            info = await cf.comfyui.start()
             required = {"SAM3_Detect", "AUSBOSS_NODES_ImageResize", "AUSBOSS_NODES_RefineMask",
                         "TextEncodeQwenImage21", "QwenImage21Cache", "ImageRGBToYUV"}
             available = info.extra.get("node_metadata", {}).get("nodes", {})
@@ -87,22 +87,22 @@ async def main(args):
             if args.download_models:
                 await acquire_models(phases)
             started = time.perf_counter()
-            uploaded = await comani.files.upload(args.input)
+            uploaded = await cf.files.upload(args.input)
             phases.append({"phase": "upload", "seconds": time.perf_counter() - started})
             try:
                 started = time.perf_counter()
-                original, _ = comani.node("LoadImage", image=uploaded.native_name)
-                image, _, _, _ = comani.node(
+                original, _ = cf.node("LoadImage", image=uploaded.native_name)
+                image, _, _, _ = cf.node(
                     "AUSBOSS_NODES_ImageResize", image=original, target_mode="megapixels",
                     width=0, height=0, edge_length=1024, megapixels=args.megapixels, scale_factor=0.5,
                     keep_proportion="fit", fill_color="#000000", divisible_by=32, interpolation="lanczos",
                 )
-                clip = comani.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
-                vae = comani.node("VAELoader", vae_name=VAE)
-                sam, sam_clip, _ = comani.node("CheckpointLoaderSimple", ckpt_name=SAM)
-                model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-                model = comani.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=1.0)
-                model = comani.node("QwenImage21Cache", model=model, device="auto", dtype="default")
+                clip = cf.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
+                vae = cf.node("VAELoader", vae_name=VAE)
+                sam, sam_clip, _ = cf.node("CheckpointLoaderSimple", ckpt_name=SAM)
+                model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+                model = cf.node("LoraLoaderModelOnly", model=model, lora_name=LORA, strength_model=1.0)
+                model = cf.node("QwenImage21Cache", model=model, device="auto", dtype="default")
                 await asyncio.gather(image, clip, vae, sam, sam_clip, model)
                 phases.append({"phase": "load_objects_resize", "seconds": time.perf_counter() - started,
                                "note": "Loader objects; GPU movement also occurs during encode/sample."})
@@ -113,38 +113,38 @@ async def main(args):
                 # Explicitly reuse only values independent of the sampling seed.
                 # Each invocation rebuilds them for its own input/object/prompt.
                 started = time.perf_counter()
-                find = comani.node("CLIPTextEncode", clip=sam_clip, text=args.object)
-                selection, _ = comani.node("SAM3_Detect", model=sam, image=image, conditioning=find,
+                find = cf.node("CLIPTextEncode", clip=sam_clip, text=args.object)
+                selection, _ = cf.node("SAM3_Detect", model=sam, image=image, conditioning=find,
                                            threshold=0.5, refine_iterations=2, individual_masks=False)
-                alpha, alpha_inverse = comani.node(
+                alpha, alpha_inverse = cf.node(
                     "AUSBOSS_NODES_RefineMask", mask=selection, expand=args.alpha_expand, blur=1.0,
                     fill_holes=args.alpha_fill_holes, smooth=3, black_point=0.0,
                     white_point=args.alpha_white_point,
                     edge_refine="off", preview=False,
                 )
-                _, outside = comani.node(
+                _, outside = cf.node(
                     "AUSBOSS_NODES_RefineMask", mask=selection, expand=8, blur=0.0,
                     fill_holes=True, smooth=3, black_point=0.0, white_point=1.0,
                     edge_refine="off", preview=False,
                 )
-                black = comani.node("EmptyImage", width=64, height=64, batch_size=1, color=0)
-                foreground = comani.node("ImageCompositeMasked", destination=image, source=black,
+                black = cf.node("EmptyImage", width=64, height=64, batch_size=1, color=0)
+                foreground = cf.node("ImageCompositeMasked", destination=image, source=black,
                                          mask=outside, x=0, y=0, resize_source=True)
                 # JoinImageWithAlpha uses ComfyUI's MASK convention: alpha=1 means transparent.
-                foreground = comani.node("JoinImageWithAlpha", image=foreground, alpha=alpha_inverse)
+                foreground = cf.node("JoinImageWithAlpha", image=foreground, alpha=alpha_inverse)
                 debug_masks = {}
                 if args.debug_images:
-                    debug_masks.update(selection=comani.node("MaskToImage", mask=selection),
-                                       alpha=comani.node("MaskToImage", mask=alpha))
+                    debug_masks.update(selection=cf.node("MaskToImage", mask=selection),
+                                       alpha=cf.node("MaskToImage", mask=alpha))
                 await asyncio.gather(foreground, *debug_masks.values())
                 phases.append({"phase": "prepare_segment_cutout", "seconds": time.perf_counter() - started})
                 started = time.perf_counter()
-                positive, negative, latent = comani.node(
+                positive, negative, latent = cf.node(
                     "TextEncodeQwenImage21", clip=clip, vae=vae, prompt=prompt,
                     negative_prompt="", resolution=0, **{"images.image_1": image},
                 )
-                blurred_source = comani.node("ImageBlur", image=image, blur_radius=15, sigma=5.0)
-                object_area, _ = comani.node(
+                blurred_source = cf.node("ImageBlur", image=image, blur_radius=15, sigma=5.0)
+                object_area, _ = cf.node(
                     "AUSBOSS_NODES_RefineMask", mask=selection, expand=40, blur=16.0,
                     fill_holes=True, smooth=0, black_point=0.0, white_point=1.0,
                     edge_refine="off", preview=False,
@@ -158,7 +158,7 @@ async def main(args):
                     report["runs"].append(run)
                     stages = run["phases"]
                     started = time.perf_counter()
-                    sampled = comani.node(
+                    sampled = cf.node(
                         "KSampler", model=model, positive=positive, negative=negative, latent_image=latent,
                         seed=seed, steps=args.steps, cfg=1.0, sampler_name="euler", scheduler="simple",
                         denoise=1.0,
@@ -166,30 +166,30 @@ async def main(args):
                     await sampled
                     stages.append({"phase": "sample", "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
-                    generated = comani.node("VAEDecode", samples=sampled, vae=vae)
-                    generated, _ = comani.node("SplitImageWithAlpha", image=generated)
+                    generated = cf.node("VAEDecode", samples=sampled, vae=vae)
+                    generated, _ = cf.node("SplitImageWithAlpha", image=generated)
                     await generated
                     stages.append({"phase": "decode", "seconds": time.perf_counter() - started})
                     started = time.perf_counter()
                     # The original workflow also includes shadows/reflections in its change mask.
-                    blurred_edit = comani.node("ImageBlur", image=generated, blur_radius=15, sigma=5.0)
-                    difference1 = comani.node("ImageBlend", image1=blurred_source, image2=blurred_edit,
+                    blurred_edit = cf.node("ImageBlur", image=generated, blur_radius=15, sigma=5.0)
+                    difference1 = cf.node("ImageBlend", image1=blurred_source, image2=blurred_edit,
                                               blend_factor=1.0, blend_mode="difference")
-                    difference2 = comani.node("ImageBlend", image1=blurred_edit, image2=blurred_source,
+                    difference2 = cf.node("ImageBlend", image1=blurred_edit, image2=blurred_source,
                                               blend_factor=1.0, blend_mode="difference")
-                    difference = comani.node("ImageBlend", image1=difference1, image2=difference2,
+                    difference = cf.node("ImageBlend", image1=difference1, image2=difference2,
                                              blend_factor=1.0, blend_mode="screen")
-                    luminance, _, _ = comani.node("ImageRGBToYUV", image=difference)
-                    changes = comani.node("ImageToMask", image=luminance, channel="red")
-                    changes = comani.node("ThresholdMask", mask=changes, value=args.change_threshold)
-                    changed_area, _ = comani.node(
+                    luminance, _, _ = cf.node("ImageRGBToYUV", image=difference)
+                    changes = cf.node("ImageToMask", image=luminance, channel="red")
+                    changes = cf.node("ThresholdMask", mask=changes, value=args.change_threshold)
+                    changed_area, _ = cf.node(
                         "AUSBOSS_NODES_RefineMask", mask=changes, expand=24, blur=12.0,
                         fill_holes=True, smooth=0, black_point=0.0, white_point=1.0,
                         edge_refine="off", preview=False,
                     )
-                    edit_mask = comani.node("MaskComposite", destination=changed_area, source=object_area,
+                    edit_mask = cf.node("MaskComposite", destination=changed_area, source=object_area,
                                            x=0, y=0, operation="add")
-                    background = comani.node("ImageCompositeMasked", destination=image, source=generated,
+                    background = cf.node("ImageCompositeMasked", destination=image, source=generated,
                                              mask=edit_mask, x=0, y=0, resize_source=False)
                     await background
                     stages.append({"phase": "keep_rest", "seconds": time.perf_counter() - started})
@@ -197,17 +197,17 @@ async def main(args):
                     if args.debug_images:
                         outputs.update(source=image, generated=generated)
                         outputs.update(debug_masks)
-                        outputs["edit_mask"] = comani.node("MaskToImage", mask=edit_mask)
+                        outputs["edit_mask"] = cf.node("MaskToImage", mask=edit_mask)
                     for name, output in outputs.items():
                         started = time.perf_counter()
-                        saved = comani.node("SaveImage", images=output,
-                                            filename_prefix=f"comani/cutout/{name}", return_call=True)
+                        saved = cf.node("SaveImage", images=output,
+                                            filename_prefix=f"comfier/cutout/{name}", return_call=True)
                         file = await saved.file()
                         stages.append({"phase": "save", "name": name,
                                        "seconds": time.perf_counter() - started})
                         started = time.perf_counter()
                         target = args.output_dir / f"seed{seed}-repeat{index % args.repeat + 1:02d}-{name}.png"
-                        await comani.files.download(file, target)
+                        await cf.files.download(file, target)
                         stages.append({"phase": "download", "name": name, "bytes": file.size,
                                        "seconds": time.perf_counter() - started})
                         print(target, flush=True)
@@ -215,7 +215,7 @@ async def main(args):
                     run["cache_note"] = ("Fixed input/mask/conditioning prepared once; --repeat repeats this seed's "
                                          "sampling and downstream work, including native cache reuse.")
             finally:
-                await comani.files.remove(uploaded)
+                await cf.files.remove(uploaded)
     except Exception as error:
         report["error"] = f"{type(error).__name__}: {error}"
         raise
@@ -225,7 +225,7 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--object", required=True)
     parser.add_argument("--fill", default="the background that would be behind")

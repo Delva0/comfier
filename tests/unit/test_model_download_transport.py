@@ -7,9 +7,9 @@ import shutil
 import pytest
 from aiohttp import web
 
-from comani.daemon.management import transports
-from comani.daemon.management.service import ManagementService
-from comani.daemon.management.transports import select_transport
+from comfier.daemon.management import transports
+from comfier.daemon.management.service import ManagementService
+from comfier.daemon.management.transports import select_transport
 
 from .test_management_service import Supervisor, finish, submit
 

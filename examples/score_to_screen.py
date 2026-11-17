@@ -27,7 +27,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 PACKAGES = ("ComfyUI-ABCScoreIO", "ComfyUI-PromptSplitter", "ComfyUI-ABCTiming", "ComfyUI-ABCInstrumentalize")
 NODE_ARCHIVE = {
@@ -49,25 +49,25 @@ async def main(args):
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.output_dir = Path(tempfile.mkdtemp(prefix="run-", dir=args.output_dir)).resolve()
     print(f"Output directory: {args.output_dir}", flush=True)
-    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
-        configured = await comani.comfyui.info()
-        await comani.bash.run(shlex.join([configured.runtime_python, "-c",
+    async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
+        configured = await cf.comfyui.info()
+        await cf.bash.run(shlex.join([configured.runtime_python, "-c",
             "import sys; assert sys.version_info >= (3,12), 'Original Score packages require Python >=3.12'"]))
         if args.install_plugins:
-            installed = await comani.plugins.list()
+            installed = await cf.plugins.list()
             missing = {name: path for name, path in NODE_ARCHIVE["packages"].items() if not any(
                 Path(plugin.path).name.casefold() == name.casefold() for plugin in installed)}
             if missing:
-                await comani.comfyui.stop()
-                await comani.plugins.install_archive({**NODE_ARCHIVE, "packages": missing})
-        info = await comani.comfyui.start()
+                await cf.comfyui.stop()
+                await cf.plugins.install_archive({**NODE_ARCHIVE, "packages": missing})
+        info = await cf.comfyui.start()
         required = {"ABCLoadSong", "S2SSceneList", "S2SScenePlanN", "S2SSceneRunner", "S2SLLMSettings",
                     "PromptSplitterLLM", "S2SH3Engine", "S2SOmniPatch", "ABCTimingPrompt"}
         if missing := required - info.extra.get("node_metadata", {}).get("nodes", {}).keys():
             raise ValueError(f"Install original Score packages first; missing: {sorted(missing)}")
         # INPUT_TYPES registers the original LLM model directory. Tool selection
         # and downloads remain with the node package; no vendor cache repair here.
-        await comani.python(code=r"""def prepare(allow_download, device):
+        await cf.python(code=r"""def prepare(allow_download, device):
     import importlib, nodes, re, subprocess
     settings = nodes.NODE_CLASS_MAPPINGS['S2SLLMSettings']
     settings.INPUT_TYPES()
@@ -90,9 +90,9 @@ async def main(args):
     raise RuntimeError('Original llama.cpp preparation failed: ' + '; '.join(errors))
 """, entry="prepare", inputs={"allow_download": args.prepare_llama, "device": args.llm_device})
         if args.download_models:
-            sources = await asyncio.gather(*(comani.models.resolve({"repo_id": repo, "path": path})
+            sources = await asyncio.gather(*(cf.models.resolve({"repo_id": repo, "path": path})
                                              for _, repo, path, _ in WEIGHTS))
-            downloads = await asyncio.gather(*(comani.models.download(
+            downloads = await asyncio.gather(*(cf.models.download(
                 source.files[0], category=category, path=filename, reuse=True)
                 for (category, _, _, filename), source in zip(WEIGHTS, sources)), return_exceptions=True)
             for result in downloads:
@@ -100,25 +100,25 @@ async def main(args):
                     raise result
         folder = "score-" + uuid.uuid4().hex[:12]
         image, song, _score = await asyncio.gather(
-            comani.files.upload(args.image, path=f"{folder}/person.png"),
-            comani.files.upload(args.audio, path=f"{folder}/song.wav"),
-            comani.files.upload(args.abc, path=f"{folder}/song.abc"))
+            cf.files.upload(args.image, path=f"{folder}/person.png"),
+            cf.files.upload(args.audio, path=f"{folder}/song.wav"),
+            cf.files.upload(args.abc, path=f"{folder}/song.abc"))
         scenes = json.dumps([
             {"image": image.native_name, "text": args.scene1, "start": "own picture", "sound": "song"},
             {"image": image.native_name, "text": args.scene2, "start": "continue", "sound": "silent"}])
-        with comani.graph() as workflow:
-            audio, abc, _song_report, _selected, start = comani.node(
+        with cf.graph() as workflow:
+            audio, abc, _song_report, _selected, start = cf.node(
                 "ABCLoadSong", song=f"input/{song.relative_path}", start="0")
-            scene_list, _count, picture = comani.node("S2SSceneList", scenes=scenes,
+            scene_list, _count, picture = cf.node("S2SSceneList", scenes=scenes,
                                                     missing_picture="use scene 1's picture")
-            plan, _total, _plan_report, _first_seconds, first_frames, rest_frames = comani.node(
+            plan, _total, _plan_report, _first_seconds, first_frames, rest_frames = cf.node(
                 "S2SScenePlanN", scenes=scene_list, start_sec=start, max_scene_sec=args.scene_seconds,
                 whole_song=True, song=audio, abc=abc, song_delay=0.0)
-            mixed, _sfx, _mix_report = comani.node(
+            mixed, _sfx, _mix_report = cf.node(
                 "SongSfxMix", song=audio, enabled=False, s1_frames=first_frames, s2_frames=rest_frames,
                 fps=24, sfx_volume=0.35, song_volume=1.0, remove_vocals=True, fade_ms=20,
                 song_volume_curve="", normalize_loudness=True, target_lufs=-16.0)
-            llm = comani.node(
+            llm = cf.node(
                 "S2SLLMSettings", backend="gguf", gguf_model=args.llm_model, mmproj=args.mmproj,
                 gpu_layers="all" if args.llm_device == "cuda" else "cpu",
                 llama_build=args.llm_device, ctx_size=8192,
@@ -127,65 +127,65 @@ async def main(args):
                 quantization="none", device="cpu", lm_studio_url="http://127.0.0.1:1234/v1", lm_studio_model="")
             # This is the original shared prompt template. The runner reads its
             # hidden graph inputs, then creates one real local-LLM call per scene.
-            template = comani.node(
+            template = cf.node(
                 "PromptSplitterLLM", prompt="An adult visitor explores a peaceful garden. No singing.",
                 duration=args.scene_seconds, base_url="http://127.0.0.1:1234/v1", model="", api_key="",
                 temperature=0.3, seed=0, timeout=600, instrumental_mode="instrumental",
                 instrumental_audio="yue2", unload_after=True, prompt_style="shot_list",
                 use_image="auto", detail_level="minimal", sfx_only=False, min_first_shot=3.0,
                 thinking="off", prompt_format="ref2va_structured", llm=llm, return_call=True)
-            _name, turbo, steps, sampler, _sampler_name, omni = comani.node(
+            _name, turbo, steps, sampler, _sampler_name, omni = cf.node(
                 "S2SH3Engine", engine="fasth3_omni", omni_model=args.model, omni_steps=8,
                 h3_sampler="res_multistep", omni_sampler="euler", standard_steps=20)
-            model = comani.node("UNETLoader", unet_name=args.model, weight_dtype="default")
-            model = comani.node("ModelAttentionBackend", model=model, attention="comfy kitchen attention")
-            model = comani.node("S2SOmniPatch", model=model, omni=omni, shift_video=12.0, shift_audio=3.0,
+            model = cf.node("UNETLoader", unet_name=args.model, weight_dtype="default")
+            model = cf.node("ModelAttentionBackend", model=model, attention="comfy kitchen attention")
+            model = cf.node("S2SOmniPatch", model=model, omni=omni, shift_video=12.0, shift_audio=3.0,
                                 vsa=True, keep_percent=10.0, start_percent=0.0, end_percent=1.0,
                                 min_tokens=12288, extra_tokens=256, sink_conditioning="exact_kv_and_rows",
                                 vsa_log=True)
-            clip = comani.node("CLIPLoader", clip_name="qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+            clip = cf.node("CLIPLoader", clip_name="qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
                                type="minimax", device="default")
-            vae = comani.node("VAELoader", vae_name="minimax_h3_video_vae_int8_convrot.safetensors")
-            audio_vae = comani.node("VAELoader", vae_name="minimax_h3_audio_vae_fp32.safetensors")
+            vae = cf.node("VAELoader", vae_name="minimax_h3_video_vae_int8_convrot.safetensors")
+            audio_vae = cf.node("VAELoader", vae_name="minimax_h3_audio_vae_fp32.safetensors")
             # These primitive producers keep required lazy ports as real links.
-            seed = comani.node("PrimitiveInt", value=args.seed)
-            width = comani.node("PrimitiveInt", value=args.width)
-            height = comani.node("PrimitiveInt", value=args.height)
-            turbo_steps = comani.node("PrimitiveInt", value=4)
-            yes = comani.node("PrimitiveBoolean", value=True)
-            no = comani.node("PrimitiveBoolean", value=False)
-            off = comani.node("PrimitiveString", value="off")
-            result = comani.node(
+            seed = cf.node("PrimitiveInt", value=args.seed)
+            width = cf.node("PrimitiveInt", value=args.width)
+            height = cf.node("PrimitiveInt", value=args.height)
+            turbo_steps = cf.node("PrimitiveInt", value=4)
+            yes = cf.node("PrimitiveBoolean", value=True)
+            no = cf.node("PrimitiveBoolean", value=False)
+            off = cf.node("PrimitiveString", value="off")
+            result = cf.node(
                 "S2SSceneRunner", scenes=scene_list, plan=plan, mode="off", scale=1.5,
                 quality="ULTRA", strength=1.0, review="auto", handoff="1 frame",
                 scene_brief="director + scene before", decode="full", song_db=0.0, h3_db=0.0,
                 blend_db=-14.0, video_crf=18, audio_kbps=256, vae=vae, audio_vae=audio_vae, clip=clip,
                 model=model, sampler=sampler, use_turbo=turbo, steps_off=steps, turbo_steps=turbo_steps,
                 seed_random=seed, seed_lock=yes, seed_fixed=seed, width=width, height=height,
-                song=audio, abc=abc, instrumental=yes, audio_lock=off, song_delay=comani.node("PrimitiveFloat", value=0.0),
-                min_first_shot=comani.node("PrimitiveFloat", value=3.0), band_cues=yes,
+                song=audio, abc=abc, instrumental=yes, audio_lock=off, song_delay=cf.node("PrimitiveFloat", value=0.0),
+                min_first_shot=cf.node("PrimitiveFloat", value=3.0), band_cues=yes,
                 drum_audio_sync=no, strum_ai=no, strum_keys=no, strum_fallback=off,
-                on_screen_singing=comani.node("PrimitiveString", value="no"), llm=llm,
+                on_screen_singing=cf.node("PrimitiveString", value="no"), llm=llm,
                 song_llm=template.output(0), fallback_picture=picture, mv_audio=mixed,
                 return_call=True)
-            saved = comani.node("SaveVideo", video=result.output(0), filename_prefix="comani/score-to-screen",
+            saved = cf.node("SaveVideo", video=result.output(0), filename_prefix="comfier/score-to-screen",
                                 format="mp4", codec="h264", return_call=True)
             workflow.output("report", result.output(1))
             workflow.output("prompts", result.output(2))
             workflow.output("plan", plan)
             workflow.target(saved)
-        run = comani.submit(workflow, return_call=True)
+        run = cf.submit(workflow, return_call=True)
         file = await run.file(node_id=saved.id)
         for index, name in enumerate(("report", "prompts", "plan")):
             (args.output_dir / f"{name}.txt").write_text(await (await run.output(index)).fetch())
         target = args.output_dir / "film.mp4"
-        await comani.files.download(file, target)
+        await cf.files.download(file, target)
         print(target, flush=True)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--image", type=Path, required=True)
     parser.add_argument("--audio", type=Path, required=True)
     parser.add_argument("--abc", type=Path, required=True)

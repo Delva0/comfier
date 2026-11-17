@@ -7,7 +7,7 @@ from pathlib import Path
 
 from aiohttp import web
 
-from comani import Client, SessionClosed
+from comfier import Client, SessionClosed
 
 
 async def main(args):

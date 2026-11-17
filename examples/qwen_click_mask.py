@@ -24,7 +24,7 @@ import tempfile
 import time
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 MODEL = "qwen_image_2.1_int8_convrot.safetensors"
 CLIP = "qwen3vl_8b_int8_convrot.safetensors"
@@ -117,10 +117,10 @@ def editable_patch(source, edited, blend, sampling_mask, crop, stitcher, source_
 async def acquire_models(report):
     for category, repository, path in WEIGHTS:
         started = time.perf_counter()
-        source = await comani.models.resolve({"repo_id": repository, "path": path})
+        source = await cf.models.resolve({"repo_id": repository, "path": path})
         artifact, = source.files
         filename = Path(path).name
-        file = await comani.models.download(artifact, category=category, path=filename, reuse=True)
+        file = await cf.models.download(artifact, category=category, path=filename, reuse=True)
         report.append({"phase": "model_download", "file": path, "revision": source.revision,
                        "sha256": artifact.sha256, "root": file.root.path, "priority": file.root.priority,
                        "seconds": time.perf_counter() - started})
@@ -139,9 +139,9 @@ async def main(args):
     phases = report["phases"]
     started = time.perf_counter()
     try:
-        async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")):
+        async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")):
             if args.install_plugin:
-                installed = await comani.plugins.list()
+                installed = await cf.plugins.list()
                 if not any(
                     plugin.id.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
                     or Path(plugin.path).name.casefold() in {"ausboss-nodes", "comfyui-ausboss"}
@@ -149,9 +149,9 @@ async def main(args):
                     == "https://github.com/ausboss/comfyui-ausboss"
                     for plugin in installed
                 ):
-                    await comani.comfyui.stop()
-                    await comani.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
-            info = await comani.comfyui.start()
+                    await cf.comfyui.stop()
+                    await cf.plugins.install_git("https://github.com/ausboss/ComfyUI-AusBoss")
+            info = await cf.comfyui.start()
             required = {"AUSBOSS_NODES_MaskByTouch", "AUSBOSS_NODES_CropForInpaint",
                         "AUSBOSS_NODES_StitchInpaint", "TextEncodeQwenImage21", "QwenImage21Cache"}
             available = info.extra.get("node_metadata", {}).get("nodes", {})
@@ -163,16 +163,16 @@ async def main(args):
             if args.download_models:
                 await acquire_models(phases)
             started = time.perf_counter()
-            uploaded = await comani.files.upload(args.input)
+            uploaded = await cf.files.upload(args.input)
             phases.append({"phase": "upload", "seconds": time.perf_counter() - started})
             try:
                 started = time.perf_counter()
-                image, _ = comani.node("LoadImage", image=uploaded.native_name)
-                clip = comani.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
-                vae = comani.node("VAELoader", vae_name=VAE)
-                sam, sam_clip, _ = comani.node("CheckpointLoaderSimple", ckpt_name=SAM)
-                model = comani.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
-                model = comani.node("QwenImage21Cache", model=model, device="auto", dtype="default")
+                image, _ = cf.node("LoadImage", image=uploaded.native_name)
+                clip = cf.node("CLIPLoader", clip_name=CLIP, type="qwen_image", device="default")
+                vae = cf.node("VAELoader", vae_name=VAE)
+                sam, sam_clip, _ = cf.node("CheckpointLoaderSimple", ckpt_name=SAM)
+                model = cf.node("UNETLoader", unet_name=MODEL, weight_dtype="default")
+                model = cf.node("QwenImage21Cache", model=model, device="auto", dtype="default")
                 await asyncio.gather(image, clip, vae, sam, sam_clip, model)
                 phases.append({"phase": "load_objects", "seconds": time.perf_counter() - started,
                                "note": "Loader objects; GPU movement also occurs during encode/sample."})
@@ -182,7 +182,7 @@ async def main(args):
                 # Keep these Futures for this fixed input/selection/prompt. A new
                 # invocation prepares them again when any of those inputs change.
                 started = time.perf_counter()
-                mask, _cutout, _names = comani.node(
+                mask, _cutout, _names = cf.node(
                     "AUSBOSS_NODES_MaskByTouch", image=image, model=sam, clip=sam_clip,
                     touches=touches, grow=16, soften=0.0, smooth=0, fill_holes=True,
                     if_nothing="stop the run", free_vram=True, invert=False, ask="", fine_edges="off",
@@ -190,24 +190,24 @@ async def main(args):
                 await mask
                 phases.append({"phase": "prepare_segment", "seconds": time.perf_counter() - started})
                 started = time.perf_counter()
-                crop, crop_mask, stitcher = comani.node(
+                crop, crop_mask, stitcher = cf.node(
                     "AUSBOSS_NODES_CropForInpaint", image=image, mask=mask, context_factor=1.6,
                     blend_pixels=8, output_multiple=32, target_megapixels=args.megapixels,
                     rescale_algorithm="bicubic", keep_inside=True,
                 )
-                sample_mask = comani.node("GrowMask", mask=crop_mask, expand=8, tapered_corners=True)
-                positive, negative, _ = comani.node(
+                sample_mask = cf.node("GrowMask", mask=crop_mask, expand=8, tapered_corners=True)
+                positive, negative, _ = cf.node(
                     "TextEncodeQwenImage21", clip=clip, vae=vae,
                     prompt=args.prompt + " Keep everything else exactly the same.",
                     negative_prompt="", resolution=0, **{"images.image_1": crop},
                 )
-                latent = comani.node("VAEEncode", pixels=crop, vae=vae)
-                latent = comani.node("SetLatentNoiseMask", samples=latent, mask=sample_mask)
+                latent = cf.node("VAEEncode", pixels=crop, vae=vae)
+                latent = cf.node("SetLatentNoiseMask", samples=latent, mask=sample_mask)
                 debug_inputs = {}
                 if args.debug_images:
                     debug_inputs.update(source=image, crop=crop,
-                                        selection=comani.node("MaskToImage", mask=mask),
-                                        sample_mask=comani.node("MaskToImage", mask=sample_mask))
+                                        selection=cf.node("MaskToImage", mask=mask),
+                                        sample_mask=cf.node("MaskToImage", mask=sample_mask))
                 await asyncio.gather(positive, negative, latent, *debug_inputs.values())
                 phases.append({"phase": "prepare_crop_encode", "seconds": time.perf_counter() - started})
                 for index in range(args.count * args.repeat):
@@ -215,16 +215,16 @@ async def main(args):
                     run_started = time.perf_counter()
                     run = {"index": index + 1, "seed": seed, "cache_repeat": index % args.repeat + 1}
                     report["runs"].append(run)
-                    sampled = comani.node(
+                    sampled = cf.node(
                         "KSampler", model=model, positive=positive, negative=negative,
                         latent_image=latent, seed=seed, steps=args.steps, cfg=1.0,
                         sampler_name="euler", scheduler="simple", denoise=1.0,
                     )
-                    painted = comani.node("VAEDecode", samples=sampled, vae=vae)
-                    edited, blend = comani.node("AUSBOSS_NODES_StitchInpaint", stitcher=stitcher,
+                    painted = cf.node("VAEDecode", samples=sampled, vae=vae)
+                    edited, blend = cf.node("AUSBOSS_NODES_StitchInpaint", stitcher=stitcher,
                                                 inpainted=painted, fix_edge_halo=False, color_match=0.0)
                     if args.editable:
-                        bundle = await (await comani.python(source=Path(__file__), entry="editable_patch", inputs={
+                        bundle = await (await cf.python(source=Path(__file__), entry="editable_patch", inputs={
                             "source": image, "edited": edited, "blend": blend, "sampling_mask": sample_mask,
                             "crop": crop, "stitcher": stitcher, "source_sha256": uploaded.sha256,
                         })).fetch()
@@ -240,19 +240,19 @@ async def main(args):
                     outputs = {"edited": edited}
                     if args.debug_images:
                         outputs.update(debug_inputs)
-                        outputs["blend_mask"] = comani.node("MaskToImage", mask=blend)
+                        outputs["blend_mask"] = cf.node("MaskToImage", mask=blend)
                     for name, output in outputs.items():
-                        saved = comani.node("SaveImage", images=output,
-                                            filename_prefix=f"comani/click/{name}", return_call=True)
+                        saved = cf.node("SaveImage", images=output,
+                                            filename_prefix=f"comfier/click/{name}", return_call=True)
                         file = await saved.file()
                         target = args.output_dir / f"seed{seed}-repeat{index % args.repeat + 1:02d}-{name}.png"
-                        await comani.files.download(file, target)
+                        await cf.files.download(file, target)
                         print(target, flush=True)
                     run["wall_seconds"] = time.perf_counter() - run_started
                     run["cache_note"] = ("Fixed input/mask/conditioning prepared once; --repeat repeats this seed's "
                                          "sampling and downstream work, including native cache reuse.")
             finally:
-                await comani.files.remove(uploaded)
+                await cf.files.remove(uploaded)
     except Exception as error:
         report["error"] = f"{type(error).__name__}: {error}"
         raise
@@ -262,7 +262,7 @@ async def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--url", default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+    parser.add_argument("--url", default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--point", type=int, nargs=2, action="append", required=True, metavar=("X", "Y"))
     parser.add_argument("--prompt", required=True)

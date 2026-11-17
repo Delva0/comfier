@@ -5,12 +5,12 @@ import threading
 import pytest
 from aiohttp import ClientSession, web
 
-from comani import Client
-from comani.daemon import NativeRuntime
-from comani.daemon.http import create_app
-from comani.errors import Expired, SessionClosed
+from comfier import Client
+from comfier.daemon import NativeRuntime
+from comfier.daemon.http import create_app
+from comfier.errors import Expired, SessionClosed
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(not os.path.isfile(COMFY + "/execution.py"), reason="real ComfyUI checkout required")
 
 

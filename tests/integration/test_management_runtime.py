@@ -11,13 +11,13 @@ from pathlib import Path
 import pytest
 from aiohttp import ClientSession, web
 
-from comani import Client
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
-from comani.errors import Expired, OperationError, SessionClosed
-from comani.protocol import LZ4_ACCEPT_HEADER, LZ4_CODEC, PICKLE_CONTENT_TYPE
+from comfier import Client
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier.errors import Expired, OperationError, SessionClosed
+from comfier.protocol import LZ4_ACCEPT_HEADER, LZ4_CODEC, PICKLE_CONTENT_TYPE
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 
 
 async def launch(config):
@@ -138,7 +138,7 @@ async def test_independent_process_short_grace_heartbeat_survives_blocked_client
         port = reserve.getsockname()[1]
     env = dict(os.environ, PYTHONPATH=str(project / "src"))
     child = await asyncio.create_subprocess_exec(
-        sys.executable, "-m", "comani", "daemon", "--comfy-root", COMFY,
+        sys.executable, "-m", "comfier", "daemon", "--comfy-root", COMFY,
         "--workspace", str(tmp_path), "--port", str(port), "--offline-grace", "0.3",
         "--cpu", "--no-custom-nodes", "--no-start", cwd=tmp_path, env=env,
         stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)

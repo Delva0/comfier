@@ -2,7 +2,7 @@
 
 import pytest
 
-from comani import Client, InvalidReference, UnknownOutputLayout
+from comfier import Client, InvalidReference, UnknownOutputLayout
 
 from .test_management_sdk import managed_server
 

@@ -2,7 +2,7 @@
 
 本文描述当前实现。带外 daemon 管理一个 ComfyUI 计算子进程，在未安装、停止或启动失败时继续提供管理能力。SDK 通过同一个 Client 使用管理、文件与计算；连接只做管理握手，首次 node/Python/submit 才惰性附着已经显式启动的计算进程。
 
-实现：[SDK namespace/DTO](../../src/comani/management.py)、[supervisor](../../src/comani/daemon/supervisor.py)、[管理服务](../../src/comani/daemon/management/service.py)、[Operation](../../src/comani/daemon/management/operations.py)、[管理 HTTP](../../src/comani/daemon/management_http.py)。
+实现：[SDK namespace/DTO](../../src/comfier/management.py)、[supervisor](../../src/comfier/daemon/supervisor.py)、[管理服务](../../src/comfier/daemon/management/service.py)、[Operation](../../src/comfier/daemon/management/operations.py)、[管理 HTTP](../../src/comfier/daemon/management_http.py)。
 
 ## 进程、解释器与维护
 
@@ -18,7 +18,7 @@
 
 wait 参数决定是否先等待相关工作，并不改变 Python await：`await remote.comfyui.restart(wait=False)` 仍等待重启成功或失败。需要先拿观察句柄时使用 `begin_restart()`；结果中的 `interrupted_operations` 可查询被紧急控制中断的原 Operation。紧急控制期间拒绝新的相关维护接纳，同 key 仍可附着原操作，已排队维护不会随后悄悄继续改环境或启动 runtime。
 
-管理 Python 不需要 Torch。目标依赖只装入明确选定的解释器。启动时 daemon 将自身当前 comani 包复制到隔离 bridge 目录，只暴露该包，不把整个管理 site-packages 或继承的 PYTHONPATH 注入目标。目标 aiohttp/cloudpickle、Torch/节点依赖仍从目标解释器解析。启动检查依赖，绝不自动 pip 或替换 Torch；`runtime_bridge_digest` 记录实际桥接代码身份。
+管理 Python 不需要 Torch。目标依赖只装入明确选定的解释器。启动时 daemon 将自身当前 comfier 包复制到隔离 bridge 目录，只暴露该包，不把整个管理 site-packages 或继承的 PYTHONPATH 注入目标。目标 aiohttp/cloudpickle、Torch/节点依赖仍从目标解释器解析。启动检查依赖，绝不自动 pip 或替换 Torch；`runtime_bridge_digest` 记录实际桥接代码身份。
 
 ## 显式准备环境
 
@@ -30,7 +30,7 @@ await remote.comfyui.configure(
 )
 await remote.comfyui.prepare_tools(skip_manager=True)
 await remote.comfyui.install(skip_torch=False)
-await remote.comfyui.prepare_runtime("/srv/packages/current-comani.whl")
+await remote.comfyui.prepare_runtime("/srv/packages/current-comfier.whl")
 await remote.comfyui.start()
 ```
 
@@ -44,7 +44,7 @@ CPU 安装需 `configure(cpu=True)` 和 `install(skip_torch=False)`。GPU 环境
 
 ## 静态 namespace
 
-模块静态 namespace 与显式 Client 的有状态方法相同，使用当前显式 Client；info/config、backend/list、categories/list 和 roots 都到远端读取实际状态。纯 `comani.models.resolve/versions/manifest` 和 `comani.plugins.versions` 则在客户端查询上游，无需 Client，也不在 remote facade 上。它们使用本地 provider 凭证，与 daemon 下载权限分开。DTO 是普通本地值，不拥有远端对象。
+模块静态 namespace 与显式 Client 的有状态方法相同，使用当前显式 Client；info/config、backend/list、categories/list 和 roots 都到远端读取实际状态。纯 `cf.models.resolve/versions/manifest` 和 `cf.plugins.versions` 则在客户端查询上游，无需 Client，也不在 remote facade 上。它们使用本地 provider 凭证，与 daemon 下载权限分开。DTO 是普通本地值，不拥有远端对象。
 
 | namespace | 查询 | 明确变更 |
 | --- | --- | --- |
@@ -60,8 +60,10 @@ CPU 安装需 `configure(cpu=True)` 和 `install(skip_torch=False)`。GPU 环境
 ## 插件后端
 
 ```python
+import comfier as cf
+
 backend = await remote.plugins.backend()
-available = await comani.plugins.versions("requested-package")  # 本地 registry 查询
+available = await cf.plugins.versions("requested-package")  # 本地 registry 查询
 changes = await remote.plugins.install(["requested-package"], version="1.2.3")
 await remote.plugins.disable(["requested-package"])
 await remote.plugins.enable(["requested-package"])

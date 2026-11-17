@@ -19,8 +19,8 @@ def test_sdk_import_and_graph_capture_without_torch(tmp_path):
 import asyncio, importlib.util, json, pathlib, sys
 assert importlib.util.find_spec('torch') is None
 assert importlib.util.find_spec('execution') is None
-from comani import Client
-import comani
+from comfier import Client
+import comfier
 async def capture():
     remote = Client('http://127.0.0.1:1')
     with remote.graph() as graph:
@@ -28,7 +28,7 @@ async def capture():
         graph.output('value', value)
     assert len(graph.nodes) == 1
     assert remote._opening is None
-    return {'package': comani.__file__, 'node_count': len(graph.nodes)}
+    return {'package': comfier.__file__, 'node_count': len(graph.nodes)}
 print(json.dumps(asyncio.run(capture())))
 """
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
@@ -51,19 +51,19 @@ def test_built_wheel_import_and_daemon_entrypoint(tmp_path):
     env.pop("PYTHONPATH", None)
     completed = subprocess.run(
         [str(python), "-B", "-c",
-         "import comani,importlib.util; assert importlib.util.find_spec('torch') is None; print(comani.__file__)"],
+         "import comfier,importlib.util; assert importlib.util.find_spec('torch') is None; print(comfier.__file__)"],
         cwd=tmp_path, env=env, text=True, capture_output=True, check=True,
     )
     package = Path(completed.stdout.strip()).parent
     assert package.is_relative_to(project / ".venv-wheel")
-    source = project / "src/comani"
+    source = project / "src/comfier"
     expected = {path.relative_to(source).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in source.rglob("*.py")}
     installed = {path.relative_to(package).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
                  for path in package.rglob("*.py")}
     assert installed == expected, "Wheel test environment is stale; run scripts/refresh_wheel.py"
     help_result = subprocess.run(
-        [str(python), "-B", "-m", "comani", "daemon", "--help"], cwd=tmp_path,
+        [str(python), "-B", "-m", "comfier", "daemon", "--help"], cwd=tmp_path,
         env=env, text=True, capture_output=True, check=True,
     )
     assert "--comfy-root" in help_result.stdout
@@ -78,8 +78,8 @@ async def test_built_wheel_client_runs_over_http_without_torch(native_http, tmp_
     script = """
 import asyncio,importlib.util,json,sys
 assert importlib.util.find_spec('torch') is None
-from comani import Client
-import comani
+from comfier import Client
+import comfier
 async def main():
     async with Client(sys.argv[1]) as remote:
         call=remote.python(lambda:{'ok':True},return_call=True)
@@ -90,7 +90,7 @@ async def main():
             graph.output('answer',b.output())
         run=remote.submit(graph,return_call=True)
         assert await (await run.output('answer')).fetch()==21
-    print(json.dumps({'package':comani.__file__,'answer':21}))
+    print(json.dumps({'package':comfier.__file__,'answer':21}))
 asyncio.run(main())
 """
     env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")

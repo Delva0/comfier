@@ -9,8 +9,8 @@ import sys
 import pytest
 from aiohttp import web
 
-from comani.daemon.management.download_tools import aria2_status
-from comani.daemon.management.service import ManagementService
+from comfier.daemon.management.download_tools import aria2_status
+from comfier.daemon.management.service import ManagementService
 
 from .test_management_service import Supervisor, finish, submit
 from .test_model_download_transport import serve
@@ -28,7 +28,7 @@ import json,os,pathlib,shutil,sys,time
 args=sys.argv[1:]
 with open({str(log)!r},"a") as stream: stream.write(json.dumps(args)+"\\n")
 time.sleep(.08)
-mode=os.environ.get("COMANI_TEST_ARIA_MODE","success")
+mode=os.environ.get("COMFIER_TEST_ARIA_MODE","success")
 if mode=="failure": sys.exit(9)
 if "install" in args and mode!="missing_output":
  target=pathlib.Path({str(directory / 'aria2c')!r})
@@ -51,7 +51,7 @@ os.execv(args[0],args)
     (directory / "sudo").write_text(sudo)
     (directory / "sudo").chmod(0o755)
     monkeypatch.setenv("PATH", str(directory))
-    monkeypatch.setenv("COMANI_TEST_ARIA_MODE", "success")
+    monkeypatch.setenv("COMFIER_TEST_ARIA_MODE", "success")
     return directory, log, binary
 
 
@@ -100,7 +100,7 @@ async def test_missing_tool_is_installed_version_checked_and_actually_downloads(
 async def test_concurrent_first_downloads_share_one_install_attempt(tmp_path, installer, monkeypatch, failure):
     _, log, _ = installer
     if failure:
-        monkeypatch.setenv("COMANI_TEST_ARIA_MODE", "failure")
+        monkeypatch.setenv("COMFIER_TEST_ARIA_MODE", "failure")
     payload, requests = b"owned model" * 65536, []
 
     async def source(request):
@@ -133,7 +133,7 @@ async def test_concurrent_first_downloads_share_one_install_attempt(tmp_path, in
                                         ("broken_output", "verify_installed")])
 async def test_failed_or_unusable_install_is_not_ready_and_a_new_call_can_retry(tmp_path, installer, monkeypatch, mode, phase):
     _, _, _ = installer
-    monkeypatch.setenv("COMANI_TEST_ARIA_MODE", mode)
+    monkeypatch.setenv("COMFIER_TEST_ARIA_MODE", mode)
     payload, requests = b"model bytes", []
 
     async def source(request):
@@ -150,7 +150,7 @@ async def test_failed_or_unusable_install_is_not_ready_and_a_new_call_can_retry(
         assert result["error"]["details"]["phase"] == phase
         assert aria2_status(service.providers)["state"] == "failed"
         assert not requests and not (root.path / "failed.bin").exists()
-        monkeypatch.setenv("COMANI_TEST_ARIA_MODE", "success")
+        monkeypatch.setenv("COMFIER_TEST_ARIA_MODE", "success")
         accepted = await begin_download(service, root, url, payload, "retry.bin")
         result = await finish(service, accepted)
         assert result["state"] == "succeeded", result

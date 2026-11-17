@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(
     not Path(COMFY, "main.py").is_file(), reason="configured ComfyUI environment required",
 )
@@ -27,8 +27,8 @@ def test_native_cache_options_run_eager_and_borrowed_graph(arguments, kind, cach
 
     probe("""
 import asyncio, json, sys
-from comani import Client, InProcessTransport
-from comani.daemon import NativeRuntime
+from comfier import Client, InProcessTransport
+from comfier.daemon import NativeRuntime
 
 async def main():
     runtime = NativeRuntime(sys.argv[1], cpu=True, custom_nodes=False,
@@ -71,7 +71,7 @@ def test_native_paths_apply_before_registry_initialization(tmp_path):
     probe("""
 import json, sys
 from pathlib import Path
-from comani.daemon.adapter import NativeAdapter
+from comfier.daemon.adapter import NativeAdapter
 root = Path(sys.argv[2])
 adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False,
                         comfy_args=['--disable-partner-nodes', *json.loads(sys.argv[3])])
@@ -94,7 +94,7 @@ def test_cold_and_live_temp_roots_survive_another_native_startup(tmp_path, expli
     probe("""
 import json, shutil, subprocess, sys
 from pathlib import Path
-from comani.daemon.adapter import NativeAdapter
+from comfier.daemon.adapter import NativeAdapter
 
 root = Path(sys.argv[2])
 base = root / 'base'
@@ -108,7 +108,7 @@ if explicit:
     arguments += ['--temp-directory', str(root / 'temporary')]
 config = {'comfy_root': sys.argv[1], 'comfy_args': arguments}
 cold = subprocess.run([sys.executable, '-B', '-c',
-    'import json,sys;from comani.daemon._paths import snapshot;'
+    'import json,sys;from comfier.daemon._paths import snapshot;'
     'print(json.dumps(snapshot(json.loads(sys.argv[1]))))', json.dumps(config)],
     capture_output=True, text=True, check=True)
 directories = json.loads(cold.stdout)['directories']
@@ -139,8 +139,8 @@ finally:
 def test_sequential_default_runtimes_do_not_treat_native_auto_detection_as_new_options():
     probe("""
 import asyncio, sys
-from comani import Client, InProcessTransport
-from comani.daemon import NativeRuntime
+from comfier import Client, InProcessTransport
+from comfier.daemon import NativeRuntime
 
 async def main():
     for expected in (17, 23, 29):
@@ -179,7 +179,7 @@ class ObserveTorch(importlib.abc.MetaPathFinder):
             return spec
 sys.meta_path.insert(0, ObserveTorch())
 os.environ.pop('CUBLAS_WORKSPACE_CONFIG', None)
-from comani.daemon.adapter import NativeAdapter
+from comfier.daemon.adapter import NativeAdapter
 adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False, comfy_args=[
     '--disable-partner-nodes', '--cuda-device', '3',
     '--oneapi-device-selector', 'level_zero:gpu', '--deterministic',
@@ -202,7 +202,7 @@ import socket, sys
 def denied(*args, **kwargs):
     raise AssertionError('Registry initialization attempted an outbound connection')
 socket.socket.connect = denied
-from comani.daemon.adapter import NativeAdapter
+from comfier.daemon.adapter import NativeAdapter
 disabled = sys.argv[2] == 'True'
 adapter = NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False,
                         comfy_args=['--disable-partner-nodes'] if disabled else [])
@@ -222,7 +222,7 @@ finally:
 def test_unsupported_native_services_fail_before_torch_import(arguments):
     result = subprocess.run([sys.executable, "-B", "-c", """
 import sys
-from comani.daemon.adapter import NativeAdapter
+from comfier.daemon.adapter import NativeAdapter
 try:
     NativeAdapter(sys.argv[1], cpu=True, custom_nodes=False, comfy_args=sys.argv[2:]).boot()
 except SystemExit as error:
@@ -232,4 +232,4 @@ except SystemExit as error:
 raise AssertionError('Unsupported native mode was accepted')
 """, COMFY, *arguments], capture_output=True, text=True, timeout=30)
     assert result.returncode == 2, result.stdout + result.stderr
-    assert "Comani" in result.stderr
+    assert "Comfier" in result.stderr

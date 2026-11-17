@@ -8,8 +8,8 @@ import stat
 import pytest
 from aiohttp import web
 
-from comani.daemon.files import FileStore
-from comani.daemon.management.service import ManagementService
+from comfier.daemon.files import FileStore
+from comfier.daemon.management.service import ManagementService
 
 from .test_binary_fetch import serve
 from .test_management_service import Supervisor, finish, submit
@@ -167,7 +167,7 @@ async def test_download_refuses_changed_selected_root(tmp_path, monkeypatch, pub
 
 @pytest.mark.parametrize("publish", ["download", "directory"])
 async def test_publication_rechecks_root_after_async_preflight(tmp_path, monkeypatch, publish):
-    from comani.daemon.management.models import ModelService
+    from comfier.daemon.management.models import ModelService
     original = ModelService._revalidate_root
 
     async def replace_after_check(service, store, identity, generation):
@@ -222,7 +222,7 @@ def test_observed_removal_retires_id_but_unrelated_updates_keep_it(tmp_path):
 
 
 def test_open_root_handle_prevents_deleted_directory_identity_reuse(tmp_path):
-    from comani.daemon.files import FileChangedError
+    from comfier.daemon.files import FileChangedError
     paths = ModelPaths([tmp_path / "selected"])
     store = FileStore(paths, max_file_size=None)
     root, = store.roots(category="checkpoints")

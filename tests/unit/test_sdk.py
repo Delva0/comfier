@@ -8,7 +8,7 @@ import zipfile
 
 import pytest
 
-from comani import (
+from comfier import (
     Client,
     CodeCompatibilityError,
     GraphRef,
@@ -20,8 +20,8 @@ from comani import (
     SessionClosed,
     UnknownOutputLayout,
 )
-from comani.code import prepare_code
-from comani.protocol import decode_tree, encode_tree, lift_arguments, restore_arguments
+from comfier.code import prepare_code
+from comfier.protocol import decode_tree, encode_tree, lift_arguments, restore_arguments
 
 from ._helpers import eventually
 

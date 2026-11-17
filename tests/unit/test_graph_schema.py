@@ -4,7 +4,7 @@ import asyncio
 
 import pytest
 
-from comani import (
+from comfier import (
     Client,
     CodeCompatibilityError,
     Expired,

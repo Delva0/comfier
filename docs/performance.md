@@ -144,10 +144,10 @@ await remote.files.download(file, "result.png")
 当前例程已迁入显式管理 API。下面入口用于已配置实例，完整环境/模型准备参数见[H3 主流程](design/development.md#h3-完整脚本)。历史测量使用各报告记录的旧脚本 hash，不因示例改写成为本轮管理架构的性能证据。例如：
 
 ```sh
-comani daemon --comfy-root /path/to/ComfyUI --runtime-python /path/to/runtime/bin/python --no-start -- --reserve-vram 4
+comfier daemon --comfy-root /path/to/ComfyUI --runtime-python /path/to/runtime/bin/python --no-start -- --reserve-vram 4
 ```
 
-客户端配置 `COMANI_URL`、`COMANI_TOKEN`，在项目目录运行。脚本通过本地 models.resolve 查询来源、远端 models.download 校验并复用指定三模型，不再读取私有 model-verification 文件：
+客户端配置 `COMFIER_URL`、`COMFIER_TOKEN`，在项目目录运行。脚本通过本地 models.resolve 查询来源、远端 models.download 校验并复用指定三模型，不再读取私有 model-verification 文件：
 
 ```sh
 python -B benchmarks/minimax_h3_reuse.py \
@@ -184,7 +184,7 @@ binary fetch 直接返回原有 cloudpickle bytes，去掉 JSON/base64 包装；
 
 这组数据来自 i7-14700HX/WSL2 的单调用线程，不含序列化、HTTP、unpickle 或 GPU。PNG 和高熵 bytes 基本没有压缩收益，部分会膨胀。以“节省字节 ÷ encode+decode”算出的串行无重叠盈亏点只是理论模型，不能当远端实测。
 
-生产实现采用可选安装 `comani[lz4]`、两端精确能力协商、缺失能力回退 binary identity。`Client(..., fetch_compression="auto")` 默认允许协商；`"identity"` 禁用 LZ4。提供自建 transport 时，将选项写在 `HTTPTransport` 上。`auto` 不自动测网络：至少 1 MiB 才尝试压缩，且压缩后至少节省 1% 才发送。
+生产实现采用可选安装 `comfier[lz4]`、两端精确能力协商、缺失能力回退 binary identity。`cf.Client(..., fetch_compression="auto")` 默认允许协商；`"identity"` 禁用 LZ4。提供自建 transport 时，将选项写在 `HTTPTransport` 上。`auto` 不自动测网络：至少 1 MiB 才尝试压缩，且压缩后至少节省 1% 才发送。
 
 带 content checksum 的生产 codec 对同一真实图像 payload 编码为 **42,363,548 B**，节省 **15.83%**；本地 encode/decode 中位数为 **0.115 / 0.054 s**，合计约 **0.169 s**。生产 HTTP loopback 的交错单 fetch 样本为 identity **0.109 / 0.113 s**，LZ4 **0.262 / 0.261 s**，在该快链路上更慢。计时包括 HTTP、压缩和解压，排除 cloudpickle serialization/unpickle，不能当作完整 SDK 或 WAN 延迟。
 

@@ -1,6 +1,6 @@
 # 远端对象、GC 与会话
 
-实现：[SDK refs](../../src/comani/refs.py)、[client 控制消息](../../src/comani/client.py)、[ObjectStore](../../src/comani/daemon/objects.py)、[runtime reservations](../../src/comani/daemon/service.py)。
+实现：[SDK refs](../../src/comfier/refs.py)、[client 控制消息](../../src/comfier/client.py)、[ObjectStore](../../src/comfier/daemon/objects.py)、[runtime reservations](../../src/comfier/daemon/service.py)。
 
 ## 两种所有权
 
@@ -71,7 +71,7 @@ daemon 仅在调用终态、非 inflight、无依赖 reservation 时回收调用
 
 独立续约仍依赖客户端进程与网络。断网宽限内owned对象继续持有，borrowed仍可能被原生cache驱逐。宽限到期拒绝resume，取消尚未开工的排队/依赖调用；已经进入原生用户函数的调用自然完成后释放，不全局中断其他session。真正计算重启产生新epoch，旧refs失效，不补算/重提。管理daemon崩溃没有跨进程恢复保证。
 
-显式 `async with Client(...)` 退出或 `await client.close()` 主动撤销整个会话，存活的 Call/Ref/Graph 不能阻止关闭。关闭后的包装对象可保留本地已完成 metadata，但不能继续成功进行远端操作。应在业务 loop 关闭前完成显式关闭；owner loop 已关闭时 keeper 会退出，但该 loop 上的普通 transport 异步清理无法再执行。
+显式 `async with cf.Client(...)` 退出或 `await client.close()` 主动撤销整个会话，存活的 Call/Ref/Graph 不能阻止关闭。关闭后的包装对象可保留本地已完成 metadata，但不能继续成功进行远端操作。应在业务 loop 关闭前完成显式关闭；owner loop 已关闭时 keeper 会退出，但该 loop 上的普通 transport 异步清理无法再执行。
 
 离线显式关闭仍优先停止本地计算使用；远端撤销未确认时报告不确定，资源可能保留至宽限到期。它不取消已接纳管理Operation。files则主动停止本地传输并清理自己的partial，已发布文件保留。
 

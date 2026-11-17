@@ -9,9 +9,9 @@ from pathlib import Path
 from aiohttp import web
 from independent_load import Echo, rss_mib
 
-from comani import Client
-from comani.daemon import NativeRuntime
-from comani.daemon.http import create_app
+from comfier import Client
+from comfier.daemon import NativeRuntime
+from comfier.daemon.http import create_app
 
 
 async def main(args):

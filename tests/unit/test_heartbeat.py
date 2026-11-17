@@ -11,9 +11,9 @@ from concurrent.futures import Future
 import pytest
 from aiohttp import ClientConnectionError, web
 
-from comani import Client, HTTPTransport, InProcessTransport, RemoteError, SessionClosed
-from comani.protocol import pack_pickle
-from comani.transport import _post
+from comfier import Client, HTTPTransport, InProcessTransport, RemoteError, SessionClosed
+from comfier.protocol import pack_pickle
+from comfier.transport import _post
 
 
 async def until(predicate):
@@ -252,7 +252,7 @@ async def test_transient_heartbeat_failure_allows_business_rpcs_and_recovers(
             raise failure("injected transient heartbeat failure")
         return await _post(session, url, method, params, **kwargs)
 
-    monkeypatch.setattr("comani.transport._post", temporary_failure)
+    monkeypatch.setattr("comfier.transport._post", temporary_failure)
     client = await Client(lease_server.url).start()
     lease = client._lease
     try:

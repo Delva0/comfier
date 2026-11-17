@@ -9,10 +9,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from comani.daemon.management import model_resume
-from comani.daemon.management.model_resume import ModelResumeCache, RETENTION_SECONDS
-from comani.daemon.management.operations import ManagementError
-
+from comfier.daemon.management import model_resume
+from comfier.daemon.management.model_resume import RETENTION_SECONDS, ModelResumeCache
+from comfier.daemon.management.operations import ManagementError
 
 pytestmark = pytest.mark.skipif(os.name != "posix", reason="Model resume leases require flock")
 SHA = hashlib.sha256(b"verified model").hexdigest()

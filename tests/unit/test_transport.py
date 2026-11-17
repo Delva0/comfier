@@ -1,4 +1,4 @@
-from comani import HTTPTransport
+from comfier import HTTPTransport
 
 
 async def test_http_waits_and_transfers_do_not_share_control_connections(monkeypatch):
@@ -38,8 +38,8 @@ async def test_http_waits_and_transfers_do_not_share_control_connections(monkeyp
         async def close(self):
             self.closed = True
 
-    monkeypatch.setattr("comani.transport.aiohttp.TCPConnector", Connector)
-    monkeypatch.setattr("comani.transport.aiohttp.ClientSession", Session)
+    monkeypatch.setattr("comfier.transport.aiohttp.TCPConnector", Connector)
+    monkeypatch.setattr("comfier.transport.aiohttp.ClientSession", Session)
     transport = HTTPTransport("http://example.invalid")
     await transport.open()
     for method in ("wait_result", "heartbeat", "submit", "fetch", "artifact_put", "close_session"):

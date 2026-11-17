@@ -7,11 +7,11 @@ import time
 
 import pytest
 
-from comani.daemon import NativeRuntime
-from comani.daemon.objects import RefExpired, SessionClosed
-from comani.daemon.service import RecoveryError, RecoveryPolicy
+from comfier.daemon import NativeRuntime
+from comfier.daemon.objects import RefExpired, SessionClosed
+from comfier.daemon.service import RecoveryError, RecoveryPolicy
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 pytestmark = pytest.mark.skipif(not os.path.isfile(COMFY + "/execution.py"), reason="real ComfyUI required")
 
 

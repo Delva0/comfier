@@ -14,11 +14,11 @@ from pathlib import Path
 import pytest
 from aiohttp import ClientPayloadError, ClientSession, FormData
 
-from comani import Client, DownloadedFile, RemoteError, RemoteFile, SessionClosed
-from comani.daemon.files import FileStore
-from comani.daemon.http import create_app
-from comani.daemon.service import NativeRuntime
-from comani.files import _io
+from comfier import Client, DownloadedFile, RemoteError, RemoteFile, SessionClosed
+from comfier.daemon.files import FileStore
+from comfier.daemon.http import create_app
+from comfier.daemon.service import NativeRuntime
+from comfier.files import _io
 
 from .test_binary_fetch import serve
 from .test_runtime_files import Folders
@@ -184,7 +184,7 @@ async def test_close_cancels_active_file_io_and_rejects_new_io(tmp_path, monkeyp
         gate.set()
         await asyncio.Event().wait()
 
-    monkeypatch.setattr("comani.files._upload_http", paused)
+    monkeypatch.setattr("comfier.files._upload_http", paused)
     async with running(tmp_path) as (_, url):
         remote = await Client(url, token="file-token").start()
         pending = asyncio.create_task(remote.files.upload(source))

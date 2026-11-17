@@ -23,18 +23,18 @@ destination.parent.mkdir(parents=True, exist_ok=True)
 
 
 def provenance():
-    import comani
-    package = Path(comani.__file__).resolve().parent
+    import comfier
+    package = Path(comfier.__file__).resolve().parent
     installed = {str(path.relative_to(package)): hashlib.sha256(path.read_bytes()).hexdigest()
                  for path in package.rglob('*.py')}
     manifest = json.loads(Path(manifest_path).read_text())['files']
-    expected = {name.removeprefix('src/comani/'): value for name, value in manifest.items()
-                if name.startswith('src/comani/')}
-    assert installed == expected and '/site-packages/comani' in str(package)
+    expected = {name.removeprefix('src/comfier/'): value for name, value in manifest.items()
+                if name.startswith('src/comfier/')}
+    assert installed == expected and '/site-packages/comfier' in str(package)
     return {'package': str(package), 'installed_files': installed,
             'loaded_modules': {name: {'path': str(Path(module.__file__).resolve()),
                 'sha256': hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()}
-                for name, module in list(sys.modules.items()) if name.startswith('comani')
+                for name, module in list(sys.modules.items()) if name.startswith('comfier')
                 and getattr(module, '__file__', '').endswith('.py')}}
 
 

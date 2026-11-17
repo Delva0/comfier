@@ -44,7 +44,7 @@ def start(directory):
                 log.flush()
                 (directory / 'resource-peaks.json').write_text(json.dumps(peaks, indent=2))
                 time.sleep(1)
-    thread = threading.Thread(target=sample, daemon=True, name='comani-acceptance-resource-sampler')
+    thread = threading.Thread(target=sample, daemon=True, name='comfier-acceptance-resource-sampler')
     thread.start()
     return {'sampling_started': True, 'interval_seconds': 1}
 

@@ -9,12 +9,12 @@ from pathlib import Path
 import pytest
 from aiohttp import web
 
-from comani import Client
-from comani.daemon.management_http import create_management_app
-from comani.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
-from comani.errors import Expired
+from comfier import Client
+from comfier.daemon.management_http import create_management_app
+from comfier.daemon.supervisor import RuntimeConfig, RuntimeSupervisor
+from comfier.errors import Expired
 
-COMFY = os.environ.get("COMANI_COMFY_ROOT", "/home/delva/projects/ComfyUI")
+COMFY = os.environ.get("COMFIER_COMFY_ROOT", "/home/delva/projects/ComfyUI")
 
 
 async def entered(path):

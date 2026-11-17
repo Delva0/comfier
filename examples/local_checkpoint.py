@@ -10,11 +10,11 @@ import asyncio
 import os
 from pathlib import Path
 
-import comani
+import comfier as cf
 
 
 async def main(args):
-    async with comani.Client(args.url, token=os.environ.get("COMANI_TOKEN")) as remote:
+    async with cf.Client(args.url, token=os.environ.get("COMFIER_TOKEN")) as remote:
         if args.upload_checkpoint:
             roots = await remote.files.roots(category="checkpoints")
             selected = [root for root in roots if root.path == args.model_root] if args.model_root else roots
@@ -38,7 +38,7 @@ async def main(args):
             )
             decoded = remote.node("VAEDecode", samples=sampled, vae=vae)
             saved = remote.node("SaveImage", images=decoded,
-                                filename_prefix="comani/checkpoint", return_call=True)
+                                filename_prefix="comfier/checkpoint", return_call=True)
         run = remote.submit(graph, return_call=True)
         output = await run.file(node_id=saved.id)
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -49,7 +49,7 @@ async def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", type=str,
-                        default=os.environ.get("COMANI_URL", "http://127.0.0.1:8190"))
+                        default=os.environ.get("COMFIER_URL", "http://127.0.0.1:8190"))
     parser.add_argument("--checkpoint", type=str, required=True, help="server-native checkpoint filename")
     parser.add_argument("--upload-checkpoint", type=Path, help="optional local checkpoint to upload")
     parser.add_argument("--model-root", type=str, help="absolute server checkpoint root for upload")
