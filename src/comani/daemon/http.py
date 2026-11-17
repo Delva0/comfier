@@ -38,6 +38,17 @@ async def _binary_response(request, payload, content_type, *, headers=None):
     return response
 
 
+async def create_runtime_app(runtime, *, token=None, close_runtime=True):
+    """Boot before app construction so native subapps mount before signals freeze."""
+    try:
+        await runtime.start()
+        return create_app(runtime, token=token, close_runtime=close_runtime)
+    except BaseException:
+        if close_runtime:
+            await runtime.close()
+        raise
+
+
 def create_app(runtime, *, token=None, close_runtime=True):
     methods = {"handshake", "resume", "submission_window", "runtime_info", "file_invalidate", "submit", "submit_batch", "wait_result", "fetch", "release", "forget_calls", "close_session", "artifact_put", "heartbeat", "file_roots", "file_stat", "file_remove"}
 
@@ -186,6 +197,28 @@ def create_app(runtime, *, token=None, close_runtime=True):
     app.router.add_get("/queue", queue)
     app.router.add_get("/ws", websocket)
     install_file_routes(app, runtime)
+    server = getattr(getattr(runtime, "adapter", None), "server", None)
+    if server is not None:
+        # Core and custom nodes register routes during boot. Keep their patterns
+        # separate and omit controls for the unused native prompt queue.
+        blocked = ("/rpc", "/manage", "/files", "/prompt", "/queue", "/history",
+                   "/ws", "/interrupt", "/free", "/api/jobs")
+
+        def reserved(path):
+            return any(path == prefix or path.startswith(prefix + "/") for prefix in blocked)
+
+        @web.middleware
+        async def native_controls(request, handler):
+            # Block broad plugin patterns matching a reserved path as well.
+            if reserved(request.path.removeprefix("/native")):
+                raise web.HTTPNotFound()
+            return await handler(request)
+
+        native = server.app
+        native.middlewares.insert(0, native_controls)
+        native.add_routes(route for route in server.routes
+                          if not reserved(route.path if isinstance(route, web.RouteDef) else route.prefix))
+        app.add_subapp("/native", native)
     app.on_startup.append(startup)
     app.on_cleanup.append(cleanup)
     return app

@@ -57,7 +57,7 @@ from .management import (
     Plugins,
 )
 from .refs import Call, CallMetadata, OutputFuture, RemoteRef
-from .transport import HTTPTransport, InProcessTransport
+from .transport import HTTPTransport, InProcessTransport, ZMQTransport
 
 
 def node(node_type, node_inputs=_NODE_INPUTS, /, *, return_call=False,
@@ -102,7 +102,7 @@ __all__ = [
     "node", "python", "graph", "submit", "start", "close",
     "files", "bash", "comfyui", "models", "plugins", "operations",
     "Client", "Call", "OutputFuture", "RemoteRef", "Graph", "GraphInput", "GraphRef",
-    "HTTPTransport", "InProcessTransport", "ComaniError", "RemoteError", "SessionClosed",
+    "HTTPTransport", "InProcessTransport", "ZMQTransport", "ComaniError", "RemoteError", "SessionClosed",
     "InvalidReference", "NotSubmitted", "Expired", "Released", "NotProduced", "Skipped",
     "UnknownOutputLayout", "CodeCompatibilityError", "PackageConflict",
     "Files", "FileRoot", "RemoteFile", "DownloadedFile", "FileDescriptor",

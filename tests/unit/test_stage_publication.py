@@ -313,7 +313,12 @@ async def test_model_http_and_snapshot_files_share_adoption_and_native_cache_not
                 target.stat().st_size, target.stat().st_mtime_ns, target.stat().st_ctime_ns]
             assert item["native_visibility"] == "visible" and notices == ["checkpoints"]
             assert "checkpoints" not in supervisor.file_store.folder_paths.filename_list_cache
-            assert not list((tmp_path / ".comani" / "staging").iterdir())
+            staging = tmp_path / ".comani" / "staging"
+            assert not staging.exists() or not list(staging.iterdir())
+            # SHA-bound acquisitions now live in stable resume storage. Both
+            # staging layouts must release payloads after atomic publication.
+            cache = tmp_path / ".comani" / "model-resume"
+            assert not list(cache.glob("*/payload.part*"))
         finally:
             await service.close()
 

@@ -144,36 +144,43 @@ async def _aria_source(address, credentials, connections, timeout, *, probe_vali
             await runner.cleanup()
 
 
-async def _run_aria2(context, binary, address, target, connections, timeout, *, validator, tries, relay):
-    # Signed URIs and validators stay in an owner-only input file, never argv.
-    fd, name = tempfile.mkstemp(prefix="aria-input-", dir=target.parent)
+async def _run_aria2(context, binary, address, target, connections, timeout, *, validator, tries, relay,
+                    resume=None):
+    # Signed URIs never enter argv or persistent files, even if Python is
+    # killed before finally runs. aria2 reads an inherited anonymous file FD.
+    stream = tempfile.TemporaryFile(mode="w+", encoding="utf-8", dir=target.parent)
     try:
-        os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "w") as stream:
-            stream.write(address + "\n dir=" + str(target.parent) + "\n out=" + target.name + "\n")
-            if validator:
-                if "\n" in validator or "\r" in validator:
-                    raise ManagementError("ProviderError", "Provider returned an invalid entity validator")
-                stream.write(" header=If-Match: " + validator + "\n")
+        if "\n" in address or "\r" in address:
+            raise ManagementError("ProviderError", "Provider returned an invalid download address")
+        stream.write(address + "\n dir=" + str(target.parent) + "\n out=" + target.name + "\n")
+        if validator:
+            if "\n" in validator or "\r" in validator:
+                raise ManagementError("ProviderError", "Provider returned an invalid entity validator")
+            stream.write(" header=If-Match: " + validator + "\n")
+        stream.flush()
+        stream.seek(0)
         command = [binary, "--no-conf=true", "--no-netrc=true",
-            "--input-file=" + name, "--dir=" + str(target.parent), "--out=" + target.name,
+            "--input-file=/proc/self/fd/" + str(stream.fileno()), "--dir=" + str(target.parent), "--out=" + target.name,
             "--max-connection-per-server=" + str(connections), "--split=" + str(connections),
             "--min-split-size=1M", "--allow-overwrite=true", "--auto-file-renaming=false",
-            "--continue=false", "--check-certificate=true", "--file-allocation=none",
+            "--continue=" + ("true" if resume is not None else "false"),
+            "--auto-save-interval=1", "--check-certificate=true", "--file-allocation=none",
             "--max-tries=" + str(tries), "--retry-wait=1", "--connect-timeout=30", "--timeout=60",
             "--quiet=false", "--show-console-readout=false", "--summary-interval=0",
             "--download-result=hide", "--console-log-level=error"]
         if relay:
             command.append("--no-proxy=127.0.0.1,localhost")
+        descriptors = (stream.fileno(),) + ((resume.fd,) if resume is not None else ())
         return await run_process(QuietContext(context), command, cwd=target.parent,
-                                 timeout=timeout, output_limit=4096)
+                                 timeout=timeout, output_limit=4096, pass_fds=descriptors)
     finally:
-        os.unlink(name)
-        target.with_name(target.name + ".aria2").unlink(missing_ok=True)
+        stream.close()
+        if resume is None:
+            target.with_name(target.name + ".aria2").unlink(missing_ok=True)
 
 
 async def external_download(context, resolver, artifact, target, *, transport, connections, timeout,
-                            python=sys.executable):
+                            python=sys.executable, resume=None):
     if transport == "aria2":
         tool = await ensure_aria2(context, resolver, cwd=target.parent, timeout=timeout)
         binary = tool["binary"]
@@ -190,7 +197,7 @@ async def external_download(context, resolver, artifact, target, *, transport, c
                                  attempt=attempt + 1)
                 command = await _run_aria2(context, binary, address, target, parallel, timeout,
                                           validator=validator if not immutable else None,
-                                          tries=3 if immutable else 1, relay=route == "credential_relay")
+                                          tries=3 if immutable else 1, relay=route == "credential_relay", resume=resume)
             if not command["exit_code"]:
                 return
             if immutable or attempt == 3:

@@ -257,7 +257,11 @@ async def test_checksum_mismatch_does_not_publish(tmp_path):
         result = await finish(service, accepted)
         assert result["error"]["code"] == "ChecksumMismatch"
         assert not (root.path / "weights.bin").exists()
-        assert not list((tmp_path / ".comani" / "staging").iterdir())
+        staging = tmp_path / ".comani" / "staging"
+        assert not staging.exists() or not list(staging.iterdir())
+        # A disproven representation must not survive in the stable cache.
+        cache = tmp_path / ".comani" / "model-resume"
+        assert not [path for path in cache.iterdir() if path.is_dir()]
     finally:
         await service.close()
         await runner.cleanup()
@@ -301,7 +305,12 @@ async def test_existing_aria2_binary_streams_and_verifies_before_publish(tmp_pat
         rec = service.operations.get(accepted["operation_id"], accepted["daemon_epoch"], "user")
         assert "must-not-log" not in str(list(rec.logs))
         assert calls
-        assert not list((tmp_path / ".comani" / "staging").iterdir())
+        staging = tmp_path / ".comani" / "staging"
+        assert not staging.exists() or not list(staging.iterdir())
+        # Successful create-only publication leaves the final model above,
+        # while its SHA partial, control file and manifest are all released.
+        cache = tmp_path / ".comani" / "model-resume"
+        assert not [path for path in cache.iterdir() if path.is_dir()]
     finally:
         await service.close()
         await runner.cleanup()

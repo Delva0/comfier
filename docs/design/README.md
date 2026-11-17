@@ -6,10 +6,10 @@ Comani 用一个 Python 入口管理远端实例并调用原生 ComfyUI。管理
 客户端 Python
   模块 API / Client / Files / Call / Graph / refs
   HF/Civitai/registry 纯查询直接访问上游
-                  │ 一个公开 HTTP endpoint
+                  │ HTTP 管理/文件；可选 ZMQ 计算 gateway
                   ▼
 带外 daemon：配置、生命周期、Operation、bash、插件、模型、文件 I/O
-                  │ bounded 原始 HTTP/二进制/WS 字节流代理
+                  │ 默认 HTTP 计算；显式可选 IPC 计算；文件/辅助路由 HTTP
                   ▼
 带内 ComfyUI 子进程：一个 native worker、执行器、cache、计算 session、对象
 ```
@@ -24,6 +24,7 @@ Comani 用一个 Python 入口管理远端实例并调用原生 ComfyUI。管理
 | [Runtime](runtime.md) | [service](../../src/comani/daemon/service.py)、[adapter](../../src/comani/daemon/adapter.py) | 依赖 admission、原生计算、cache 与观察 |
 | [所有权与恢复](ownership.md) | [refs](../../src/comani/refs.py)、[objects](../../src/comani/daemon/objects.py) | Owned/borrowed、GC、会话恢复与失效 |
 | [协议](protocol.md) | [transport](../../src/comani/transport.py)、[管理 HTTP](../../src/comani/daemon/management_http.py)、[计算 HTTP](../../src/comani/daemon/http.py) | 分层握手、RPC、二进制、去重与续传 |
+| [可选 ZMQ 计算通道](compute-transport.md) | [ZMQ SDK](../../src/comani/_zmq_transport.py)、[ZMQ server](../../src/comani/daemon/zmq.py) | 同协议 IPC/TCP、显式内部通道、HTTP companion 与 CURVE |
 | [Python artifacts](python-artifacts.md) | [code](../../src/comani/code.py)、[python_node](../../src/comani/daemon/python_node.py) | callable/source/package 传输与正常 imports |
 | [文件 I/O](files.md) | [客户端 files](../../src/comani/files.py)、[FileStore](../../src/comani/daemon/files.py)、[file_http](../../src/comani/daemon/file_http.py) | 原生 roots、显式流、自动字节续传与持久文件 |
 | [运行与开发](development.md) | [CLI](../../src/comani/cli/)、[pyproject](../../pyproject.toml) | 必要启动入口、示例、开发和冻结验证 |

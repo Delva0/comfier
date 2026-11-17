@@ -126,6 +126,10 @@ class ManagementService:
                 return await self.models.categories()
             if action == "list":
                 return await self.models.listing(**params)
+            if action == "clear_partial":
+                if params:
+                    raise ManagementError("InvalidArgument", "clear_partial does not accept parameters")
+                return await self.models.clear_partial()
         raise ManagementError("UnknownMethod", "Unknown management read")
 
     async def run(self, namespace, action, params, context):

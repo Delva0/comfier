@@ -30,8 +30,15 @@ from .errors import (
 )
 from .files import Files
 from .management import Bash, ComfyUI, Models, Operations, Plugins
-from .protocol import (PYTHON_NODE, SUBMIT_BATCH_VERSION, SUBMIT_BATCH_MAX_CALLS,
-                       SUBMIT_BATCH_MAX_BYTES, encode_tree, lift_arguments, unpack_pickle)
+from .protocol import (
+    PYTHON_NODE,
+    SUBMIT_BATCH_MAX_BYTES,
+    SUBMIT_BATCH_MAX_CALLS,
+    SUBMIT_BATCH_VERSION,
+    encode_tree,
+    lift_arguments,
+    unpack_pickle,
+)
 from .refs import Call, OutputFuture, RemoteRef, _CallState
 from .transport import HTTPTransport, retryable_transport_error
 
@@ -372,7 +379,7 @@ class Client:
             self._recovery = _ConnectionRecovery(self.transport, self.handshake, self.session_id)
             self._cache_node_metadata({"epoch": self.epoch, "nodes": self.handshake.get("nodes", {})})
             interval = min(20.0, max(0.01, self.handshake.get("session_ttl", 120) / 3))
-            if isinstance(self.transport, HTTPTransport) and self.handshake.get("session_id"):
+            if callable(getattr(self.transport, "_start_heartbeat", None)) and self.handshake.get("session_id"):
                 self._lease = self.transport._start_heartbeat(self.session_id, interval, self._loop,
                     partial(_heartbeat_notice, weakref.ref(self)))
                 self._cleanup.lease = self._lease

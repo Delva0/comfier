@@ -45,7 +45,8 @@ async def terminate(process):
     await process.wait()
 
 
-async def run_process(context, argv, *, cwd, env=None, timeout=None, output_limit=1024 * 1024):
+async def run_process(context, argv, *, cwd, env=None, timeout=None, output_limit=1024 * 1024,
+                      pass_fds=()):
     if os.name != "posix":
         raise ManagementError("UnsupportedPlatform", "Management subprocesses require Linux")
     if timeout is not None and (not isinstance(timeout, (int, float)) or timeout <= 0):
@@ -53,7 +54,8 @@ async def run_process(context, argv, *, cwd, env=None, timeout=None, output_limi
     started = time.monotonic()
     creation = asyncio.create_task(asyncio.create_subprocess_exec(
         *argv, cwd=cwd, env=child_env(env), stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True))
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, start_new_session=True,
+        pass_fds=tuple(pass_fds)))
     try:
         process = await asyncio.shield(creation)
     except asyncio.CancelledError:

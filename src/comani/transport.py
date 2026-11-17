@@ -8,7 +8,9 @@ import inspect
 import threading
 import weakref
 from concurrent.futures import Future
+from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 import aiohttp
 
@@ -35,6 +37,29 @@ def retryable_transport_error(error):
         return _retryable_heartbeat_status(error.status)
     return isinstance(error, (aiohttp.ClientConnectionError, aiohttp.ClientPayloadError,
                               TimeoutError, ConnectionError, OSError))
+
+
+def _native_path(path):
+    """Keep extension control requests on this daemon and out of SDK routes."""
+    if not isinstance(path, str):
+        raise ValueError("Native control path must be an absolute path on this daemon")
+    decoded = path
+    # Reject double-encoded routing aliases as well as ordinary encoded paths.
+    for _ in range(len(path) + 1):
+        value = unquote(decoded)
+        if value == decoded:
+            break
+        decoded = value
+    parts = urlsplit(decoded)
+    if (not decoded.startswith("/") or decoded.startswith("//")
+            or parts.scheme or parts.netloc or parts.query or parts.fragment
+            or "?" in decoded or "#" in decoded or "\\" in decoded
+            or any(ord(character) < 32 or ord(character) == 127 for character in decoded)
+            or any(segment in {".", ".."} for segment in decoded.split("/"))):
+        raise ValueError("Native control path must be a same-origin absolute path; use params for query values")
+    if parts.path.split("/", 2)[1] in {"manage", "rpc", "files", "prompt", "history", "queue", "ws"}:
+        raise ValueError("Use the dedicated SDK interface for management, compute, files or prompt routes")
+    return path
 
 
 async def _post(session, url, method, params, *, retry_http=False, binary=False, lz4=False,
@@ -137,6 +162,16 @@ class _HTTPHeartbeat:
                 self.stop()
                 return
 
+    @asynccontextmanager
+    async def _connection(self):
+        async with aiohttp.ClientSession(headers=self.headers,
+                timeout=aiohttp.ClientTimeout(total=self.interval),
+                connector=aiohttp.TCPConnector(limit=1)) as session:
+            yield session
+
+    async def _renew(self, session):
+        await _post(session, self.url, "heartbeat", {"session_id": self.session_id}, retry_http=True)
+
     async def _serve(self):
         with self._lock:
             self._loop = asyncio.get_running_loop()
@@ -145,15 +180,12 @@ class _HTTPHeartbeat:
             return
         watcher = asyncio.create_task(self._watch_owner(), context=contextvars.Context())
         try:
-            async with aiohttp.ClientSession(headers=self.headers,
-                    timeout=aiohttp.ClientTimeout(total=self.interval),
-                    connector=aiohttp.TCPConnector(limit=1)) as session:
+            async with self._connection() as session:
                 if not self.ready.done():
                     self.ready.set_result(None)
                 while not self._stopped.is_set():
                     try:
-                        await _post(session, self.url, "heartbeat", {"session_id": self.session_id},
-                                    retry_http=True)
+                        await self._renew(session)
                         self.error = None
                     except (aiohttp.ClientConnectionError, aiohttp.ClientPayloadError, TimeoutError, OSError) as error:
                         # The server owns strict lease expiry; do not extend it
@@ -255,6 +287,25 @@ class HTTPTransport:
     async def management_request(self, method: str, **params):
         return await self.request("management:" + method, **params)
 
+    async def native_request(self, method, path, *, params=None, json=None):
+        path = _native_path(path)
+        if self._session is None:
+            raise SessionClosed("Transport is not open")
+        # Native extension POSTs may have side effects. Never replay a request
+        # after a timeout, redirect, HTTP failure or disconnected response.
+        async with self._session.request(method, self.url[:-4] + "/native" + path, params=params,
+                                         json=json, allow_redirects=False) as response:
+            response.raise_for_status()
+            if not 200 <= response.status < 300:
+                raise aiohttp.ClientResponseError(response.request_info, response.history,
+                    status=response.status, message=response.reason, headers=response.headers)
+            if response.status == 204 or not (await response.read()).strip():
+                return None
+            try:
+                return await response.json()
+            except (aiohttp.ContentTypeError, ValueError):
+                raise ValueError("Native control route did not return JSON") from None
+
     def _reset_runtime_capabilities(self):
         self._binary_fetch = self._binary_fetch_lz4 = False
 
@@ -314,3 +365,6 @@ class InProcessTransport:
 
     async def close(self):
         pass
+
+
+from ._zmq_transport import ZMQTransport  # noqa: E402,F401

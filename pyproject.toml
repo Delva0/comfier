@@ -10,6 +10,7 @@ dependencies = ["aiohttp>=3.11", "cloudpickle>=3.1"]
 comani = "comani.cli:main"
 
 [project.optional-dependencies]
+zmq = ["pyzmq>=27"]
 lz4 = ["lz4>=4.3"]
 test = ["pytest>=9.0", "pytest-asyncio>=1.3", "Pillow>=10.1", "ruff>=0.14"]
 

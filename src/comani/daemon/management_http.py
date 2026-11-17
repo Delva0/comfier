@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hmac
 import ipaddress
 import logging
@@ -14,6 +15,7 @@ from aiohttp import web
 from multidict import CIMultiDict
 
 from comani.files import FILE_CHUNK_SIZE, FILE_VERSION
+from comani.protocol import PICKLE_CONTENT_TYPE
 
 from . import file_http
 from .supervisor import SupervisorError
@@ -51,7 +53,14 @@ class ManagedFiles:
 
 
 def create_management_app(supervisor, *, token=None, service=None, auto_start=False,
-                          management_limits=None, prepare_download_tools=False):
+                          management_limits=None, prepare_download_tools=False,
+                          compute_endpoints=(), curve_public_key=None, curve_secret_key=None):
+    compute = None
+    if compute_endpoints:
+        from .zmq import ZMQServer
+
+        compute = ZMQServer(supervisor, endpoints=compute_endpoints, token=token,
+                            curve_public_key=curve_public_key, curve_secret_key=curve_secret_key)
     if service is not None and management_limits is not None:
         raise ValueError("Pass service or management_limits, not both")
     if service is None:
@@ -109,6 +118,11 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
                       "file_limits": supervisor.file_limits(),
                       "download_tools": service.download_tools_status(),
                       "node_metadata": supervisor.observed_nodes()}
+            if compute is not None:
+                result["capabilities"]["compute_zmq"] = 1
+                result["compute_endpoints"] = [{"endpoint": item, "protocol": "zmq-v1",
+                    "curve_server_key": compute.curve_public_key.decode() if compute.curve_public_key else None}
+                    for item in compute.endpoints]
         elif method in {"file_roots", "file_stat", "file_remove"}:
             await supervisor.get_file_store()
             result = await getattr(file_http, method)(files, **params)
@@ -150,6 +164,29 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
                     or supervisor.state in {"stopping", "stopped", "starting", "failed"}):
                 raise SupervisorError("RefExpired", "The runtime lifecycle ended; old computation calls and references expired") from error
             raise SupervisorError("RuntimeUnavailable", "The native runtime connection ended") from error
+
+    async def compute_rpc(request):
+        # The HTTP public entry remains compatible when the private compute
+        # channel is IPC. Files and native helper routes retain their HTTP path.
+        if supervisor.config.compute_transport != "zmq":
+            return await proxy(request)
+        from comani._zmq_protocol import METHODS
+
+        from .http import _binary_response
+
+        await ready()
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise ValueError("Expected a compute request object")
+        method, params = body.get("method"), body.get("params", {})
+        if method not in METHODS or not isinstance(params, dict):
+            raise ValueError("Unknown compute RPC method or object params")
+        result = await supervisor.runtime_request(method, **params)
+        if method == "fetch":
+            if request.headers.get("Accept") == PICKLE_CONTENT_TYPE:
+                return await _binary_response(request, result, PICKLE_CONTENT_TYPE)
+            result = {"codec": "pickle", "data": base64.b64encode(result).decode("ascii")}
+        return web.json_response({"result": result})
 
     async def websocket(request):
         await ready()
@@ -209,6 +246,16 @@ def create_management_app(supervisor, *, token=None, service=None, auto_start=Fa
         await supervisor.close()
 
     app.router.add_post("/manage", manage)
+    app.router.add_post("/rpc", compute_rpc)
+    if compute is not None:
+        async def compute_channel(app):
+            await compute.start()
+            try:
+                yield
+            finally:
+                await compute.close()
+
+        app.cleanup_ctx.append(compute_channel)
     install_file_routes = file_http.install_file_routes
     install_file_routes(app, files)
     app.router.add_get("/ws", websocket)

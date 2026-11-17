@@ -12,6 +12,11 @@ def info() -> Coroutine[Any, Any, ComfyUIInfo]:
     return _invoke_async(("comfyui", "info"))
 
 
+def request(method: str, path: str, *, params=None, json=None) -> Coroutine[Any, Any, Any]:
+    """Call a native JSON HTTP control route through the current Client."""
+    return _invoke_async(("comfyui", "request"), method, path, params=params, json=json)
+
+
 def config() -> Coroutine[Any, Any, ManagementMetadata]:
     return _invoke_async(("comfyui", "config"))
 

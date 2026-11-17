@@ -21,6 +21,7 @@ from comani.files import _io
 from ..file_http import metadata_wire
 from ..files import Revision, _relative, verify_staged
 from .operations import ManagementError
+from .model_resume import ModelResumeCache
 from .providers import provider_headers
 from .tools import python_metadata
 from .transports import external_download, select_transport
@@ -42,6 +43,10 @@ class ModelService:
     def __init__(self, supervisor, resolver):
         self.supervisor, self.resolver = supervisor, resolver
         self._targets = set()
+
+    async def clear_partial(self):
+        """Remove idle download partials, skipping every process-held lease."""
+        return await _io(ModelResumeCache(self.supervisor.config.workspace).clear)
 
     async def categories(self):
         store = await self.supervisor.get_file_store()
@@ -98,7 +103,7 @@ class ModelService:
             expected_size = None
         if expected_size is not None and (type(expected_size) is not int or expected_size < 0 or (max_bytes is not None and expected_size > max_bytes)):
             raise ManagementError("InvalidArgument", "Artifact exceeds the configured file limit")
-        self._space(target.parent, expected_size)
+        self._space(target.parent, None if expected_size is None else max(0, expected_size - target.stat().st_size))
         validator, known_total = None, expected_size
         for attempt in range(4):
             offset = target.stat().st_size
@@ -232,7 +237,8 @@ class ModelService:
             raise ManagementError("DestinationBusy", "Another operation is publishing this model path")
         self.resolver.retain(artifact)
         self._targets.add(key)
-        partial = staging_directory = root_identity = None
+        partial = staging_directory = root_identity = resume = None
+        discard_resume = False
         try:
             # Fail before provider traffic for conflicting destinations.
             try:
@@ -247,22 +253,33 @@ class ModelService:
                             "sha256": existing.metadata.sha256, "verified_against": "sha256", "reused": True,
                             "native_visibility": "visible" if self.supervisor.state == "running" else "unknown"}
             root_identity = await _io(store.pin_root, selected, _cancel_cleanup=lambda value: value.close())
-            staging = Path(self.supervisor.config.workspace) / ".comani" / "staging"
-            staging.mkdir(parents=True, exist_ok=True)
-            staging_directory = Path(tempfile.mkdtemp(prefix="model-", dir=staging))
-            partial = staging_directory / "payload.part"
-            partial.touch(mode=0o600, exist_ok=False)
+            expected = artifact.get("sha256")
+            if expected is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
+                raise ManagementError("InvalidArgument", "Expected SHA256 must contain 64 hexadecimal characters")
+            engine = select_transport(artifact, transport)
+            if expected and os.name == "posix":
+                cache = ModelResumeCache(self.supervisor.config.workspace)
+                resume = await _io(cache.acquire, root_identity, path, expected, engine,
+                                   _cancel_cleanup=lambda value: value.close())
+                partial = resume.target
+            else:
+                staging = Path(self.supervisor.config.workspace) / ".comani" / "staging"
+                staging.mkdir(parents=True, exist_ok=True)
+                staging_directory = Path(tempfile.mkdtemp(prefix="model-", dir=staging))
+                partial = staging_directory / "payload.part"
+                partial.touch(mode=0o600, exist_ok=False)
             max_bytes = store.max_file_size
             if _max_bytes is not None:
                 max_bytes = _max_bytes if max_bytes is None else min(max_bytes, _max_bytes)
             stage, verified, selected_transport = await self._acquire(
-                context, artifact, partial, max_bytes, transport, connections, timeout)
+                context, artifact, partial, max_bytes, transport, connections, timeout, resume=resume)
             size, actual = stage.size, stage.sha256
             context.progress(phase="verifying", bytes=size, total=size)
             await self._revalidate_root(store, root_identity, generation)
             context.progress(phase="publishing", bytes=size, total=size)
             info = await self._publish_staged(store, selected, path, stage,
                                               check_root=lambda: self._check_root(root_identity))
+            discard_resume = True
             result = {"file": metadata_wire(store, info), "artifact": self.resolver.public(artifact), "sha256": actual,
                       "verified_against": verified, "reused": False,
                       "native_visibility": "visible" if self.supervisor.state == "running" else "unknown",
@@ -277,11 +294,19 @@ class ModelService:
                     result["native_visibility"] = "unknown"
             context.progress(phase="complete", bytes=size, total=size)
             return result
+        except ManagementError as error:
+            # A completed but invalid representation cannot supply trusted
+            # pieces to a later attempt with the same expected digest.
+            if error.code in {"ChecksumMismatch", "ArtifactChanged", "InvalidRangeResponse", "FileTooLarge"}:
+                discard_resume = True
+            raise
         finally:
             self._targets.discard(key)
             self.resolver.release(artifact)
             if root_identity is not None:
                 root_identity.close()
+            if resume is not None:
+                await _io(resume.close, discard=discard_resume)
             if staging_directory is not None:
                 await _io(shutil.rmtree, staging_directory)
 
@@ -333,7 +358,7 @@ class ModelService:
                     raise asyncio.CancelledError from None
                 raise
 
-    async def _acquire(self, context, artifact, target, max_bytes, transport, connections, timeout):
+    async def _acquire(self, context, artifact, target, max_bytes, transport, connections, timeout, *, resume=None):
         hf_available = False
         if artifact.get("provider") == "huggingface" and transport == "hf":
             if not hasattr(context, "provider_environment"):
@@ -343,6 +368,22 @@ class ModelService:
                 raise ManagementError("MissingDownloadTool", "Install an explicit huggingface-hub version with comfyui.prepare_tools before selecting hf")
         selected = select_transport(artifact, transport, hf_available=hf_available)
         context.progress(phase="downloading", requested_transport=transport, transport=selected)
+        if resume is not None and target.stat().st_size and not target.with_name(target.name + ".aria2").exists():
+            cached = await _io(verify_staged, target)
+            if cached.sha256 == artifact["sha256"].lower():
+                if max_bytes is not None and cached.size > max_bytes:
+                    raise ManagementError("FileTooLarge", "Artifact exceeds the configured file limit")
+                if (artifact.get("provider") != "civitai" and artifact.get("size") is not None
+                        and cached.size != artifact["size"]):
+                    raise ManagementError("ArtifactChanged", "Downloaded bytes differ from the resolved length")
+                if artifact.get("git_sha1"):
+                    await _io(verify_git_blob, target, artifact["git_sha1"])
+                cached.check()
+                return cached, "sha256", selected
+            if selected != "http":
+                # aria2 files may be sparse: without its piece map their
+                # apparent length does not prove a contiguous byte prefix.
+                await _io(resume.reset)
         if selected == "http":
             stage, verified = await self._fetch(context, artifact, target, max_bytes=max_bytes, timeout=timeout)
             if artifact.get("git_sha1"):
@@ -355,8 +396,10 @@ class ModelService:
             raise ManagementError("InvalidArgument", "Expected SHA256 must contain 64 hexadecimal characters")
         if type(artifact.get("size")) is int and max_bytes is not None and artifact["size"] > max_bytes:
             raise ManagementError("FileTooLarge", "Artifact exceeds the configured file limit")
-        self._space(target.parent, artifact.get("size"))
-        await self._external(context, artifact, target, selected, connections, timeout, max_bytes)
+        allocated = target.stat()
+        allocated = allocated.st_blocks * 512 if hasattr(allocated, "st_blocks") else allocated.st_size
+        self._space(target.parent, None if artifact.get("size") is None else max(0, artifact["size"] - allocated))
+        await self._external(context, artifact, target, selected, connections, timeout, max_bytes, resume=resume)
         stage = await _io(verify_staged, target)
         size, actual = stage.size, stage.sha256
         if (max_bytes is not None and size > max_bytes) or (artifact.get("provider") != "civitai" and artifact.get("size") is not None and size != artifact["size"]):
@@ -428,6 +471,8 @@ class ModelService:
             raise ManagementError("DestinationBusy", "Another operation is publishing inside this snapshot destination")
         self._targets.add(key)
         staging = root_identity = None
+        resumes, invalid_resumes = [], set()
+        published = False
         try:
             store._conflicts(selected, path)
             root_identity = await _io(store.pin_root, selected, _cancel_cleanup=lambda value: value.close())
@@ -450,9 +495,21 @@ class ModelService:
             total_bytes = 0
             for index, (relative, artifact) in enumerate(entries):
                 context.progress(file=index + 1, files=len(entries), path=relative)
-                transfer_directory = Path(tempfile.mkdtemp(prefix="acquire-", dir=staging))
-                temporary = transfer_directory / "payload.part"
-                temporary.touch(mode=0o600, exist_ok=False)
+                resume = transfer_directory = None
+                expected = artifact.get("sha256")
+                if expected is not None and not re.fullmatch(r"[0-9a-fA-F]{64}", expected):
+                    raise ManagementError("InvalidArgument", "Expected SHA256 must contain 64 hexadecimal characters")
+                if expected and os.name == "posix":
+                    cache = ModelResumeCache(self.supervisor.config.workspace)
+                    resume = await _io(cache.acquire, root_identity, path + "/" + relative, expected,
+                                       select_transport(artifact, transport),
+                                       _cancel_cleanup=lambda value: value.close())
+                    resumes.append(resume)
+                    temporary = resume.target
+                else:
+                    transfer_directory = Path(tempfile.mkdtemp(prefix="acquire-", dir=staging))
+                    temporary = transfer_directory / "payload.part"
+                    temporary.touch(mode=0o600, exist_ok=False)
                 self.resolver.retain(artifact)
                 try:
                     max_bytes = store.max_file_size
@@ -460,14 +517,24 @@ class ModelService:
                         remaining = max_total_bytes - total_bytes
                         max_bytes = remaining if max_bytes is None else min(max_bytes, remaining)
                     stage, verified, engine = await self._acquire(
-                        context, artifact, temporary, max_bytes, transport, connections, timeout)
+                        context, artifact, temporary, max_bytes, transport, connections, timeout, resume=resume)
+                except ManagementError as error:
+                    if resume is not None and error.code in {"ChecksumMismatch", "ArtifactChanged", "InvalidRangeResponse", "FileTooLarge"}:
+                        invalid_resumes.add(id(resume))
+                    raise
                 finally:
                     self.resolver.release(artifact)
                 destination = tree / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 stage.check()
-                temporary.replace(destination)
-                await _io(shutil.rmtree, transfer_directory)
+                if resume is not None:
+                    # The snapshot tree needs independent ownership: retaining
+                    # a hard link would let SIGKILL leave a shared cache inode.
+                    self._space(destination.parent, stage.size)
+                    await _io(self._copy_snapshot_stage, stage, destination)
+                else:
+                    temporary.replace(destination)
+                    await _io(shutil.rmtree, transfer_directory)
                 total_bytes += stage.size
                 results.append({"relative_path": relative, "sha256": stage.sha256, "size": stage.size,
                                 "verified_against": verified, "transport": engine, "artifact": self.resolver.public(artifact)})
@@ -481,6 +548,7 @@ class ModelService:
                 store._conflicts(selected, path)
                 destination = parent / _relative(path)[-1]
                 self._rename_directory(tree, destination)
+                published = True
                 store._invalidate(selected)
                 result["complete"], result["partial_changes"] = True, True
                 result["path"], result["root"] = path, root
@@ -499,8 +567,35 @@ class ModelService:
             self._targets.discard(key)
             if root_identity is not None:
                 root_identity.close()
-            if staging is not None:
-                await _io(shutil.rmtree, staging)
+            try:
+                if staging is not None:
+                    await _io(shutil.rmtree, staging)
+            finally:
+                await _io(self._close_snapshot_resumes, resumes, published, invalid_resumes)
+
+    @staticmethod
+    def _close_snapshot_resumes(entries, published, invalid):
+        failure = None
+        for entry in entries:
+            try:
+                entry.close(discard=published or id(entry) in invalid)
+            except BaseException as error:
+                failure = failure or error
+        if failure is not None:
+            raise failure
+
+    @staticmethod
+    def _copy_snapshot_stage(stage, destination):
+        stage.check()
+        digest = hashlib.sha256()
+        descriptor = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, "wb") as output, stage.path.open("rb") as source:
+            while chunk := source.read(1024 * 1024):
+                output.write(chunk)
+                digest.update(chunk)
+        stage.check()
+        if digest.hexdigest() != stage.sha256:
+            raise ManagementError("ChecksumMismatch", "Snapshot copy differs from its verified acquisition")
 
     @staticmethod
     def _rename_directory(source, destination, *, source_fd=None, destination_fd=None):
@@ -521,10 +616,10 @@ class ModelService:
                 raise ManagementError("FileExists", "Snapshot destination already exists")
             raise OSError(number, os.strerror(number))
 
-    async def _external(self, context, artifact, target, transport, connections, timeout, max_bytes):
+    async def _external(self, context, artifact, target, transport, connections, timeout, max_bytes, *, resume=None):
         transfer = asyncio.create_task(external_download(context, self.resolver, artifact, target,
             transport=transport, connections=connections, timeout=timeout,
-            python=self.supervisor.config.runtime_python))
+            python=self.supervisor.config.runtime_python, resume=resume))
         try:
             while not transfer.done():
                 # Official Hub cache + final copy can temporarily occupy twice

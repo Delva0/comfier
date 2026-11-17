@@ -20,6 +20,8 @@ daemon 命令展开时会先检查可用的 `aria2c`，缺失时通过目标系�
 
 通过 `--config /server/runtime.json` 保存/加载配置，明确 flags 覆盖配置。API configure 的持久化需要 daemon 配置了该文件，否则仅当前进程有效。`--print-config` 查看有效配置。远端入口使用部署方 SSH 转发或鉴权 HTTPS；token 来自 COMANI_TOKEN 或 --token，非 loopback 绑定必须有 token。
 
+计算通道默认 HTTP。显式配置 `compute_transport="zmq"` 或 `--compute-transport zmq` 可让 daemon 到 worker 使用私有 IPC，`--zmq-bind` 可重复开放 IPC/TCP gateway；管理、文件与原生 JSON 控制继续通过 HTTP。可选依赖、同一个 Client 的 HTTP companion 和远端 CURVE 部署见 [ZMQ 计算通道](compute-transport.md)。
+
 ## 模型目录与代码更新分开
 
 同一实例保留磁盘时，重启计算、重启 daemon、替换 Comani wheel 都不要求重新下载模型。ComfyUI 的原地 Git 更新也不删除已有模型；把 ComfyUI 改装到另一个目录时，默认 `models/` 会随代码目录改变，旧文件可能仍在磁盘却不在新搜索路径里。
@@ -158,7 +160,7 @@ python benchmarks/minimax_h3_reuse.py --output artifacts/h3-benchmark \
 
 ## 原生参数与管理行为
 
-原生参数放在 daemon 的 `--` 后，例如 `-- --lowvram --reserve-vram 4`，或 configure(comfy_args=[...])。设备环境在 Torch 导入前应用。节点名直接取 registry，不生成本地包装类；前端 JS、所有第三方 HTTP route 和官方 WebUI 不在统一兼容范围。
+原生参数放在 daemon 的 `--` 后，例如 `-- --lowvram --reserve-vram 4`，或 configure(comfy_args=[...])。设备环境在 Torch 导入前应用。节点名直接取 registry，不生成本地包装类；已注册的原生 JSON 控制 route 可通过[同 Client HTTP 入口](native-controls.md)调用。前端 JS、官方 WebUI 与依赖独立服务的插件仍需分别适配。
 
 环境、core、插件变更需显式停止计算；bash 是独立 OS 通道，可与 runtime 并行。`stop()/restart()` 默认 wait=True；显式 wait=False 紧急中断相关工作后停止/尝试重启，不保证安装回滚。就绪、恢复和 Operation 细节见 [管理设计](remote-management-plan.md)。
 

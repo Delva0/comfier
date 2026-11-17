@@ -28,6 +28,10 @@ def main(argv=None):
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8190)
     parser.add_argument("--token", default=os.environ.get("COMANI_TOKEN"))
+    parser.add_argument("--compute-transport", choices=("http", "zmq"),
+                        help="Controller to native worker compute channel (default: http)")
+    parser.add_argument("--zmq-bind", action="append", default=[], metavar="ENDPOINT",
+                        help="Additional compute endpoint, repeat for ipc:// and tcp://; requires comani[zmq] and COMANI_TOKEN")
     parser.add_argument("--cpu", action="store_true", default=None)
     parser.add_argument("--no-custom-nodes", action="store_true", default=None)
     parser.add_argument("--no-start", action="store_true", help="Start only management; runtime starts explicitly through the API")
@@ -59,6 +63,8 @@ def main(argv=None):
                      "transfer_idle_timeout", "transfer_limit", "transfer_owner_limit"):
             if getattr(args, name) is not None:
                 values[name] = getattr(args, name)
+        if args.compute_transport is not None:
+            values["compute_transport"] = args.compute_transport
         if args.no_custom_nodes is not None:
             values["custom_nodes"] = not args.no_custom_nodes
         if args.comfy_args:
@@ -73,7 +79,20 @@ def main(argv=None):
     if args.print_config:
         print(json.dumps(asdict(config), indent=2))
         return
+    if args.zmq_bind or config.compute_transport == "zmq":
+        from comani._zmq_protocol import dependency
+
+        try:
+            dependency()
+        except ImportError as error:
+            parser.error(str(error))
     supervisor = RuntimeSupervisor(config, config_path=args.config)
-    web.run_app(create_management_app(supervisor, token=args.token, auto_start=not args.no_start,
-                                      prepare_download_tools=True),
+    try:
+        app = create_management_app(supervisor, token=args.token, auto_start=not args.no_start,
+                                    prepare_download_tools=True, compute_endpoints=args.zmq_bind,
+                                    curve_public_key=os.environ.get("COMANI_ZMQ_CURVE_PUBLIC_KEY"),
+                                    curve_secret_key=os.environ.get("COMANI_ZMQ_CURVE_SECRET_KEY"))
+    except ValueError as error:
+        parser.error(str(error))
+    web.run_app(app,
                 host=args.host, port=args.port, handler_cancellation=True)

@@ -1,7 +1,7 @@
 """A small out-of-band supervisor for exactly one native runtime process.
 
-Only JSON metadata crosses this object. Tensor and file response bodies are
-forwarded by the HTTP layer without deserializing them in this process.
+Tensor and file response bodies cross the selected compute adapter or HTTP
+file proxy without deserializing them in this process.
 """
 
 from __future__ import annotations
@@ -53,8 +53,13 @@ class RuntimeConfig:
     transfer_limit: int = 128
     transfer_owner_limit: int = 8
     startup_timeout: float = 180
+    compute_transport: str = "http"
 
     def __post_init__(self):
+        if self.compute_transport not in {"http", "zmq"}:
+            raise ValueError("compute_transport must be 'http' or 'zmq'")
+        if self.compute_transport == "zmq" and os.name != "posix":
+            raise ValueError("The supervised ZMQ worker currently requires Unix IPC")
         object.__setattr__(self, "comfy_root", str(Path(self.comfy_root).expanduser().absolute()))
         object.__setattr__(self, "workspace", str(Path(self.workspace).expanduser().absolute()))
         object.__setattr__(self, "comfy_args", tuple(self.comfy_args))
@@ -117,6 +122,8 @@ class RuntimeSupervisor:
         self.logs = deque(maxlen=256)
         self._token = secrets.token_urlsafe(32)
         self._client = None
+        self._compute_transport = None
+        self._compute_directory = None
         self._monitor = self._reader = None
         self.file_store = None
         self.roots_generation = None
@@ -183,6 +190,8 @@ class RuntimeSupervisor:
             return await self.info()
 
     async def runtime_rpc(self, method, params=None):
+        if self.config.compute_transport == "zmq":
+            return await self.runtime_request(method, **(params or {}))
         if self.endpoint is None or self.process is None or self.process.returncode is not None:
             raise SupervisorError("RuntimeStopped", "The runtime is stopped; call comfyui.start() explicitly")
         client = await self._http()
@@ -195,6 +204,27 @@ class RuntimeSupervisor:
             return payload.get("result", payload)
 
     async def runtime_request(self, method, **params):
+        if self.config.compute_transport == "zmq":
+            if self._compute_transport is None or self.process is None or self.process.returncode is not None:
+                raise SupervisorError("RuntimeStopped", "The runtime is stopped; call comfyui.start() explicitly")
+            return await self._compute_transport.request(method, **params)
+        if method == "fetch":
+            from comani.protocol import PICKLE_CONTENT_TYPE
+
+            client = await self._http()
+            if self.endpoint is None or self.process is None or self.process.returncode is not None:
+                raise SupervisorError("RuntimeStopped", "The runtime is stopped; call comfyui.start() explicitly")
+            async with client.post(self.endpoint + "/rpc", json={"method": method, "params": params},
+                                   headers={"Accept": PICKLE_CONTENT_TYPE}, timeout=aiohttp.ClientTimeout(total=60)) as response:
+                if response.content_type == PICKLE_CONTENT_TYPE:
+                    response.raise_for_status()
+                    return await response.read()
+                payload = await response.json()
+                if "error" in payload:
+                    from comani.errors import error_from_wire
+                    raise error_from_wire(payload["error"])
+                response.raise_for_status()
+                raise SupervisorError("InvalidResponse", "Runtime did not return a binary fetch response")
         return await self.runtime_rpc(method, params)
 
     async def refresh_roots(self):
@@ -270,7 +300,7 @@ class RuntimeSupervisor:
 
     async def _discover_paths(self):
         env = {key: value for key, value in os.environ.items()
-               if key not in {"COMANI_TOKEN", "COMANI_RUNTIME_TOKEN"}}
+               if key not in {"COMANI_TOKEN", "COMANI_RUNTIME_TOKEN", "COMANI_ZMQ_CURVE_SECRET_KEY"}}
         env["PYTHONPATH"] = self._bridge_path()
         process = await asyncio.create_subprocess_exec(
             self.config.runtime_python, "-c",
@@ -316,11 +346,13 @@ class RuntimeSupervisor:
 
     async def _validate_environment(self):
         code = """import importlib.util,json,sys
-missing=[name for name in ('aiohttp','cloudpickle') if importlib.util.find_spec(name) is None]
+names=json.loads(sys.argv[1])
+missing=[name for name in names if importlib.util.find_spec(name) is None]
 print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
 """
         process = await asyncio.create_subprocess_exec(
             self.config.runtime_python, "-I", "-c", code,
+            json.dumps(["aiohttp", "cloudpickle"] + (["zmq"] if self.config.compute_transport == "zmq" else [])),
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         try:
             output, _ = await asyncio.wait_for(process.communicate(), 20)
@@ -328,7 +360,8 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                 raise SupervisorError("InvalidRuntimePython", "The selected runtime interpreter could not execute its environment check")
             info = json.loads(output)
             if info["python"] < [3, 11, 0] or info["missing"]:
-                raise SupervisorError("RuntimeEnvironmentIncomplete", "The selected runtime Python needs Python 3.11+, aiohttp and cloudpickle; prepare it explicitly with comfyui.prepare_runtime(package=...) before start")
+                requirements = "Python 3.11+, aiohttp and cloudpickle" + (" and the comani[zmq] extra" if self.config.compute_transport == "zmq" else "")
+                raise SupervisorError("RuntimeEnvironmentIncomplete", "The selected runtime Python needs " + requirements + "; prepare it explicitly with comfyui.prepare_runtime(package=...) before start")
             return info
         except BaseException:
             if process.returncode is None:
@@ -358,13 +391,14 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
         listener.set_inheritable(True)
         port = listener.getsockname()[1]
         env = {key: value for key, value in os.environ.items()
-               if key not in {"COMANI_TOKEN", "COMANI_RUNTIME_TOKEN"}}
+               if key not in {"COMANI_TOKEN", "COMANI_RUNTIME_TOKEN", "COMANI_ZMQ_CURVE_SECRET_KEY"}}
         env["PYTHONPATH"] = self._bridge_path()
         env["COMANI_RUNTIME_TOKEN"] = self._token
         args = [self.config.runtime_python, "-u", "-c",
                 "import json,os,sys;from comani.daemon._worker import run;"
                 "payload=json.load(sys.stdin);run(payload['config'],socket_fd=payload['socket_fd'],"
-                "port=payload['port'],token=os.environ.get('COMANI_RUNTIME_TOKEN'))"]
+                "port=payload['port'],token=os.environ.get('COMANI_RUNTIME_TOKEN'),"
+                "compute_endpoint=payload.get('compute_endpoint'))"]
         socket_fd = listener.fileno() if os.name == "posix" else None
         payload = {"config": asdict(self.config), "socket_fd": socket_fd, "port": port}
         options = {}
@@ -373,6 +407,15 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
         else:
             listener.close()
         try:
+            if self.config.compute_transport == "zmq":
+                from comani import ZMQTransport
+
+                self._compute_directory = tempfile.TemporaryDirectory(prefix="comani-compute-")
+                os.chmod(self._compute_directory.name, 0o700)
+                compute_endpoint = "ipc://" + str(Path(self._compute_directory.name) / "rpc.sock")
+                payload["compute_endpoint"] = compute_endpoint
+                self._compute_transport = ZMQTransport(compute_endpoint, token=self._token, timeout=60)
+                await self._compute_transport.open()
             self.process = await asyncio.create_subprocess_exec(
                 *args, cwd=self.config.workspace, env=env,
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
@@ -394,7 +437,7 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                     self.state = "running"
                     await self.refresh_roots()
                     return await self.info()
-                except (aiohttp.ClientError, TimeoutError):
+                except (aiohttp.ClientError, TimeoutError, ConnectionError):
                     await asyncio.sleep(0.1)
             raise SupervisorError("RuntimeStartTimeout", "The native runtime did not become ready before startup_timeout")
         except BaseException as error:
@@ -418,6 +461,15 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
                 self.state = "failed"
                 self.error = f"Native runtime exited with status {code}"
             self.endpoint = self.runtime_epoch = None
+            await self._close_compute()
+
+    async def _close_compute(self):
+        transport, directory = self._compute_transport, self._compute_directory
+        self._compute_transport = self._compute_directory = None
+        if transport is not None:
+            await transport.close()
+        if directory is not None:
+            directory.cleanup()
 
     async def _terminate(self, *, interrupt=False):
         process = self.process
@@ -443,6 +495,7 @@ print(json.dumps({'missing':missing,'python':list(sys.version_info[:3])}))
         if self._reader:
             await self._reader
         self.endpoint = self.runtime_epoch = None
+        await self._close_compute()
 
     @asynccontextmanager
     async def _control_scope(self, *, wait):

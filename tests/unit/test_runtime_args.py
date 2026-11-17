@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import copy
 import sys
 from types import SimpleNamespace
@@ -27,15 +28,15 @@ def test_private_worker_receives_native_arguments_without_a_second_cli(monkeypat
         captured.update(root=root, **kwargs)
         return runtime
 
-    def make_app(value, **kwargs):
+    async def make_app(value, **kwargs):
         assert value is runtime and kwargs == {"token": "test-token"}
         return app
 
     def run_app(value, **kwargs):
-        assert value is app and kwargs == {"host": "127.0.0.1", "port": 8190}
+        assert asyncio.run(value) is app and kwargs == {"host": "127.0.0.1", "port": 8190}
 
     monkeypatch.setattr(service, "NativeRuntime", make_runtime)
-    monkeypatch.setattr(http, "create_app", make_app)
+    monkeypatch.setattr(http, "create_runtime_app", make_app)
     monkeypatch.setattr(web, "run_app", run_app)
     monkeypatch.setattr(importlib.util, "find_spec", lambda _: object())
     (tmp_path / "execution.py").touch()

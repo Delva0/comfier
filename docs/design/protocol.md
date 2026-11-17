@@ -103,4 +103,6 @@ driver 还提供 `/prompt`、`/history`、`/queue`、`/ws` 的小型辅助接口
 
 ## 网络入口
 
+HTTP 是默认传输。显式安装 `comani[zmq]` 后可选择同协议 IPC/TCP 计算通道；管理、文件与 Range 保留 HTTP。端点、逐请求 token、CURVE、credit 和截止时间的部署约定见 [可选 ZMQ 计算通道](compute-transport.md)。
+
 配置 token 时使用 Bearer 鉴权；无 token 时仅接受 loopback peer、local Host 与同源浏览器请求。代码执行属于授权能力，实际远端网络、转发和鉴权部署应以独立远端报告为准。

@@ -52,6 +52,11 @@ def list(*, category=None, root: FileRoot | None = None, prefix=None) -> Corouti
     return _invoke_async(("models", "list"), category=category, root=root, prefix=prefix)
 
 
+def clear_partial() -> Coroutine[Any, Any, Any]:
+    """Clear idle model download partials on the current daemon."""
+    return _invoke_async(("models", "clear_partial"))
+
+
 def begin_download(
     artifact: ModelArtifact | Mapping | str,
     *,

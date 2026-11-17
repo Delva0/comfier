@@ -3,14 +3,14 @@
 from pathlib import Path
 
 
-def run(config, *, socket_fd=None, port=None, token=None):
+def run(config, *, socket_fd=None, port=None, token=None, compute_endpoint=None):
     """Run the one child selected by RuntimeSupervisor from an explicit config."""
     import importlib.util
     import socket
 
     from aiohttp import web
 
-    from .http import create_app
+    from .http import create_runtime_app
     from .service import NativeRuntime, RecoveryPolicy
 
     root = Path(config["comfy_root"]).expanduser()
@@ -28,4 +28,21 @@ def run(config, *, socket_fd=None, port=None, token=None):
                                        max_call_records=config.get("max_call_records", 1000000)))
     options = ({"sock": socket.socket(fileno=socket_fd)} if socket_fd is not None
                else {"host": "127.0.0.1", "port": port})
-    web.run_app(create_app(runtime, token=token), **options)
+    async def application():
+        app = await create_runtime_app(runtime, token=token)
+        if compute_endpoint is not None:
+            from .zmq import ZMQServer
+
+            server = ZMQServer(runtime, endpoints=[compute_endpoint], token=token)
+
+            async def compute_channel(app):
+                await server.start()
+                try:
+                    yield
+                finally:
+                    await server.close()
+
+            app.cleanup_ctx.append(compute_channel)
+        return app
+
+    web.run_app(application(), **options)

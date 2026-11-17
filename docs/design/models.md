@@ -49,7 +49,13 @@ Civitai 的版本可能同时有不同精度、格式和 pruned 文件，必须�
 
 Operation 的 progress 返回请求与实际引擎（`requested_transport`、`transport`），以及 aria2 的 `source_route`、实际连接配置、完整性策略和尝试次数。引擎缺失或失败保留该引擎的明确错误，不静默换用另一实现；revision/hash 校验失败也不会通过换引擎掩盖。SHA256 或 Git blob SHA1 仍在发布前完整校验。无预期 digest 的 URL 也可下载：强 ETag 使用 `If-Match` 钉住分段版本；没有强 validator 时限单连接，失败后清空 partial 并重新探测、从零有界重试，避免混拼不同响应。
 
-本轮断点恢复只覆盖同一 Operation 中 aria2 的有界重试。失败、取消或正常关闭会清除临时 partial 与 `.aria2` 控制文件；后续 Operation、daemon 重启或代码重部署不承诺复用未完成下载。已完成模型的跨运行复用依赖持久原生模型目录、相同目标路径与 `reuse=True` 的完整 SHA 检查，不依赖这个临时目录。支持官方 hub/Xet 路由不等于 private/gated、账号权限和大 LFS 已做真实远端验收；新报告应分别说明覆盖范围，受控每连接限速测试的收益不代表互联网吞吐承诺。
+已知预期 SHA256 的下载默认使用 workspace 下 `.comani/model-resume` 稳定缓存；普通失败、主动取消和正常关闭都会保留未完成 bytes 与 aria2 piece map，结束时刷新时间，闲置 24 小时后在后续获取时清除。新 Operation、daemon 重启或代码重部署可继续使用同一缓存；source URL 更新不会改变缓存身份。身份绑定预期 SHA、实际目标 root 的绝对路径及设备/inode/owner/group/mode 和目标相对路径，不绑定 daemon epoch 或临时 root ID。换成另一个 SHA、另一个实际 root 或另一个目标路径不会拼接旧 pieces；切换 transport 会清除该 entry 的旧引擎状态后安全重下。没有预期 SHA256（包括只有 Git blob hash）的来源仍采用本次 Operation 的隔离 staging，结束即删除，不跨版本拼接；aria2 的 ETag、无 validator 单连接和有界重试规则保持不变。官方 HF transport 仍由 Hub 自己管理传输 cache；已完整获取且 SHA 命中的 payload 可复用，不声称其未完成传输也具备 aria2 的 piece map 恢复能力。
+
+POSIX `flock` 对每个缓存 entry 独占，aria2 继承同一个锁 FD；Python 父进程被 SIGKILL 后，仍在写入的 aria2 继续持锁，后来的同目标获取返回 `DestinationBusy`。源地址只经匿名 FD 交给 aria2，不落 argv 或可遗留的输入文件；manifest 不记录 URL 或凭据。完整 SHA 不符、长度/Range 身份不符或超限的 bytes 会废弃；其余传输失败保留可重试部分。恢复后仍核对完整 SHA 和既有 root/stage 身份，随后使用原 create-only 原子发布，不凭缓存名字、文件长度或 aria2 退出码直接安装。
+
+`await remote.models.clear_partial()`（或当前 Client 的 `comani.models.clear_partial()`）立即清除闲置下载缓存，返回 `{"removed": ..., "skipped_active": ...}`；活跃锁持有者即使过期也只跳过并计数，包括仍在运行的旧 aria2。清理只操作该私有 cache，不删除任何已发布模型；已下载但尚未发布的 snapshot artifact 也属于可清除缓存。成功发布后清除本次相关 cache。已完成原生模型的跨运行复用仍通过相同目标路径和 `reuse=True` 的完整 SHA 检查。
+
+支持官方 hub/Xet 路由不等于 private/gated、账号权限和大 LFS 已做真实远端验收；新报告应分别说明覆盖范围，受控每连接限速测试的收益不代表互联网吞吐承诺。
 
 Provider→daemon 断流与 SDK→daemon 断流不同：SDK 恢复观察同一个 Operation；provider 的字节恢复必须绑定原 artifact/revision、validators、长度/hash。HTTP 核对 206 与 Content-Range，200 从零重下，416 重新校验；不盲 append。来源变化或无法证明安全时明确失败或在同操作从零重新获取，重试有界。
 
@@ -82,11 +88,15 @@ snapshot 的 **publish 必填且无默认值**：
 
 directory 返回目录路径、root、完整 files/items 与 native_visibility；它不是跨任意现有目录的替换或文件系统事务。files 模式适用于明确接受逐项可见的场景，不能宣称整组原子。ModelSnapshot 的 complete/partial_changes 表达实际结果。
 
+两种 snapshot 模式的已知 SHA artifact 都使用上述稳定 cache。directory 模式将核验后的 payload 分块复制进独立私有 tree，持有本次所有 artifact 的锁直到目录发布或失败；后续 artifact 失败/取消时，之前已经完成但尚未发布的 payload 也保留，下次先全 SHA 核对后复用。目标目录在全部完成前仍不可见。成功目录原子发布后删除相关 cache，失败只清除本次 tree；cache 与 tree 的独立所有权也避免 daemon 异常退出遗留共享 cache inode。
+
 H3 的 UNET、text encoder、VAE 可能来自不同 provider 和不同 roots，不能把它们假称 HF 目录原子事务。用普通 asyncio.gather 下载，全部成功作为出图前就绪屏障；失败自然中断脚本，已完成文件仍持久存在。[H3 主脚本](../../examples/minimax_h3_remote.py) 正是这一流程。
 
 ## 磁盘与限额
 
-默认 `max_file_bytes=None` 不添加任意单文件上限；实例可显式配置单文件 policy。snapshot 的 `max_total_bytes=None` 是独立的可选总 staging 限额，不把单文件限额当总额，也没有隐藏的 64 GiB 上限。已知大小先检查实际可用磁盘；途中 ENOSPC 报 DiskFull。同文件系统的上述发布不再分配第二份 payload；跨文件系统仍需完整目标空间。HF Hub 等引擎自身的 acquisition cache 与 payload 峰值没有因此消失，成功不能由供应商磁盘报价推定。
+默认 `max_file_bytes=None` 不添加任意单文件上限；实例可显式配置单文件 policy。snapshot 的 `max_total_bytes=None` 是独立的可选总 staging 限额，不把单文件限额当总额，也没有隐藏的 64 GiB 上限。已知大小先检查实际可用磁盘；途中 ENOSPC 报 DiskFull。单文件和 `publish="files"` 的同文件系统发布不再分配第二份 payload；跨文件系统仍需完整目标空间。HF Hub 等引擎自身的 acquisition cache 与 payload 峰值没有因此消失，成功不能由供应商磁盘报价推定。
+
+`snapshot(publish="directory")` 为保留可跨 Operation 复用的 artifact，cache 和独立 tree 在发布前会同时占空间，约为已获取 payload 的两份，另加控制文件等开销；即使二者位于同一文件系统也如此。单文件和 `publish="files"` 的同文件系统原子采用仍不复制 payload。24 小时保留会占用失败下载的实际磁盘空间，可用上述显式清理提前释放；清理不会释放活跃锁仍在保护的数据。
 
 stage 身份、revision、独占 link 和私有目录检查遵循 [文件 I/O](files.md) 的既有权限边界，不隔离具有 daemon 同等文件权限的恶意 writer。revision 不是内容快照；不能据此声称拒绝同 UID 的所有同长度改写。实际低空间、普通磁盘大模型及保留反例的验收归属见 [管理验收](../management_acceptance.md)。
 

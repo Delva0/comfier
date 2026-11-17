@@ -140,4 +140,7 @@ def test_real_cli_enables_deployment_preparation(monkeypatch, tmp_path, no_start
     monkeypatch.setattr(launcher.web, "run_app", lambda app, **options: None)
     argv = ["--comfy-root", str(tmp_path / "ComfyUI")]
     launcher.main([*argv, *(["--no-start"] if no_start else [])])
-    assert calls == [{"token": None, "auto_start": not no_start, "prepare_download_tools": True}]
+    assert len(calls) == 1
+    assert calls[0]["token"] is None
+    assert calls[0]["auto_start"] is not no_start
+    assert calls[0]["prepare_download_tools"] is True

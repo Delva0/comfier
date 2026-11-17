@@ -433,6 +433,15 @@ class Bash(_Namespace):
 class ComfyUI(_Namespace):
     namespace = "comfyui"
 
+    async def request(self, method: str, path: str, *, params=None, json=None):
+        """Call a native JSON HTTP control route on this daemon, without retries.
+
+        Successful empty responses return None; other successes must be JSON.
+        HTTP errors retain aiohttp's status/message. Comani routes are reserved.
+        """
+        await self._client.start()
+        return await self._client.transport.native_request(method, path, params=params, json=json)
+
     async def info(self) -> ComfyUIInfo:
         result = await self._read("info")
         if self._client.epoch and result.runtime_epoch != self._client.epoch:
@@ -606,6 +615,10 @@ class Models(_Namespace):
 
     async def list(self, *, category=None, root: FileRoot | None = None, prefix=None):
         return await self._read("list", category=category, root=root, prefix=prefix)
+
+    async def clear_partial(self):
+        """Delete idle model download partials on the daemon; skip active leases."""
+        return await self._read("clear_partial")
 
     async def begin_download(self, artifact: ModelArtifact | Mapping | str, *,
                              root: FileRoot | None = None, category: str | None = None,

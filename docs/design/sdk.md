@@ -8,6 +8,8 @@
 
 `comani.node/python/graph/submit` 和 `comani.files/comfyui/plugins/models/bash/operations` 是有明确签名的模块 API。有状态调用使用最近进入的 `async with Client(...)`；显式 `remote.node(...)` 等仍可用，始终使用该 Client。构造 Client 或单独 `await client.start()` 不设置当前上下文，也不创建隐式连接。
 
+`comani.comfyui.request(method, path, params=..., json=...)` 通过同一 Client 访问原生 JSON 控制路由，例如插件的项目查询与 trim 操作。SDK 映射到同端口 `/native` 并继承认证；不自动重试写请求。原生计算队列路由不开放，返回值与兼容边界见[原生 HTTP 控制](native-controls.md)。
+
 嵌套上下文退出后恢复外层，task 之间按 ContextVar 隔离。子 task 继承 binding，但必须在拥有 Client 的 scope 内完成；scope 退出后新模块调用失败。相同 Client 重复/并发 owning enter 被拒绝。binding 不强持有 Client，不扩大原有 Call/Ref/Graph 生命周期；跨 loop/thread 使用仍拒绝。模块 async 代理在调用时捕获原 scope，await 时再次校验，不能通过在 B 中 await 将 A 的工作改投 B。
 
 `models.resolve/versions/manifest` 在客户端查询 HF/Civitai，`plugins.versions` 在客户端查询 registry，无需 Client；这些纯查询不在 remote facade 上。远端状态（如 models.list、plugins.backend）和所有变更仍 RPC。管理与 files 是普通 async I/O，即使位于 graph scope 内也不被捕获。准备、Operation 和恢复见 [管理设计](remote-management-plan.md)。
